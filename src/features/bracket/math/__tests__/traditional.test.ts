@@ -87,16 +87,33 @@ describe('generateTraditionalBracket', () => {
       expect(sfMatches[1].nextMatchSlot).toBe(2);
     });
 
-    it('correctly generates a 16-player bracket', () => {
+    it('correctly generates a 16-player bracket with Round 1, Quarterfinals, Semifinals, Finals', () => {
       const players = createMockPlayers(16);
       const bracket = generateTraditionalBracket(players);
 
       expect(bracket.totalRounds).toBe(4);
+      expect(bracket.rounds[0].name).toBe('Round 1');
+      expect(bracket.rounds[1].name).toBe('Quarterfinals');
+      expect(bracket.rounds[2].name).toBe('Semifinals');
+      expect(bracket.rounds[3].name).toBe('Finals');
+
       expect(bracket.rounds[0].matches).toHaveLength(8);
       expect(bracket.rounds[1].matches).toHaveLength(4);
       expect(bracket.rounds[2].matches).toHaveLength(2);
       expect(bracket.rounds[3].matches).toHaveLength(1);
       expect(Object.keys(bracket.matchesById)).toHaveLength(15);
+    });
+
+    it('correctly generates a 32-player bracket with Round 1, Round 2, Quarterfinals, Semifinals, Finals', () => {
+      const players = createMockPlayers(32);
+      const bracket = generateTraditionalBracket(players);
+
+      expect(bracket.totalRounds).toBe(5);
+      expect(bracket.rounds[0].name).toBe('Round 1');
+      expect(bracket.rounds[1].name).toBe('Round 2');
+      expect(bracket.rounds[2].name).toBe('Quarterfinals');
+      expect(bracket.rounds[3].name).toBe('Semifinals');
+      expect(bracket.rounds[4].name).toBe('Finals');
     });
   });
 
@@ -171,6 +188,57 @@ describe('generateTraditionalBracket', () => {
       expect(byeMatches).toHaveLength(1);
       expect(activeMatches).toHaveLength(3);
       expect(byeMatches[0].player1.player?.seed).toBe(1);
+    });
+
+    it('correctly handles 9 players (7 byes, 1 active match) and names earliest round "Round 0"', () => {
+      const players = createMockPlayers(9);
+      const bracket = generateTraditionalBracket(players);
+
+      expect(bracket.totalPlayers).toBe(9);
+      expect(bracket.totalRounds).toBe(4);
+
+      const r0 = bracket.rounds[0];
+      // 9 players in 16-size: 7 byes, 1 active match
+      expect(r0.name).toBe('Round 0');
+      expect(r0.matches.filter((m) => m.isBye)).toHaveLength(7);
+      expect(r0.matches.filter((m) => !m.isBye)).toHaveLength(1);
+
+      // Active match must be 8 vs 9
+      const activeMatch = r0.matches.find((m) => !m.isBye);
+      expect(activeMatch?.player1.player?.seed).toBe(8);
+      expect(activeMatch?.player2.player?.seed).toBe(9);
+
+      // Subsequent rounds follow standard names
+      expect(bracket.rounds[1].name).toBe('Quarterfinals');
+      expect(bracket.rounds[2].name).toBe('Semifinals');
+      expect(bracket.rounds[3].name).toBe('Finals');
+    });
+
+    it('enforces Round 0 break-even threshold (11 players -> Round 0, 12 players -> not Round 0)', () => {
+      // 11 players: 5 byes, 3 active matches (3 < 5) -> Round 0
+      const bracket11 = generateTraditionalBracket(createMockPlayers(11));
+      expect(bracket11.rounds[0].name).toBe('Round 0');
+
+      // 12 players: 4 byes, 4 active matches (4 == 4, not less) -> Not Round 0
+      const bracket12 = generateTraditionalBracket(createMockPlayers(12));
+      expect(bracket12.rounds[0].name).not.toBe('Round 0');
+    });
+  });
+
+  describe('Seating order guarantees (top match -> top seat, bottom match -> bottom seat)', () => {
+    it('always routes the top match winner to Slot 1 (top) and bottom match winner to Slot 2 (bottom)', () => {
+      const players = createMockPlayers(4);
+      const bracket = generateTraditionalBracket(players);
+
+      const m0 = bracket.rounds[0].matches[0]; // Top match
+      const m1 = bracket.rounds[0].matches[1]; // Bottom match
+
+      // Both feed into Finals (r2-m1)
+      expect(m0.nextMatchId).toBe('r2-m1');
+      expect(m0.nextMatchSlot).toBe(1); // Top seat
+
+      expect(m1.nextMatchId).toBe('r2-m1');
+      expect(m1.nextMatchSlot).toBe(2); // Bottom seat
     });
   });
 

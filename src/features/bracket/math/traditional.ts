@@ -30,6 +30,11 @@ export function generateTraditionalBracket(
   const totalPlayers = players.length;
   const bracketSize = getNextPowerOfTwo(totalPlayers);
   const totalRounds = Math.log2(bracketSize);
+  const totalByes = bracketSize - totalPlayers;
+  const activeRound1Matches = (totalPlayers - totalByes) / 2;
+  // Round 0 naming rule: applies when there are fewer active matches in the earliest round
+  // than there are players with byes advancing to the next round.
+  const isRoundZero = activeRound1Matches < totalByes;
 
   // Map players by seed
   const playerBySeed = new Map<number, SeededPlayer>();
@@ -77,7 +82,7 @@ export function generateTraditionalBracket(
 
     rounds.push({
       roundNumber: r,
-      name: getRoundName(r, totalRounds, matchCount),
+      name: getRoundName(r, totalRounds, matchCount, isRoundZero),
       matches: roundMatches,
     });
   }

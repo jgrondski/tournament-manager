@@ -136,13 +136,11 @@ export function generateFlatBracket(
   for (let r = 1; r <= numPrelimRounds; r++) {
     const currentRound = rounds[r - 1];
     const nextRound = rounds[r];
+    const offset = nextRound.matches.length - currentRound.matches.length;
 
     for (let m = 0; m < currentRound.matches.length; m++) {
       const match = currentRound.matches[m];
-      // Target match in next round:
-      // In flat step-in brackets, the winners from previous round occupy slot 2 of target matches
-      const targetMatchIndex = nextRound.matches.length - 1 - m;
-      const targetMatch = nextRound.matches[Math.max(0, targetMatchIndex)];
+      const targetMatch = nextRound.matches[m + offset];
 
       match.nextMatchId = targetMatch.id;
       match.nextMatchSlot = 2;
@@ -151,11 +149,6 @@ export function generateFlatBracket(
   }
 
   // Step 4: Seed entering players into match slots
-  // Calculate which seeds enter in which round:
-  // - Round 1: bottom 2 * m1 seeds (e.g. seeds (N - 2*m1 + 1) to N)
-  // - Round 2 to numPrelimRounds: next (2 * flatWidth - prevMatches) seeds
-  // - Championship round 1: remaining top seeds into remaining open slots
-
   // Populate Round 1:
   const round1SeedsStart = totalPlayers - 2 * m1 + 1;
   const round1Subset: number[] = [];
@@ -163,36 +156,30 @@ export function generateFlatBracket(
     round1Subset.push(s);
   }
 
-  // Pair highest vs lowest in this subset
+  // Pair highest vs lowest in Round 1 subset
   for (let m = 0; m < m1; m++) {
     const match = rounds[0].matches[m];
     const highSeed = round1Subset[m];
     const lowSeed = round1Subset[round1Subset.length - 1 - m];
 
-    const p1 = playerBySeed.get(highSeed) ?? null;
-    const p2 = playerBySeed.get(lowSeed) ?? null;
-
-    match.player1 = { player: p1 };
-    match.player2 = { player: p2 };
+    match.player1 = { player: playerBySeed.get(highSeed) ?? null };
+    match.player2 = { player: playerBySeed.get(lowSeed) ?? null };
   }
 
   // Populate entering seeds for subsequent rounds (Rounds 2 through numPrelimRounds + 1)
-  let currentTopSeed = round1SeedsStart - 1;
-
+  // Higher seeds enter in later rounds, filling slot 1 of active matches
+  let currentSeed = round1SeedsStart - 1;
   for (let r = 2; r <= numPrelimRounds + 1; r++) {
     const round = rounds[r - 1];
-    // Find matches in this round whose player1 slot is currently empty
     for (let m = 0; m < round.matches.length; m++) {
       const match = round.matches[m];
-      if (!match.player1.player && currentTopSeed >= 1) {
-        const p = playerBySeed.get(currentTopSeed) ?? null;
-        match.player1 = { player: p };
-        currentTopSeed--;
+      if (!match.player1.player && currentSeed >= 1) {
+        match.player1 = { player: playerBySeed.get(currentSeed) ?? null };
+        currentSeed--;
       }
-      if (!match.player2.player && !match.player2.sourceMatchId && currentTopSeed >= 1) {
-        const p = playerBySeed.get(currentTopSeed) ?? null;
-        match.player2 = { player: p };
-        currentTopSeed--;
+      if (!match.player2.player && !match.player2.sourceMatchId && currentSeed >= 1) {
+        match.player2 = { player: playerBySeed.get(currentSeed) ?? null };
+        currentSeed--;
       }
     }
   }

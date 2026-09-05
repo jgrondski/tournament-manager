@@ -51,19 +51,25 @@ export function getStandardSeedingPairs(bracketSize: number): [number, number][]
 }
 
 /**
- * Returns a human-friendly name for a bracket round based on round index and match count.
+ * Returns a human-friendly name for a bracket round.
+ * Only Quarterfinals, Semifinals, and Finals receive named stages.
+ * Earlier rounds are named "Round {#}" (or "Round 0" for play-in rounds).
  */
 export function getRoundName(
   roundNumber: number,
   totalRounds: number,
-  matchCount: number
+  _matchCount?: number,
+  isRoundZero: boolean = false
 ): string {
   const roundsFromFinals = totalRounds - roundNumber;
   if (roundsFromFinals === 0) return 'Finals';
   if (roundsFromFinals === 1) return 'Semifinals';
   if (roundsFromFinals === 2) return 'Quarterfinals';
-  if (matchCount === 8) return 'Round of 16';
-  if (matchCount === 16) return 'Round of 32';
-  if (matchCount === 32) return 'Round of 64';
-  return `Round ${roundNumber}`;
+
+  if (isRoundZero && roundNumber === 1) {
+    return 'Round 0';
+  }
+
+  const adjustedNumber = isRoundZero ? roundNumber - 1 : roundNumber;
+  return `Round ${adjustedNumber}`;
 }
