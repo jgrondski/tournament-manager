@@ -1,0 +1,171 @@
+import React, { useState } from 'react';
+import { Tournament, TournamentTier } from '../../tournament/types';
+import { BracketMatch } from '../types';
+import { MatchScoreDrawer } from './MatchScoreDrawer';
+import { Clock, CheckCircle2, ChevronRight, Trophy } from 'lucide-react';
+
+interface MatchCardFeedProps {
+  tournament: Tournament;
+  tier: TournamentTier;
+}
+
+export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }) => {
+  const [selectedRoundIdx, setSelectedRoundIdx] = useState<number>(0);
+  const [activeMatch, setActiveMatch] = useState<BracketMatch | null>(null);
+
+  const rounds = tier.bracket.rounds;
+  const currentRound = rounds[selectedRoundIdx] || rounds[0];
+
+  return (
+    <div style={{ maxWidth: '600px', margin: '0 auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      {/* Round Selector Bar */}
+      <div style={{ overflowX: 'auto', display: 'flex', gap: '0.5rem', paddingBottom: '0.5rem' }}>
+        {rounds.map((round, idx) => (
+          <button
+            key={round.roundNumber}
+            onClick={() => setSelectedRoundIdx(idx)}
+            style={{
+              padding: '0.5rem 1rem',
+              borderRadius: 'var(--radius-full)',
+              border: selectedRoundIdx === idx ? '1px solid var(--color-gold)' : '1px solid var(--color-border)',
+              background: selectedRoundIdx === idx ? 'var(--color-gold-bg)' : 'var(--color-bg-surface-elevated)',
+              color: selectedRoundIdx === idx ? 'var(--color-gold-bright)' : 'var(--color-text-secondary)',
+              fontWeight: 600,
+              fontSize: '0.85rem',
+              whiteSpace: 'nowrap',
+              cursor: 'pointer',
+            }}
+          >
+            {round.name}
+          </button>
+        ))}
+      </div>
+
+      {/* Match Cards List */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        {currentRound?.matches.map((match) => {
+          const record = tournament.matchScores[match.id];
+          const p1 = match.player1.player;
+          const p2 = match.player2.player;
+          const p1Name = p1?.name || (match.player1.isBye ? 'BYE' : 'TBD');
+          const p2Name = p2?.name || (match.player2.isBye ? 'BYE' : 'TBD');
+
+          const p1Wins = record?.player1Wins || 0;
+          const p2Wins = record?.player2Wins || 0;
+          const isComplete = match.winnerId !== null || record?.isComplete;
+          const inProgress = !isComplete && (p1Wins > 0 || p2Wins > 0);
+          const p1Won = match.winnerId === p1?.id || record?.winnerPlayerId === p1?.id;
+          const p2Won = match.winnerId === p2?.id || record?.winnerPlayerId === p2?.id;
+
+          return (
+            <div
+              key={match.id}
+              onClick={() => setActiveMatch(match)}
+              style={{
+                background: 'var(--color-bg-surface)',
+                borderRadius: 'var(--radius-md)',
+                border: inProgress
+                  ? '2px solid var(--color-gold-bright)'
+                  : isComplete
+                  ? '1px solid var(--color-border)'
+                  : '1px solid var(--color-border-subtle)',
+                boxShadow: inProgress ? '0 0 12px rgba(245, 158, 11, 0.25)' : 'var(--shadow-sm)',
+                padding: '1rem',
+                cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.75rem',
+              }}
+            >
+              {/* Card Top */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span className="badge badge-gold">Match #{match.matchNumber}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  {isComplete ? (
+                    <span className="badge badge-green">
+                      <CheckCircle2 size={12} /> Complete
+                    </span>
+                  ) : inProgress ? (
+                    <span className="badge badge-gold animate-pulse-border">
+                      <Clock size={12} /> Live (Bo{record?.bestOf || match.bestOf || tier.bestOf})
+                    </span>
+                  ) : (
+                    <span className="badge badge-muted">Ready</span>
+                  )}
+                  <ChevronRight size={18} color="var(--color-text-muted)" />
+                </div>
+              </div>
+
+              {/* Matchup row */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '0.5rem 0.75rem',
+                    borderRadius: 'var(--radius-sm)',
+                    background: p1Won ? 'var(--color-gold-bg)' : 'var(--color-bg-surface-elevated)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    {p1?.seed && <span style={badgeSeedStyle}>#{p1.seed}</span>}
+                    <span style={{ fontWeight: p1Won ? 700 : 500, color: p1Won ? 'var(--color-gold-bright)' : 'var(--color-text-primary)' }}>
+                      {p1Name}
+                    </span>
+                    {p1Won && <Trophy size={14} color="#fbbf24" />}
+                  </div>
+                  <span className="tabular-nums" style={{ fontSize: '1.25rem', fontWeight: 800, color: p1Won ? 'var(--color-gold-bright)' : 'inherit' }}>
+                    {p1Wins}
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '0.5rem 0.75rem',
+                    borderRadius: 'var(--radius-sm)',
+                    background: p2Won ? 'var(--color-gold-bg)' : 'var(--color-bg-surface-elevated)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    {p2?.seed && <span style={badgeSeedStyle}>#{p2.seed}</span>}
+                    <span style={{ fontWeight: p2Won ? 700 : 500, color: p2Won ? 'var(--color-gold-bright)' : 'var(--color-text-primary)' }}>
+                      {p2Name}
+                    </span>
+                    {p2Won && <Trophy size={14} color="#fbbf24" />}
+                  </div>
+                  <span className="tabular-nums" style={{ fontSize: '1.25rem', fontWeight: 800, color: p2Won ? 'var(--color-gold-bright)' : 'inherit' }}>
+                    {p2Wins}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {activeMatch && (
+        <MatchScoreDrawer
+          isOpen={true}
+          onClose={() => setActiveMatch(null)}
+          tournamentId={tournament.id}
+          tierId={tier.id}
+          match={activeMatch}
+          matchScoreRecord={tournament.matchScores[activeMatch.id]}
+          roundName={currentRound?.name}
+        />
+      )}
+    </div>
+  );
+};
+
+const badgeSeedStyle: React.CSSProperties = {
+  fontSize: '0.7rem',
+  padding: '0.1rem 0.35rem',
+  borderRadius: 'var(--radius-sm)',
+  background: 'rgba(255, 255, 255, 0.1)',
+  color: 'var(--color-text-muted)',
+};
