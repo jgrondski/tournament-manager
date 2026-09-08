@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Tournament, TournamentTier } from '../features/tournament/types';
 import { useTournament } from '../features/tournament/store';
-import { Layers, RotateCcw, ExternalLink, ChevronDown, Video } from 'lucide-react';
+import { Layers, RotateCcw, ExternalLink, ChevronDown, Video, ShieldCheck, AlertTriangle } from 'lucide-react';
 
 interface TournamentNavbarProps {
   tournament: Tournament;
   activeTier?: TournamentTier;
-  activeView: 'bracket' | 'sheet' | 'judge' | 'leaderboard';
+  activeView: 'bracket' | 'sheet' | 'judge' | 'leaderboard' | 'standings' | 'settings';
 }
 
 export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
@@ -74,6 +74,17 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
               </div>
             )}
           </div>
+
+          {/* Verification Status Badge */}
+          {!tournament.isVerified ? (
+            <span className="badge badge-gold" style={{ fontSize: '0.7rem' }} title="Brackets in dynamic draft preview">
+              <AlertTriangle size={12} /> DRAFT
+            </span>
+          ) : (
+            <span className="badge badge-green" style={{ fontSize: '0.7rem' }} title="Verified tournament match play active">
+              <ShieldCheck size={12} /> VERIFIED
+            </span>
+          )}
         </div>
 
         {/* Global Toolbar Actions */}
@@ -187,6 +198,30 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
             }}
           >
             🏆 Qualifiers
+          </Link>
+
+          <Link
+            to={`/${tournament.slug}/standings`}
+            style={{
+              ...viewTabStyle,
+              background: activeView === 'standings' ? 'var(--color-bg-surface)' : 'transparent',
+              color: activeView === 'standings' ? 'var(--color-gold-bright)' : 'var(--color-text-muted)',
+              fontWeight: activeView === 'standings' ? 700 : 500,
+            }}
+          >
+            🏅 Standings
+          </Link>
+
+          <Link
+            to={`/${tournament.slug}/manage/settings`}
+            style={{
+              ...viewTabStyle,
+              background: activeView === 'settings' ? 'var(--color-bg-surface)' : 'transparent',
+              color: activeView === 'settings' ? 'var(--color-gold-bright)' : 'var(--color-text-muted)',
+              fontWeight: activeView === 'settings' ? 700 : 500,
+            }}
+          >
+            ⚙️ Settings
           </Link>
         </div>
       </div>

@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Tournament, TournamentTier, MatchScoreRecord } from '../../tournament/types';
 import { BracketMatch, isMatchPlayable } from '../types';
 import { MatchScoreDrawer } from './MatchScoreDrawer';
+import { BracketDraftBanner } from './BracketDraftBanner';
 import { Filter, Check, ChevronDown, Trophy, Clock, CheckCircle2 } from 'lucide-react';
 
 interface OrganizerSheetMatrixProps {
@@ -115,6 +116,8 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      <BracketDraftBanner tournament={tournament} />
+
       {/* Top Filter & Telemetry Bar */}
       <div style={telemetryBarStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
@@ -301,13 +304,13 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                         {/* Row 1: Player 1 */}
                         <tr
                           onClick={() => {
-                            if (isPlayable) setSelectedMatch({ match, roundName: round.name });
+                            if (isPlayable && tournament.isVerified) setSelectedMatch({ match, roundName: round.name });
                           }}
                           onMouseEnter={() => setHoveredMatchId(match.id)}
                           onMouseLeave={() => setHoveredMatchId(null)}
                           style={{
                             background: blockBg,
-                            cursor: isPlayable ? 'pointer' : 'default',
+                            cursor: isPlayable && tournament.isVerified ? 'pointer' : 'default',
                             opacity: isPlayable ? 1 : 0.75,
                             transition: 'background 0.1s ease',
                           }}
@@ -407,13 +410,13 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                         {/* Row 2: Player 2 */}
                         <tr
                           onClick={() => {
-                            if (isPlayable) setSelectedMatch({ match, roundName: round.name });
+                            if (isPlayable && tournament.isVerified) setSelectedMatch({ match, roundName: round.name });
                           }}
                           onMouseEnter={() => setHoveredMatchId(match.id)}
                           onMouseLeave={() => setHoveredMatchId(null)}
                           style={{
                             background: blockBg,
-                            cursor: isPlayable ? 'pointer' : 'default',
+                            cursor: isPlayable && tournament.isVerified ? 'pointer' : 'default',
                             opacity: isPlayable ? 1 : 0.75,
                             transition: 'background 0.1s ease',
                           }}

@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Tournament, TournamentTier } from '../../tournament/types';
 import { BracketMatch, isMatchPlayable } from '../types';
 import { MatchScoreDrawer } from './MatchScoreDrawer';
-import { Clock, CheckCircle2, ChevronRight, Trophy } from 'lucide-react';
+import { BracketDraftBanner } from './BracketDraftBanner';
+import { Clock, CheckCircle2, ChevronRight, Trophy, Lock } from 'lucide-react';
 
 interface MatchCardFeedProps {
   tournament: Tournament;
@@ -17,7 +18,9 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
   const currentRound = rounds[selectedRoundIdx] || rounds[0];
 
   return (
-    <div style={{ maxWidth: '600px', margin: '0 auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <div style={{ maxWidth: '680px', margin: '0 auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <BracketDraftBanner tournament={tournament} />
+
       {/* Round Selector Bar */}
       <div style={{ overflowX: 'auto', display: 'flex', gap: '0.5rem', paddingBottom: '0.5rem' }}>
         {rounds.map((round, idx) => (
@@ -62,7 +65,7 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
             <div
               key={match.id}
               onClick={() => {
-                if (isPlayable) setActiveMatch(match);
+                if (isPlayable && tournament.isVerified) setActiveMatch(match);
               }}
               style={{
                 background: 'var(--color-bg-surface)',
@@ -74,18 +77,23 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
                   : '1px solid var(--color-border-subtle)',
                 boxShadow: inProgress ? '0 0 12px rgba(245, 158, 11, 0.25)' : 'var(--shadow-sm)',
                 padding: '1rem',
-                cursor: isPlayable ? 'pointer' : 'default',
-                opacity: isPlayable ? 1 : 0.65,
+                cursor: isPlayable && tournament.isVerified ? 'pointer' : 'default',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '0.75rem',
+                gap: '0.85rem',
+                opacity: isPlayable ? 1 : 0.65,
+                transition: 'transform 0.1s ease',
               }}
             >
               {/* Card Top */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span className="badge badge-gold">Match #{match.matchNumber}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  {isComplete ? (
+                  {!tournament.isVerified ? (
+                    <span className="badge badge-muted" title="Scores locked until bracket is verified">
+                      <Lock size={12} /> Seeding Draft
+                    </span>
+                  ) : isComplete ? (
                     <span className="badge badge-green">
                       <CheckCircle2 size={12} /> Complete
                     </span>
@@ -96,7 +104,7 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
                   ) : (
                     <span className="badge badge-muted">Ready</span>
                   )}
-                  <ChevronRight size={18} color="var(--color-text-muted)" />
+                  {tournament.isVerified && <ChevronRight size={18} color="var(--color-text-muted)" />}
                 </div>
               </div>
 

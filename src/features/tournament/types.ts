@@ -1,5 +1,12 @@
 import { BracketStructure, BracketType } from '../bracket/types';
 
+export type QualFormat = 'HIGH_SCORE' | 'AVERAGE_OF_X' | 'POINTS';
+
+export interface PointsThreshold {
+  minScore: number;
+  points: number;
+}
+
 export interface GameScoreEntry {
   gameNumber: number; // 1, 2, 3, 4, 5...
   player1Points: number | null;
@@ -30,8 +37,26 @@ export interface TournamentTier {
   flatWidth?: number;
   bestOf: number;
   playerCount: number;
+  primaryColor?: string;
+  secondaryColor?: string;
   bracket: BracketStructure;
   isLocked: boolean;
+}
+
+export interface QualifierSubmission {
+  id: string;
+  tournamentId: string;
+  playerId: string;
+  score: number;
+  submittedAt: number; // timestamp in ms
+}
+
+export interface TournamentPlayer {
+  playerId: string;
+  tournamentId: string;
+  tierId?: string;
+  seed?: number;
+  qualsCompleted?: boolean;
 }
 
 export interface QualifierScore {
@@ -56,6 +81,7 @@ export interface PlayerProfile {
   personalBest: number;
   playstyle: 'DAS' | 'Rolling' | 'Hypertap';
   notes?: string;
+  isDisqualified?: boolean;
 }
 
 export interface Tournament {
@@ -64,7 +90,15 @@ export interface Tournament {
   name: string; // e.g. 'KC Regional 2026 Open'
   date: string;
   location: string;
+  qualFormat: QualFormat;
+  qualAverageCount?: number; // target count X for AVERAGE_OF_X
+  pointsConfig?: PointsThreshold[]; // array of { minScore, points } for POINTS
+  qualsClosed: boolean;
+  isVerified: boolean; // false = DRAFT, true = VERIFIED
   tiers: TournamentTier[];
   matchScores: Record<string, MatchScoreRecord>; // keyed by matchId
-  qualifiers: QualifierScore[];
+  playersPool: PlayerProfile[];
+  qualifierSubmissions: QualifierSubmission[];
+  tournamentPlayers: Record<string, TournamentPlayer>; // keyed by playerId
+  qualifiers?: QualifierScore[]; // legacy fallback
 }

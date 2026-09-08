@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { BracketStructure, BracketMatch, isMatchPlayable } from '../types';
 import { Tournament, TournamentTier } from '../../tournament/types';
 import { MatchScoreDrawer } from './MatchScoreDrawer';
+import { BracketDraftBanner } from './BracketDraftBanner';
 import { Trophy } from 'lucide-react';
 
 interface BracketVisualizerProps {
@@ -39,12 +40,21 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
         width: '100%',
         minHeight: isObsMode ? '100vh' : 'auto',
         background: isObsMode ? 'transparent' : 'var(--color-bg-base)',
-        padding: isObsMode ? '1rem' : '1.5rem',
-        overflowX: 'auto',
         display: 'flex',
         flexDirection: 'column',
       }}
     >
+      {!isObsMode && <BracketDraftBanner tournament={tournament} canManage={canManage} />}
+
+      <div
+        style={{
+          width: '100%',
+          padding: isObsMode ? '1rem' : '1.5rem',
+          overflowX: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
       {/* Container for bracket rounds */}
       <div
         style={{
@@ -286,6 +296,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
           roundName={selectedMatch.roundName}
         />
       )}
+      </div>
     </div>
   );
 };

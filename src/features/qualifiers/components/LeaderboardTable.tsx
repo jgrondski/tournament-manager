@@ -1,28 +1,42 @@
 import React, { useState } from 'react';
 import { Tournament } from '../../tournament/types';
-import { Search, Trophy, CheckCircle2 } from 'lucide-react';
+import { deriveLeaderboard, LeaderboardRankRow } from '../scoring';
+import { QualifierEntryModal } from './QualifierEntryModal';
+import { Search, Trophy, Plus, AlertOctagon, User } from 'lucide-react';
 
 interface LeaderboardTableProps {
   tournament: Tournament;
-  onAddScoreClick?: () => void;
+  canManage?: boolean;
 }
 
-export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ tournament }) => {
+export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
+  tournament,
+  canManage = true,
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
 
-  const qualifiers = tournament.qualifiers;
-  const filtered = qualifiers.filter(q =>
-    q.playerName.toLowerCase().includes(searchTerm.toLowerCase())
+  const allRows = deriveLeaderboard(tournament);
+  const filteredRows = allRows.filter(r =>
+    r.player.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const goldTier = tournament.tiers.find(t => t.slug === 'gold');
-  const silverTier = tournament.tiers.find(t => t.slug === 'silver');
-  const goldCutoff = goldTier ? goldTier.playerCount : 12;
-  const silverCutoff = silverTier ? goldCutoff + silverTier.playerCount : 28;
+  // Calculate cutoff rank boundaries for dividers
+  const sortedTiers = [...tournament.tiers].sort((a, b) => a.priority - b.priority);
+  const cutoffRanks = new Map<number, { tierName: string; color: string; count: number }>();
+  let runningCutoff = 0;
+  sortedTiers.forEach(tier => {
+    runningCutoff += tier.playerCount;
+    cutoffRanks.set(runningCutoff, {
+      tierName: tier.name,
+      color: tier.primaryColor || '#f59e0b',
+      count: tier.playerCount,
+    });
+  });
 
   return (
     <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      {/* Header with Search & Stats */}
+      {/* Header with Search & Score Submission Button */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -30,7 +44,10 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ tournament }
             Qualifying Leaderboard
           </h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
-            Live standings determining Gold and Silver tier bracket seeding.
+            Format: <strong style={{ color: 'var(--color-gold-bright)' }}>{tournament.qualFormat.replace(/_/g, ' ')}</strong>
+            {tournament.qualFormat === 'AVERAGE_OF_X' && ` (Ao${tournament.qualAverageCount || 2})`}
+            {' • '}
+            {tournament.qualsClosed ? 'Qualifiers Closed' : 'Qualifiers Open (Live Running Standings)'}
           </p>
         </div>
 
@@ -39,7 +56,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ tournament }
             <Search size={16} color="var(--color-text-muted)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
             <input
               type="text"
-              placeholder="Search player..."
+              placeholder="Search competitor..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               style={{
@@ -52,6 +69,17 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ tournament }
               }}
             />
           </div>
+
+          {canManage && (
+            <button
+              onClick={() => setIsEntryModalOpen(true)}
+              className="btn btn-primary"
+              style={{ padding: '0.45rem 1rem', fontSize: '0.85rem' }}
+            >
+              <Plus size={16} />
+              Submit Score
+            </button>
+          )}
         </div>
       </div>
 
@@ -61,118 +89,200 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ tournament }
           <thead>
             <tr style={{ background: 'var(--color-bg-surface-highlight)', borderBottom: '2px solid var(--color-border)' }}>
               <th style={{ ...thStyle, width: '60px', textAlign: 'center' }}>Rank</th>
-              <th style={{ ...thStyle, minWidth: '180px' }}>Player</th>
-              <th style={{ ...thStyle, width: '120px', textAlign: 'right' }}>Game 1</th>
-              <th style={{ ...thStyle, width: '120px', textAlign: 'right' }}>Game 2</th>
-              <th style={{ ...thStyle, width: '120px', textAlign: 'right' }}>Game 3</th>
-              <th style={{ ...thStyle, width: '140px', textAlign: 'right' }}>Total Qualifying</th>
-              <th style={{ ...thStyle, width: '110px', textAlign: 'center' }}>Tier Cutoff</th>
-              <th style={{ ...thStyle, width: '90px', textAlign: 'center' }}>Status</th>
+              <th style={{ ...thStyle, minWidth: '200px' }}>Competitor</th>
+              <th style={{ ...thStyle, width: '130px', textAlign: 'center' }}>Attempts / Format</th>
+              <th style={{ ...thStyle, width: '150px', textAlign: 'right' }}>Score / Rating</th>
+              <th style={{ ...thStyle, width: '130px', textAlign: 'center' }}>Tier Cutoff &amp; Seed</th>
+              <th style={{ ...thStyle, width: '110px', textAlign: 'center' }}>PB (Manual)</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map((entry, idx) => {
-              const rank = entry.seed || idx + 1;
-              const isGold = rank <= goldCutoff;
-              const isSilver = rank > goldCutoff && rank <= silverCutoff;
-              const isCutoffGoldBoundary = rank === goldCutoff;
-              const isCutoffSilverBoundary = rank === silverCutoff;
+            {filteredRows.length === 0 ? (
+              <tr>
+                <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                  No competitors found matching &quot;{searchTerm}&quot;.
+                </td>
+              </tr>
+            ) : (
+              filteredRows.map((row: LeaderboardRankRow, idx) => {
+                const isRankNumeric = typeof row.rank === 'number';
+                const cutoffInfo = isRankNumeric ? cutoffRanks.get(row.rank as number) : undefined;
 
-              return (
-                <React.Fragment key={entry.id}>
-                  <tr
-                    style={{
-                      background: idx % 2 === 0 ? 'var(--color-bg-surface)' : 'var(--color-bg-surface-elevated)',
-                      borderBottom: '1px solid var(--color-border-subtle)',
-                    }}
-                  >
-                    <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>
-                      <span
-                        className="tabular-nums"
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          width: '26px',
-                          height: '26px',
-                          borderRadius: '50%',
-                          background: rank <= 3 ? 'var(--color-gold-bg)' : 'rgba(255,255,255,0.05)',
-                          color: rank <= 3 ? 'var(--color-gold-bright)' : 'var(--color-text-secondary)',
-                          fontSize: '0.8rem',
-                        }}
-                      >
-                        {rank}
-                      </span>
-                    </td>
+                // Subtle tier color row tinting
+                let rowBg = idx % 2 === 0 ? 'var(--color-bg-surface)' : 'var(--color-bg-surface-elevated)';
+                if (row.assignedTier?.primaryColor) {
+                  rowBg = `${row.assignedTier.primaryColor}0d`; // ~5% opacity tint
+                } else if (row.isDisqualified) {
+                  rowBg = 'rgba(239, 68, 68, 0.05)';
+                }
 
-                    <td style={tdStyle}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                          {entry.playerName}
-                        </span>
-                        {entry.playstyle && (
-                          <span className="badge badge-muted" style={{ fontSize: '0.65rem' }}>
-                            {entry.playstyle}
+                return (
+                  <React.Fragment key={row.player.id}>
+                    <tr
+                      style={{
+                        background: rowBg,
+                        borderBottom: '1px solid var(--color-border-subtle)',
+                        transition: 'background 0.1s ease',
+                      }}
+                    >
+                      {/* Rank */}
+                      <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>
+                        {row.isDisqualified ? (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '0.2rem 0.5rem',
+                              borderRadius: 'var(--radius-sm)',
+                              background: 'var(--color-red-bg)',
+                              color: '#f87171',
+                              fontSize: '0.75rem',
+                              fontWeight: 800,
+                            }}
+                          >
+                            DQ
+                          </span>
+                        ) : (
+                          <span
+                            className="tabular-nums"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '26px',
+                              height: '26px',
+                              borderRadius: '50%',
+                              background:
+                                typeof row.rank === 'number' && row.rank <= 3
+                                  ? 'var(--color-gold-bg)'
+                                  : 'rgba(255,255,255,0.05)',
+                              color:
+                                typeof row.rank === 'number' && row.rank <= 3
+                                  ? 'var(--color-gold-bright)'
+                                  : 'var(--color-text-secondary)',
+                              fontSize: '0.8rem',
+                            }}
+                          >
+                            {row.rank}
                           </span>
                         )}
-                      </div>
-                    </td>
+                      </td>
 
-                    <td className="tabular-nums" style={{ ...tdStyle, textAlign: 'right' }}>
-                      {entry.game1.toLocaleString()}
-                    </td>
-                    <td className="tabular-nums" style={{ ...tdStyle, textAlign: 'right' }}>
-                      {entry.game2.toLocaleString()}
-                    </td>
-                    <td className="tabular-nums" style={{ ...tdStyle, textAlign: 'right', color: entry.game3 ? 'inherit' : 'var(--color-text-muted)' }}>
-                      {entry.game3 ? entry.game3.toLocaleString() : '—'}
-                    </td>
+                      {/* Player Info */}
+                      <td style={tdStyle}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <User size={14} color="var(--color-text-muted)" />
+                          <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                            {row.player.name}
+                          </span>
+                          {row.player.playstyle && (
+                            <span className="badge badge-muted" style={{ fontSize: '0.65rem' }}>
+                              {row.player.playstyle}
+                            </span>
+                          )}
+                          {row.isDisqualified && (
+                            <span style={{ color: 'var(--color-red)', display: 'inline-flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.7rem' }}>
+                              <AlertOctagon size={12} /> DQ
+                            </span>
+                          )}
+                        </div>
+                      </td>
 
-                    <td className="tabular-nums" style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: 'var(--color-gold-bright)' }}>
-                      {entry.totalScore.toLocaleString()}
-                    </td>
-
-                    <td style={{ ...tdStyle, textAlign: 'center' }}>
-                      {isGold && <span className="badge badge-gold">Gold Seed #{rank}</span>}
-                      {isSilver && <span className="badge badge-blue">Silver Seed #{rank - goldCutoff}</span>}
-                      {!isGold && !isSilver && <span className="badge badge-muted">Alternate</span>}
-                    </td>
-
-                    <td style={{ ...tdStyle, textAlign: 'center' }}>
-                      {entry.verified ? (
-                        <span style={{ color: 'var(--color-green)', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem' }}>
-                          <CheckCircle2 size={14} /> Verified
+                      {/* Attempts / Format Details */}
+                      <td style={{ ...tdStyle, textAlign: 'center' }}>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
+                          {row.formattedDetail}
                         </span>
-                      ) : (
-                        <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>
-                          Pending
-                        </span>
-                      )}
-                    </td>
-                  </tr>
+                        {row.attempts.length > 0 && (
+                          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}>
+                            {row.attempts.map(a => a.toLocaleString()).join(', ')}
+                          </div>
+                        )}
+                      </td>
 
-                  {/* Cutoff Marker Row */}
-                  {isCutoffGoldBoundary && (
-                    <tr style={{ background: 'rgba(245, 158, 11, 0.15)', borderTop: '2px solid var(--color-gold)', borderBottom: '2px solid var(--color-gold)' }}>
-                      <td colSpan={8} style={{ padding: '0.5rem 1rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-gold-bright)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                        ▲ Gold Tier Cutoff (Top {goldCutoff} Advance to Gold Bracket) ▲
+                      {/* Final Value */}
+                      <td className="tabular-nums" style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, fontSize: '0.95rem', color: 'var(--color-gold-bright)' }}>
+                        {row.finalScore > 0 ? row.finalScore.toLocaleString() : '—'}
+                      </td>
+
+                      {/* Tier Seed / Status */}
+                      <td style={{ ...tdStyle, textAlign: 'center' }}>
+                        {row.assignedTier && row.tierSeed !== undefined ? (
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              padding: '0.2rem 0.6rem',
+                              borderRadius: 'var(--radius-full)',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              background: `${row.assignedTier.primaryColor || '#f59e0b'}26`,
+                              color: row.assignedTier.primaryColor || 'var(--color-gold-bright)',
+                              border: `1px solid ${row.assignedTier.primaryColor || 'var(--color-gold)'}4d`,
+                            }}
+                          >
+                            {row.assignedTier.name} #{row.tierSeed}
+                          </span>
+                        ) : row.isDisqualified ? (
+                          <span className="badge badge-muted" style={{ color: '#f87171' }}>
+                            Disqualified
+                          </span>
+                        ) : row.isDNQ ? (
+                          <span className="badge badge-muted" title="Did Not Qualify for active brackets">
+                            DNQ
+                          </span>
+                        ) : (
+                          <span className="badge badge-muted">Pending</span>
+                        )}
+                      </td>
+
+                      {/* Personal Best (Manual) */}
+                      <td className="tabular-nums" style={{ ...tdStyle, textAlign: 'center', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                        {row.player.personalBest ? row.player.personalBest.toLocaleString() : '—'}
                       </td>
                     </tr>
-                  )}
 
-                  {isCutoffSilverBoundary && (
-                    <tr style={{ background: 'rgba(6, 182, 212, 0.15)', borderTop: '2px solid var(--color-cyan)', borderBottom: '2px solid var(--color-cyan)' }}>
-                      <td colSpan={8} style={{ padding: '0.5rem 1rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: 700, color: '#38bdf8', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                        ▲ Silver Tier Cutoff (Next {silverTier?.playerCount || 16} Advance to Silver Bracket) ▲
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
-              );
-            })}
+                    {/* Dynamic Tier Cutoff Line Divider */}
+                    {cutoffInfo && (
+                      <tr
+                        style={{
+                          background: `${cutoffInfo.color}1a`,
+                          borderTop: `2px solid ${cutoffInfo.color}`,
+                          borderBottom: `2px solid ${cutoffInfo.color}`,
+                        }}
+                      >
+                        <td
+                          colSpan={6}
+                          style={{
+                            padding: '0.45rem 1rem',
+                            textAlign: 'center',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            color: cutoffInfo.color,
+                            letterSpacing: '0.08em',
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          ▲ {cutoffInfo.tierName} Cutoff ({cutoffInfo.count} competitors advance to {cutoffInfo.tierName}) ▲
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>
+
+      {/* Submission Modal */}
+      {isEntryModalOpen && (
+        <QualifierEntryModal
+          isOpen={isEntryModalOpen}
+          onClose={() => setIsEntryModalOpen(false)}
+          tournament={tournament}
+        />
+      )}
     </div>
   );
 };
@@ -189,3 +299,4 @@ const thStyle: React.CSSProperties = {
 const tdStyle: React.CSSProperties = {
   padding: '0.65rem 0.85rem',
 };
+

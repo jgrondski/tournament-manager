@@ -1,12 +1,48 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Tournament, MatchScoreRecord, QualifierScore } from './types';
-import { createInitialTournaments } from './mock-data';
+import {
+  Tournament,
+  TournamentTier,
+  MatchScoreRecord,
+  QualifierScore,
+  PlayerProfile,
+  QualifierSubmission,
+} from './types';
+import { createInitialTournaments, MOCK_PLAYERS_POOL } from './mock-data';
 import { advanceMatchWinner } from '../bracket/math';
+import { generateDraftBracketsForTournament } from '../qualifiers/scoring';
 
 interface TournamentContextType {
   tournaments: Tournament[];
   getTournamentBySlug: (slug: string) => Tournament | undefined;
-  getTierBySlug: (tournamentSlug: string, tierSlug: string) => { tournament: Tournament; tier: Tournament['tiers'][0] } | undefined;
+  getTierBySlug: (
+    tournamentSlug: string,
+    tierSlug: string
+  ) => { tournament: Tournament; tier: TournamentTier } | undefined;
+  createTournament: (
+    data: Omit<
+      Tournament,
+      'id' | 'matchScores' | 'playersPool' | 'qualifierSubmissions' | 'tournamentPlayers'
+    >
+  ) => Tournament;
+  updateTournament: (tournamentId: string, updates: Partial<Tournament>) => void;
+  saveTiers: (tournamentId: string, tiers: TournamentTier[]) => void;
+  addPlayerToPool: (tournamentId: string, player: Omit<PlayerProfile, 'id'>) => PlayerProfile;
+  updatePlayerInPool: (tournamentId: string, playerId: string, updates: Partial<PlayerProfile>) => void;
+  submitQualifierScore: (tournamentId: string, playerId: string, score: number) => void;
+  deleteQualifierScore: (tournamentId: string, submissionId: string) => void;
+  togglePlayerDisqualification: (
+    tournamentId: string,
+    playerId: string,
+    isDisqualified: boolean
+  ) => void;
+  togglePlayerQualsCompleted: (
+    tournamentId: string,
+    playerId: string,
+    qualsCompleted: boolean
+  ) => void;
+  setQualifiersClosed: (tournamentId: string, closed: boolean) => void;
+  verifyBrackets: (tournamentId: string) => void;
+  unlockBrackets: (tournamentId: string) => { success: boolean; error?: string };
   recordGameScore: (
     tournamentId: string,
     tierId: string,
@@ -23,7 +59,7 @@ interface TournamentContextType {
   resetTournamentData: (tournamentId?: string) => void;
 }
 
-const STORAGE_KEY = 'ctwc_tournaments_v2';
+const STORAGE_KEY = 'ctwc_tournaments_v3';
 
 const TournamentContext = createContext<TournamentContextType | null>(null);
 
@@ -32,7 +68,10 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
       }
     } catch {
       // ignore parse errors and fallback
@@ -58,6 +97,264 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const tier = tournament.tiers.find(t => t.slug === tierSlug || t.id === tierSlug);
     if (!tier) return undefined;
     return { tournament, tier };
+  };
+
+  const createTournament = (
+    data: Omit<
+      Tournament,
+      'id' | 'matchScores' | 'playersPool' | 'qualifierSubmissions' | 'tournamentPlayers'
+    >
+  ): Tournament => {
+    const id = data.slug || `tourney_${Date.now()}`;
+    const newTourney: Tournament = {
+      ...data,
+      id,
+      slug: data.slug || id,
+      matchScores: {},
+      playersPool: [...MOCK_PLAYERS_POOL],
+      qualifierSubmissions: [],
+      tournamentPlayers: {},
+      isVerified: false,
+      qualsClosed: Boolean(data.qualsClosed),
+      tiers: data.tiers || [],
+    };
+
+    // Calculate initial draft brackets if tiers exist
+    if (newTourney.tiers.length > 0) {
+      newTourney.tiers = generateDraftBracketsForTournament(newTourney);
+    }
+
+    setTournaments(prev => [newTourney, ...prev]);
+    return newTourney;
+  };
+
+  const updateTournament = (tournamentId: string, updates: Partial<Tournament>) => {
+    setTournaments(prev =>
+      prev.map(t => {
+        if (t.id !== tournamentId) return t;
+        const updated = { ...t, ...updates };
+        if (!updated.isVerified) {
+          updated.tiers = generateDraftBracketsForTournament(updated);
+        }
+        return updated;
+      })
+    );
+  };
+
+  const saveTiers = (tournamentId: string, tiers: TournamentTier[]) => {
+    setTournaments(prev =>
+      prev.map(t => {
+        if (t.id !== tournamentId) return t;
+        const updated = { ...t, tiers };
+        if (!updated.isVerified) {
+          updated.tiers = generateDraftBracketsForTournament(updated);
+        }
+        return updated;
+      })
+    );
+  };
+
+  const addPlayerToPool = (
+    tournamentId: string,
+    player: Omit<PlayerProfile, 'id'>
+  ): PlayerProfile => {
+    const newPlayer: PlayerProfile = {
+      ...player,
+      id: `p_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+    };
+
+    setTournaments(prev =>
+      prev.map(t => {
+        if (t.id !== tournamentId) return t;
+        const currentPool = t.playersPool || [];
+        const updatedPool = [...currentPool, newPlayer];
+        const updated = { ...t, playersPool: updatedPool };
+        if (!updated.isVerified) {
+          updated.tiers = generateDraftBracketsForTournament(updated);
+        }
+        return updated;
+      })
+    );
+
+    return newPlayer;
+  };
+
+  const updatePlayerInPool = (
+    tournamentId: string,
+    playerId: string,
+    updates: Partial<PlayerProfile>
+  ) => {
+    setTournaments(prev =>
+      prev.map(t => {
+        if (t.id !== tournamentId) return t;
+        const currentPool = t.playersPool || [];
+        const updatedPool = currentPool.map(p =>
+          p.id === playerId ? { ...p, ...updates } : p
+        );
+        const updated = { ...t, playersPool: updatedPool };
+        if (!updated.isVerified) {
+          updated.tiers = generateDraftBracketsForTournament(updated);
+        }
+        return updated;
+      })
+    );
+  };
+
+  const submitQualifierScore = (tournamentId: string, playerId: string, score: number) => {
+    setTournaments(prev =>
+      prev.map(t => {
+        if (t.id !== tournamentId) return t;
+        const newSubmission: QualifierSubmission = {
+          id: `sub_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          tournamentId,
+          playerId,
+          score,
+          submittedAt: Date.now(),
+        };
+        const currentSubs = t.qualifierSubmissions || [];
+        const updatedSubs = [...currentSubs, newSubmission];
+        const updated = { ...t, qualifierSubmissions: updatedSubs };
+        if (!updated.isVerified) {
+          updated.tiers = generateDraftBracketsForTournament(updated);
+        }
+        return updated;
+      })
+    );
+  };
+
+  const deleteQualifierScore = (tournamentId: string, submissionId: string) => {
+    setTournaments(prev =>
+      prev.map(t => {
+        if (t.id !== tournamentId) return t;
+        const currentSubs = t.qualifierSubmissions || [];
+        const updatedSubs = currentSubs.filter(s => s.id !== submissionId);
+        const updated = { ...t, qualifierSubmissions: updatedSubs };
+        if (!updated.isVerified) {
+          updated.tiers = generateDraftBracketsForTournament(updated);
+        }
+        return updated;
+      })
+    );
+  };
+
+  const togglePlayerDisqualification = (
+    tournamentId: string,
+    playerId: string,
+    isDisqualified: boolean
+  ) => {
+    setTournaments(prev =>
+      prev.map(t => {
+        if (t.id !== tournamentId) return t;
+        const currentPool = t.playersPool || [];
+        const updatedPool = currentPool.map(p =>
+          p.id === playerId ? { ...p, isDisqualified } : p
+        );
+        const updated = { ...t, playersPool: updatedPool };
+        if (!updated.isVerified) {
+          updated.tiers = generateDraftBracketsForTournament(updated);
+        }
+        return updated;
+      })
+    );
+  };
+
+  const togglePlayerQualsCompleted = (
+    tournamentId: string,
+    playerId: string,
+    qualsCompleted: boolean
+  ) => {
+    setTournaments(prev =>
+      prev.map(t => {
+        if (t.id !== tournamentId) return t;
+        const currentPlayers = t.tournamentPlayers || {};
+        const existing = currentPlayers[playerId] || {
+          playerId,
+          tournamentId,
+        };
+        const updatedPlayers = {
+          ...currentPlayers,
+          [playerId]: { ...existing, qualsCompleted },
+        };
+        const updated = { ...t, tournamentPlayers: updatedPlayers };
+        if (!updated.isVerified) {
+          updated.tiers = generateDraftBracketsForTournament(updated);
+        }
+        return updated;
+      })
+    );
+  };
+
+  const setQualifiersClosed = (tournamentId: string, closed: boolean) => {
+    setTournaments(prev =>
+      prev.map(t => {
+        if (t.id !== tournamentId) return t;
+        const updated = { ...t, qualsClosed: closed };
+        if (!updated.isVerified) {
+          updated.tiers = generateDraftBracketsForTournament(updated);
+        }
+        return updated;
+      })
+    );
+  };
+
+  const verifyBrackets = (tournamentId: string) => {
+    setTournaments(prev =>
+      prev.map(t => {
+        if (t.id !== tournamentId) return t;
+        // Lock brackets and freeze static match structure
+        const lockedTiers = t.tiers.map(tier => ({
+          ...tier,
+          isLocked: true,
+        }));
+        return {
+          ...t,
+          isVerified: true,
+          tiers: lockedTiers,
+        };
+      })
+    );
+  };
+
+  const unlockBrackets = (tournamentId: string): { success: boolean; error?: string } => {
+    const tournament = tournaments.find(t => t.id === tournamentId);
+    if (!tournament) {
+      return { success: false, error: 'Tournament not found' };
+    }
+
+    // Safety Invariant: "Unlock Brackets" is blocked if any match in the tournament contains recorded game scores.
+    const hasRecordedScores = Object.values(tournament.matchScores || {}).some(
+      record =>
+        record.isComplete ||
+        record.games.some(
+          g => g.player1Points !== null || g.player2Points !== null || g.winnerPlayerId !== null
+        ) ||
+        record.player1Wins > 0 ||
+        record.player2Wins > 0 ||
+        Boolean(record.winnerPlayerId)
+    );
+
+    if (hasRecordedScores) {
+      return {
+        success: false,
+        error: 'Cannot unlock: Match play has begun. Clear recorded scores before unlocking.',
+      };
+    }
+
+    setTournaments(prev =>
+      prev.map(t => {
+        if (t.id !== tournamentId) return t;
+        const updated = {
+          ...t,
+          isVerified: false,
+          tiers: t.tiers.map(tier => ({ ...tier, isLocked: false })),
+        };
+        // Re-generate draft brackets with current qualifiers
+        updated.tiers = generateDraftBracketsForTournament(updated);
+        return updated;
+      })
+    );
+
+    return { success: true };
   };
 
   const recordGameScore = (
@@ -270,6 +567,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     tournamentId: string,
     entry: Omit<QualifierScore, 'id' | 'totalScore'>
   ) => {
+    // Legacy support: also submit as qualifier submissions
     setTournaments(prev =>
       prev.map(tournament => {
         if (tournament.id !== tournamentId) return tournament;
@@ -279,18 +577,34 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           id: 'q_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
           totalScore: total,
         };
-        const updated = [...tournament.qualifiers, newScore].sort(
+        const currentQuals = tournament.qualifiers || [];
+        const updated = [...currentQuals, newScore].sort(
           (a, b) => b.totalScore - a.totalScore
         );
-        // re-rank
         updated.forEach((q, idx) => {
           q.seed = idx + 1;
         });
 
-        return {
+        // Add corresponding submission
+        const newSub: QualifierSubmission = {
+          id: `sub_${Date.now()}`,
+          tournamentId,
+          playerId: entry.playerId,
+          score: entry.game1,
+          submittedAt: Date.now(),
+        };
+
+        const updatedTourney: Tournament = {
           ...tournament,
           qualifiers: updated,
+          qualifierSubmissions: [...(tournament.qualifierSubmissions || []), newSub],
         };
+
+        if (!updatedTourney.isVerified) {
+          updatedTourney.tiers = generateDraftBracketsForTournament(updatedTourney);
+        }
+
+        return updatedTourney;
       })
     );
   };
@@ -305,7 +619,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (tournament.id !== tournamentId) return tournament;
         return {
           ...tournament,
-          qualifiers: tournament.qualifiers.map(q =>
+          qualifiers: (tournament.qualifiers || []).map(q =>
             q.id === qualifierId ? { ...q, verified } : q
           ),
         };
@@ -334,6 +648,18 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         tournaments,
         getTournamentBySlug,
         getTierBySlug,
+        createTournament,
+        updateTournament,
+        saveTiers,
+        addPlayerToPool,
+        updatePlayerInPool,
+        submitQualifierScore,
+        deleteQualifierScore,
+        togglePlayerDisqualification,
+        togglePlayerQualsCompleted,
+        setQualifiersClosed,
+        verifyBrackets,
+        unlockBrackets,
         recordGameScore,
         updateMatchBestOf,
         forfeitMatch,
@@ -355,3 +681,4 @@ export const useTournament = () => {
   }
   return context;
 };
+

@@ -1,6 +1,6 @@
 import { SeededPlayer } from '../bracket/types';
 import { generateTraditionalBracket, generateFlatBracket, advanceMatchWinner } from '../bracket/math';
-import { Tournament, QualifierScore, MatchScoreRecord, PlayerProfile } from './types';
+import { Tournament, QualifierScore, MatchScoreRecord, PlayerProfile, QualifierSubmission } from './types';
 
 export const MOCK_PLAYERS_POOL: PlayerProfile[] = [
   { id: 'p1', name: 'Blue Scuti', personalBest: 1674967, playstyle: 'Rolling', country: 'US' },
@@ -68,6 +68,40 @@ export function buildMockQualifiers(): QualifierScore[] {
     { id: 'q27', playerId: 'p27', playerName: 'Bo Steil', game1: 840000, game2: 820000, totalScore: 1660000, verified: true, seed: 15, assignedTierId: 'silver' },
     { id: 'q28', playerId: 'p28', playerName: 'RedScuti', game1: 830000, game2: 810000, totalScore: 1640000, verified: true, seed: 16, assignedTierId: 'silver' },
   ];
+}
+
+export function buildMockSubmissions(tournamentId: string): QualifierSubmission[] {
+  const qualifiers = buildMockQualifiers();
+  const submissions: QualifierSubmission[] = [];
+  const baseTime = Date.now() - 1000 * 60 * 60 * 24; // 24h ago
+
+  qualifiers.forEach((q, idx) => {
+    submissions.push({
+      id: `sub_${tournamentId}_${q.playerId}_1`,
+      tournamentId,
+      playerId: q.playerId,
+      score: q.game1,
+      submittedAt: baseTime + idx * 1000 * 60 + 1000,
+    });
+    submissions.push({
+      id: `sub_${tournamentId}_${q.playerId}_2`,
+      tournamentId,
+      playerId: q.playerId,
+      score: q.game2,
+      submittedAt: baseTime + idx * 1000 * 60 + 2000,
+    });
+    if (q.game3) {
+      submissions.push({
+        id: `sub_${tournamentId}_${q.playerId}_3`,
+        tournamentId,
+        playerId: q.playerId,
+        score: q.game3,
+        submittedAt: baseTime + idx * 1000 * 60 + 3000,
+      });
+    }
+  });
+
+  return submissions;
 }
 
 export function createInitialTournaments(): Tournament[] {
@@ -268,6 +302,13 @@ export function createInitialTournaments(): Tournament[] {
     name: 'KC Regional 2026 Open',
     date: 'March 21-22, 2026',
     location: 'Kansas City, MO',
+    qualFormat: 'AVERAGE_OF_X',
+    qualAverageCount: 2,
+    qualsClosed: false,
+    isVerified: true,
+    playersPool: MOCK_PLAYERS_POOL,
+    qualifierSubmissions: buildMockSubmissions('kc-2026-open'),
+    tournamentPlayers: {},
     tiers: [
       {
         id: 'gold',
@@ -277,6 +318,8 @@ export function createInitialTournaments(): Tournament[] {
         bracketType: 'TRADITIONAL',
         playerCount: 12,
         bestOf: 5,
+        primaryColor: '#f59e0b',
+        secondaryColor: '#fbbf24',
         bracket: goldBracket,
         isLocked: true,
       },
@@ -289,6 +332,8 @@ export function createInitialTournaments(): Tournament[] {
         flatWidth: 4,
         playerCount: 16,
         bestOf: 5,
+        primaryColor: '#06b6d4',
+        secondaryColor: '#38bdf8',
         bracket: silverBracket,
         isLocked: true,
       },
@@ -300,6 +345,8 @@ export function createInitialTournaments(): Tournament[] {
         bracketType: 'TRADITIONAL',
         playerCount: 8,
         bestOf: 3,
+        primaryColor: '#d97706',
+        secondaryColor: '#f59e0b',
         bracket: generateTraditionalBracket(silverPlayers.slice(0, 8), { tierId: 'bronze', bestOf: 3 }),
         isLocked: false,
       }
@@ -314,6 +361,12 @@ export function createInitialTournaments(): Tournament[] {
     name: 'KC Regional 2026 DAS',
     date: 'March 20, 2026',
     location: 'Kansas City, MO',
+    qualFormat: 'HIGH_SCORE',
+    qualsClosed: false,
+    isVerified: false, // DRAFT preview mode
+    playersPool: MOCK_PLAYERS_POOL,
+    qualifierSubmissions: buildMockSubmissions('kc-2026-das').slice(0, 24),
+    tournamentPlayers: {},
     tiers: [
       {
         id: 'gold',
@@ -323,6 +376,8 @@ export function createInitialTournaments(): Tournament[] {
         bracketType: 'TRADITIONAL',
         playerCount: 8,
         bestOf: 5,
+        primaryColor: '#f59e0b',
+        secondaryColor: '#fbbf24',
         bracket: generateTraditionalBracket(
           [
             { id: 'p16', name: 'Huff', seed: 1 },
@@ -336,7 +391,7 @@ export function createInitialTournaments(): Tournament[] {
           ],
           { tierId: 'gold', bestOf: 5 }
         ),
-        isLocked: true,
+        isLocked: false,
       },
       {
         id: 'silver',
@@ -347,6 +402,8 @@ export function createInitialTournaments(): Tournament[] {
         flatWidth: 2,
         playerCount: 8,
         bestOf: 3,
+        primaryColor: '#06b6d4',
+        secondaryColor: '#38bdf8',
         bracket: generateFlatBracket(
           [
             { id: 'p1', name: 'Blue Scuti', seed: 1 },
@@ -361,7 +418,7 @@ export function createInitialTournaments(): Tournament[] {
           2,
           { tierId: 'silver', bestOf: 3 }
         ),
-        isLocked: true,
+        isLocked: false,
       }
     ],
     matchScores: {},

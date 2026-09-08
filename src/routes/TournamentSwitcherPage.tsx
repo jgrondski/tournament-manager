@@ -1,10 +1,84 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTournament } from '../features/tournament/store';
-import { Calendar, MapPin, Users, Layers } from 'lucide-react';
+import { Calendar, MapPin, Users, Layers, Plus, Settings, Trophy, ShieldCheck, AlertTriangle, X } from 'lucide-react';
+import { QualFormat, TournamentTier } from '../features/tournament/types';
+import { generateTraditionalBracket } from '../features/bracket/math';
 
 export const TournamentSwitcherPage: React.FC = () => {
-  const { tournaments } = useTournament();
+  const { tournaments, createTournament } = useTournament();
+  const navigate = useNavigate();
+
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [newTourneyName, setNewTourneyName] = useState('');
+  const [newTourneySlug, setNewTourneySlug] = useState('');
+  const [newTourneyDate, setNewTourneyDate] = useState('');
+  const [newTourneyLocation, setNewTourneyLocation] = useState('');
+  const [newTourneyFormat, setNewTourneyFormat] = useState<QualFormat>('AVERAGE_OF_X');
+  const [newTourneyAvgCount, setNewTourneyAvgCount] = useState(2);
+
+  const handleNameChange = (name: string) => {
+    setNewTourneyName(name);
+    const slug = name.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-');
+    setNewTourneySlug(slug);
+  };
+
+  const handleCreateSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTourneyName.trim() || !newTourneySlug.trim()) return;
+
+    // Default 2 tiers: Gold (16) and Silver (16)
+    const initialTiers: TournamentTier[] = [
+      {
+        id: `gold_${Date.now()}`,
+        slug: 'gold',
+        name: 'Gold Championship',
+        priority: 1,
+        bracketType: 'TRADITIONAL',
+        playerCount: 16,
+        bestOf: 5,
+        primaryColor: '#f59e0b',
+        secondaryColor: '#fbbf24',
+        isLocked: false,
+        bracket: generateTraditionalBracket(
+          Array.from({ length: 16 }, (_, i) => ({ id: `p${i + 1}`, name: `Seed ${i + 1}`, seed: i + 1 })),
+          { bestOf: 5 }
+        ),
+      },
+      {
+        id: `silver_${Date.now()}`,
+        slug: 'silver',
+        name: 'Silver Bracket',
+        priority: 2,
+        bracketType: 'FLAT',
+        flatWidth: 4,
+        playerCount: 16,
+        bestOf: 3,
+        primaryColor: '#06b6d4',
+        secondaryColor: '#38bdf8',
+        isLocked: false,
+        bracket: generateTraditionalBracket(
+          Array.from({ length: 16 }, (_, i) => ({ id: `p${i + 17}`, name: `Seed ${i + 1}`, seed: i + 1 })),
+          { bestOf: 3 }
+        ),
+      },
+    ];
+
+    const created = createTournament({
+      name: newTourneyName,
+      slug: newTourneySlug,
+      date: newTourneyDate || 'Upcoming',
+      location: newTourneyLocation || 'TBD',
+      qualFormat: newTourneyFormat,
+      qualAverageCount: newTourneyAvgCount,
+      qualsClosed: false,
+      isVerified: false,
+      tiers: initialTiers,
+    });
+
+    setIsCreateModalOpen(false);
+    navigate(`/${created.slug}/manage/settings`);
+  };
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg-base)', padding: '2rem 1.5rem' }}>
@@ -22,9 +96,18 @@ export const TournamentSwitcherPage: React.FC = () => {
           <h1 style={{ fontSize: '2.5rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.03em', marginBottom: '0.75rem' }}>
             Live Regional Tournament Portal
           </h1>
-          <p style={{ fontSize: '1.1rem', color: 'var(--color-text-secondary)', maxWidth: '650px', margin: '0 auto' }}>
+          <p style={{ fontSize: '1.1rem', color: 'var(--color-text-secondary)', maxWidth: '650px', margin: '0 auto 1.5rem' }}>
             Organizer command center, public broadcast brackets, and mobile floor judge portal for Classic Tetris competitions.
           </p>
+
+          <button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="btn btn-primary"
+            style={{ padding: '0.65rem 1.5rem', fontSize: '0.95rem', boxShadow: 'var(--shadow-gold)' }}
+          >
+            <Plus size={18} />
+            Create New Tournament
+          </button>
         </header>
 
         {/* Tournaments Grid */}
@@ -50,8 +133,21 @@ export const TournamentSwitcherPage: React.FC = () => {
                 }}
               >
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                    <span className="badge badge-gold">Active Event</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      {!tournament.isVerified ? (
+                        <span className="badge badge-gold">
+                          <AlertTriangle size={12} /> Draft Preview
+                        </span>
+                      ) : (
+                        <span className="badge badge-green">
+                          <ShieldCheck size={12} /> Verified
+                        </span>
+                      )}
+                      <span className="badge badge-muted">
+                        {tournament.qualFormat?.replace(/_/g, ' ') || 'Average'}
+                      </span>
+                    </div>
                     <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
                       ID: {tournament.slug}
                     </span>
@@ -87,7 +183,7 @@ export const TournamentSwitcherPage: React.FC = () => {
                           padding: '0.35rem 0.75rem',
                           background: 'var(--color-bg-surface-elevated)',
                           borderRadius: 'var(--radius-sm)',
-                          border: '1px solid var(--color-border)',
+                          border: `1px solid ${t.primaryColor || 'var(--color-border)'}`,
                           fontSize: '0.8rem',
                           fontWeight: 600,
                           color: 'var(--color-text-primary)',
@@ -106,37 +202,53 @@ export const TournamentSwitcherPage: React.FC = () => {
                 </div>
 
                 {/* Quick Action Navigation Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.6rem' }}>
                   <Link
                     to={`/${tournament.slug}/manage/sheet?tier=${defaultTier.slug}`}
                     className="btn btn-primary"
-                    style={{ padding: '0.65rem 1rem', fontSize: '0.875rem' }}
+                    style={{ padding: '0.55rem 0.75rem', fontSize: '0.8rem' }}
                   >
-                    📊 Organizer Sheet
+                    📊 Sheet
                   </Link>
 
                   <Link
                     to={`/${tournament.slug}/${defaultTier.slug}`}
                     className="btn btn-secondary"
-                    style={{ padding: '0.65rem 1rem', fontSize: '0.875rem' }}
+                    style={{ padding: '0.55rem 0.75rem', fontSize: '0.8rem' }}
                   >
-                    🌲 Public Bracket
+                    🌲 Bracket
                   </Link>
 
                   <Link
                     to={`/${tournament.slug}/manage/judge?tier=${defaultTier.slug}`}
                     className="btn btn-secondary"
-                    style={{ padding: '0.65rem 1rem', fontSize: '0.875rem' }}
+                    style={{ padding: '0.55rem 0.75rem', fontSize: '0.8rem' }}
                   >
-                    📱 Floor Judge View
+                    📱 Floor Judge
                   </Link>
 
                   <Link
                     to={`/${tournament.slug}/leaderboard`}
                     className="btn btn-secondary"
-                    style={{ padding: '0.65rem 1rem', fontSize: '0.875rem' }}
+                    style={{ padding: '0.55rem 0.75rem', fontSize: '0.8rem' }}
                   >
                     🏆 Qualifiers
+                  </Link>
+
+                  <Link
+                    to={`/${tournament.slug}/standings`}
+                    className="btn btn-secondary"
+                    style={{ padding: '0.55rem 0.75rem', fontSize: '0.8rem' }}
+                  >
+                    <Trophy size={14} color="var(--color-gold-bright)" /> Standings
+                  </Link>
+
+                  <Link
+                    to={`/${tournament.slug}/manage/settings`}
+                    className="btn btn-secondary"
+                    style={{ padding: '0.55rem 0.75rem', fontSize: '0.8rem' }}
+                  >
+                    <Settings size={14} /> Settings
                   </Link>
                 </div>
               </div>
@@ -149,8 +261,169 @@ export const TournamentSwitcherPage: React.FC = () => {
           Classic Tetris World Championship Tournament System • LocalStorage Enabled • OBS Broadcast Ready
         </footer>
       </div>
+
+      {/* Create Tournament Modal */}
+      {isCreateModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem',
+          }}
+          onClick={() => setIsCreateModalOpen(false)}
+        >
+          <div
+            style={{
+              background: 'var(--color-bg-surface)',
+              borderRadius: 'var(--radius-lg)',
+              border: '1px solid var(--color-border)',
+              maxWidth: '500px',
+              width: '100%',
+              boxShadow: 'var(--shadow-lg)',
+              overflow: 'hidden',
+              animation: 'fadeIn 0.2s ease-out',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div
+              style={{
+                padding: '1.25rem 1.5rem',
+                background: 'var(--color-bg-surface-elevated)',
+                borderBottom: '1px solid var(--color-border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#ffffff' }}>
+                Create New Tournament
+              </h3>
+              <button
+                onClick={() => setIsCreateModalOpen(false)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateSubmit} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={modalLabelStyle}>Tournament Name</label>
+                <input
+                  type="text"
+                  value={newTourneyName}
+                  onChange={e => handleNameChange(e.target.value)}
+                  placeholder="e.g. St. Louis Open 2026"
+                  required
+                  style={modalInputStyle}
+                />
+              </div>
+
+              <div>
+                <label style={modalLabelStyle}>URL Slug</label>
+                <input
+                  type="text"
+                  value={newTourneySlug}
+                  onChange={e => setNewTourneySlug(e.target.value)}
+                  required
+                  style={modalInputStyle}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={modalLabelStyle}>Event Date</label>
+                  <input
+                    type="text"
+                    value={newTourneyDate}
+                    onChange={e => setNewTourneyDate(e.target.value)}
+                    placeholder="e.g. April 12, 2026"
+                    style={modalInputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={modalLabelStyle}>Location</label>
+                  <input
+                    type="text"
+                    value={newTourneyLocation}
+                    onChange={e => setNewTourneyLocation(e.target.value)}
+                    placeholder="e.g. St. Louis, MO"
+                    style={modalInputStyle}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={modalLabelStyle}>Qualifying Format</label>
+                <select
+                  value={newTourneyFormat}
+                  onChange={e => setNewTourneyFormat(e.target.value as QualFormat)}
+                  style={modalInputStyle}
+                >
+                  <option value="AVERAGE_OF_X">Average of X Attempts</option>
+                  <option value="HIGH_SCORE">High Score (MAX of attempts)</option>
+                  <option value="POINTS">Points Threshold System</option>
+                </select>
+              </div>
+
+              {newTourneyFormat === 'AVERAGE_OF_X' && (
+                <div>
+                  <label style={modalLabelStyle}>Target Attempt Count (X)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={newTourneyAvgCount}
+                    onChange={e => setNewTourneyAvgCount(parseInt(e.target.value, 10) || 2)}
+                    style={modalInputStyle}
+                  />
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsCreateModalOpen(false)}
+                  className="btn btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Create &amp; Configure
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
+};
+
+const modalLabelStyle: React.CSSProperties = {
+  display: 'block',
+  fontSize: '0.8rem',
+  fontWeight: 600,
+  color: 'var(--color-text-secondary)',
+  marginBottom: '0.35rem',
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
+};
+
+const modalInputStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '0.6rem 0.85rem',
+  borderRadius: 'var(--radius-sm)',
+  border: '1px solid var(--color-border)',
+  background: 'var(--color-bg-base)',
+  color: 'var(--color-text-primary)',
+  fontSize: '0.875rem',
 };
 
 const logoIconLargeStyle: React.CSSProperties = {

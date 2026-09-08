@@ -1,0 +1,630 @@
+import React, { useState } from 'react';
+import { Tournament, TournamentTier, QualFormat, PointsThreshold } from '../types';
+import { useTournament } from '../store';
+import { Plus, Trash2, ArrowUp, ArrowDown, Save, CheckCircle2, Shield, Palette } from 'lucide-react';
+import { generateTraditionalBracket, generateFlatBracket } from '../../bracket/math';
+
+interface TournamentAdminFormProps {
+  tournament: Tournament;
+  onSaved?: () => void;
+}
+
+export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({ tournament, onSaved }) => {
+  const { updateTournament, saveTiers } = useTournament();
+
+  // Tournament Fields State
+  const [name, setName] = useState(tournament.name);
+  const [slug, setSlug] = useState(tournament.slug);
+  const [date, setDate] = useState(tournament.date);
+  const [location, setLocation] = useState(tournament.location);
+  const [qualFormat, setQualFormat] = useState<QualFormat>(tournament.qualFormat || 'AVERAGE_OF_X');
+  const [qualAverageCount, setQualAverageCount] = useState<number>(tournament.qualAverageCount || 2);
+  const [qualsClosed, setQualsClosed] = useState<boolean>(tournament.qualsClosed);
+  const [pointsConfig, setPointsConfig] = useState<PointsThreshold[]>(
+    tournament.pointsConfig || [
+      { minScore: 1200000, points: 100 },
+      { minScore: 1000000, points: 50 },
+      { minScore: 800000, points: 25 },
+    ]
+  );
+
+  // Tiers State
+  const [tiers, setTiers] = useState<TournamentTier[]>(tournament.tiers || []);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Helper to auto-derive slug from name
+  const handleNameChange = (newName: string) => {
+    setName(newName);
+    // Auto derive slug if current slug matches previous derived pattern or is default
+    const derived = newName
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-');
+    setSlug(derived);
+  };
+
+  // Add Points threshold
+  const addThreshold = () => {
+    setPointsConfig(prev => [...prev, { minScore: 500000, points: 10 }]);
+  };
+
+  const updateThreshold = (index: number, field: 'minScore' | 'points', value: number) => {
+    setPointsConfig(prev => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
+  const removeThreshold = (index: number) => {
+    setPointsConfig(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Tier Management
+  const addTier = () => {
+    const nextPriority = tiers.length + 1;
+    const tierName = `Tier ${nextPriority}`;
+    const tierSlug = `tier-${nextPriority}`;
+    const newTier: TournamentTier = {
+      id: `tier_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+      slug: tierSlug,
+      name: tierName,
+      priority: nextPriority,
+      bracketType: 'TRADITIONAL',
+      playerCount: 8,
+      bestOf: 3,
+      primaryColor: '#3b82f6',
+      secondaryColor: '#60a5fa',
+      isLocked: false,
+      bracket: generateTraditionalBracket(
+        Array.from({ length: 8 }, (_, i) => ({ id: `p${i + 1}`, name: `Player ${i + 1}`, seed: i + 1 })),
+        { bestOf: 3 }
+      ),
+    };
+    setTiers([...tiers, newTier]);
+  };
+
+  const updateTier = (index: number, updates: Partial<TournamentTier>) => {
+    setTiers(prev => {
+      const next = [...prev];
+      const target = { ...next[index], ...updates };
+      // If name changed, derive slug
+      if (updates.name && !updates.slug) {
+        target.slug = updates.name.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-');
+      }
+      next[index] = target;
+      return next;
+    });
+  };
+
+  const moveTier = (index: number, direction: 'up' | 'down') => {
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === tiers.length - 1) return;
+
+    setTiers(prev => {
+      const next = [...prev];
+      const swapIndex = direction === 'up' ? index - 1 : index + 1;
+      const temp = next[index];
+      next[index] = next[swapIndex];
+      next[swapIndex] = temp;
+
+      // Re-assign priorities 1..N
+      return next.map((t, idx) => ({ ...t, priority: idx + 1 }));
+    });
+  };
+
+  const deleteTier = (index: number) => {
+    setTiers(prev => {
+      const next = prev.filter((_, i) => i !== index);
+      return next.map((t, idx) => ({ ...t, priority: idx + 1 }));
+    });
+  };
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Re-generate bracket structures for tiers if player count or type changed
+    const updatedTiers = tiers.map(tier => {
+      const dummyPlayers = Array.from({ length: tier.playerCount }, (_, i) => ({
+        id: `dummy_${i + 1}`,
+        name: `Seed ${i + 1}`,
+        seed: i + 1,
+      }));
+
+      const newBracket =
+        tier.bracketType === 'FLAT'
+          ? generateFlatBracket(dummyPlayers, tier.flatWidth || 4, { tierId: tier.id, bestOf: tier.bestOf })
+          : generateTraditionalBracket(dummyPlayers, { tierId: tier.id, bestOf: tier.bestOf });
+
+      return {
+        ...tier,
+        bracket: newBracket,
+      };
+    });
+
+    updateTournament(tournament.id, {
+      name,
+      slug,
+      date,
+      location,
+      qualFormat,
+      qualAverageCount,
+      qualsClosed,
+      pointsConfig,
+    });
+
+    saveTiers(tournament.id, updatedTiers);
+
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+
+    if (onSaved) onSaved();
+  };
+
+  // Calculate auto-thresholds for display
+  let runningPlayerCount = 0;
+  const tierThresholdBadges = tiers.map(t => {
+    const start = runningPlayerCount + 1;
+    const end = runningPlayerCount + t.playerCount;
+    runningPlayerCount = end;
+    return { start, end };
+  });
+
+  return (
+    <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+      {/* Top Banner & Save Indicator */}
+      {saveSuccess && (
+        <div
+          style={{
+            background: 'var(--color-green-bg)',
+            border: '1px solid var(--color-green)',
+            borderRadius: 'var(--radius-md)',
+            padding: '1rem',
+            color: '#34d399',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            fontWeight: 600,
+          }}
+        >
+          <CheckCircle2 size={20} />
+          Tournament configuration &amp; tiers saved successfully!
+        </div>
+      )}
+
+      {/* Section 1: Tournament Information */}
+      <section
+        style={{
+          background: 'var(--color-bg-surface)',
+          borderRadius: 'var(--radius-lg)',
+          border: '1px solid var(--color-border)',
+          padding: '1.5rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1.25rem',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.75rem' }}>
+          <Shield size={20} color="var(--color-gold-bright)" />
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+            Tournament Details
+          </h2>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+          <div>
+            <label style={labelStyle}>Tournament Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={e => handleNameChange(e.target.value)}
+              required
+              style={inputStyle}
+            />
+          </div>
+
+          <div>
+            <label style={labelStyle}>URL Slug</label>
+            <input
+              type="text"
+              value={slug}
+              onChange={e => setSlug(e.target.value)}
+              required
+              style={inputStyle}
+            />
+            <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+              Public routing: /{slug}
+            </span>
+          </div>
+
+          <div>
+            <label style={labelStyle}>Event Date</label>
+            <input
+              type="text"
+              value={date}
+              onChange={e => setDate(e.target.value)}
+              placeholder="e.g. March 21-22, 2026"
+              style={inputStyle}
+            />
+          </div>
+
+          <div>
+            <label style={labelStyle}>Location</label>
+            <input
+              type="text"
+              value={location}
+              onChange={e => setLocation(e.target.value)}
+              placeholder="e.g. Kansas City, MO"
+              style={inputStyle}
+            />
+          </div>
+        </div>
+
+        {/* Qualifying Format Controls */}
+        <div style={{ borderTop: '1px solid var(--color-border-subtle)', paddingTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', alignItems: 'center' }}>
+            <div>
+              <label style={labelStyle}>Qualifying Format</label>
+              <select
+                value={qualFormat}
+                onChange={e => setQualFormat(e.target.value as QualFormat)}
+                style={inputStyle}
+              >
+                <option value="HIGH_SCORE">High Score (MAX of attempts)</option>
+                <option value="AVERAGE_OF_X">Average of X Attempts</option>
+                <option value="POINTS">Points Threshold System</option>
+              </select>
+            </div>
+
+            {/* Qualifiers Open/Closed Global Toggle */}
+            <div>
+              <label style={labelStyle}>Qualifiers Status</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.4rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setQualsClosed(!qualsClosed)}
+                  style={{
+                    padding: '0.45rem 1rem',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--color-border)',
+                    background: qualsClosed ? 'var(--color-red-bg)' : 'var(--color-green-bg)',
+                    color: qualsClosed ? '#f87171' : '#34d399',
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {qualsClosed ? '🔴 Qualifiers Closed' : '🟢 Qualifiers Open'}
+                </button>
+                <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                  {qualsClosed
+                    ? 'In Average format, missing attempts count as 0.'
+                    : 'Running averages calculate submitted attempts only.'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Conditional Format Config */}
+          {qualFormat === 'AVERAGE_OF_X' && (
+            <div style={{ background: 'var(--color-bg-surface-elevated)', padding: '1rem', borderRadius: 'var(--radius-sm)', maxWidth: '360px' }}>
+              <label style={labelStyle}>Target Attempt Count (X)</label>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={qualAverageCount}
+                onChange={e => setQualAverageCount(parseInt(e.target.value, 10) || 2)}
+                style={inputStyle}
+              />
+              <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                e.g. 2 for Average of 2, 3 for Average of 3
+              </span>
+            </div>
+          )}
+
+          {qualFormat === 'POINTS' && (
+            <div style={{ background: 'var(--color-bg-surface-elevated)', padding: '1rem', borderRadius: 'var(--radius-sm)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--color-text-primary)' }}>
+                  Points Thresholds (Highest met threshold awards points)
+                </span>
+                <button
+                  type="button"
+                  onClick={addThreshold}
+                  className="btn btn-secondary"
+                  style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }}
+                >
+                  <Plus size={14} /> Add Threshold
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {pointsConfig.map((th, idx) => (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Min Score</label>
+                      <input
+                        type="number"
+                        value={th.minScore}
+                        onChange={e => updateThreshold(idx, 'minScore', parseInt(e.target.value, 10) || 0)}
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div style={{ width: '120px' }}>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Points Awarded</label>
+                      <input
+                        type="number"
+                        value={th.points}
+                        onChange={e => updateThreshold(idx, 'points', parseInt(e.target.value, 10) || 0)}
+                        style={inputStyle}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeThreshold(idx)}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--color-red)', cursor: 'pointer', padding: '0.5rem', marginTop: '1.25rem' }}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Section 2: Tier Management */}
+      <section
+        style={{
+          background: 'var(--color-bg-surface)',
+          borderRadius: 'var(--radius-lg)',
+          border: '1px solid var(--color-border)',
+          padding: '1.5rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1.25rem',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.75rem' }}>
+          <div>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+              Bracket Tiers
+            </h2>
+            <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+              Organize 1 to N tiered brackets (Gold, Silver, Bronze) with automatic cutoff ranges.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={addTier}
+            className="btn btn-primary"
+            style={{ padding: '0.45rem 0.9rem', fontSize: '0.85rem' }}
+          >
+            <Plus size={16} /> Add Tier
+          </button>
+        </div>
+
+        {/* Tiers List */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {tiers.map((tier, idx) => {
+            const badge = tierThresholdBadges[idx];
+
+            return (
+              <div
+                key={tier.id}
+                style={{
+                  background: 'var(--color-bg-surface-elevated)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--color-border)',
+                  borderLeft: `5px solid ${tier.primaryColor || 'var(--color-gold)'}`,
+                  padding: '1.25rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '1rem',
+                }}
+              >
+                {/* Header: Priority, Name, Cutoff Badge & Controls */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span
+                      style={{
+                        padding: '0.2rem 0.6rem',
+                        borderRadius: 'var(--radius-sm)',
+                        background: 'var(--color-bg-surface-highlight)',
+                        fontWeight: 700,
+                        fontSize: '0.8rem',
+                        color: 'var(--color-text-primary)',
+                      }}
+                    >
+                      Priority #{tier.priority}
+                    </span>
+
+                    {/* Auto-derived cutoff badge */}
+                    <span
+                      style={{
+                        padding: '0.25rem 0.75rem',
+                        borderRadius: 'var(--radius-full)',
+                        background: 'rgba(245, 158, 11, 0.15)',
+                        border: '1px solid rgba(245, 158, 11, 0.3)',
+                        color: 'var(--color-gold-bright)',
+                        fontWeight: 700,
+                        fontSize: '0.8rem',
+                      }}
+                    >
+                      Cutoff: Leaderboard Ranks {badge.start} – {badge.end}
+                    </span>
+                  </div>
+
+                  {/* Move up / down / delete */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => moveTier(idx, 'up')}
+                      disabled={idx === 0}
+                      className="btn btn-secondary"
+                      style={{ padding: '0.25rem 0.5rem', opacity: idx === 0 ? 0.3 : 1 }}
+                      title="Move tier up in priority"
+                    >
+                      <ArrowUp size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveTier(idx, 'down')}
+                      disabled={idx === tiers.length - 1}
+                      className="btn btn-secondary"
+                      style={{ padding: '0.25rem 0.5rem', opacity: idx === tiers.length - 1 ? 0.3 : 1 }}
+                      title="Move tier down in priority"
+                    >
+                      <ArrowDown size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteTier(idx)}
+                      disabled={tiers.length <= 1}
+                      className="btn btn-danger"
+                      style={{ padding: '0.25rem 0.5rem', opacity: tiers.length <= 1 ? 0.3 : 1 }}
+                      title="Delete tier"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Form Fields Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                  <div>
+                    <label style={labelStyle}>Tier Name</label>
+                    <input
+                      type="text"
+                      value={tier.name}
+                      onChange={e => updateTier(idx, { name: e.target.value })}
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>URL Slug</label>
+                    <input
+                      type="text"
+                      value={tier.slug}
+                      onChange={e => updateTier(idx, { slug: e.target.value })}
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Bracket Type</label>
+                    <select
+                      value={tier.bracketType}
+                      onChange={e => updateTier(idx, { bracketType: e.target.value as 'TRADITIONAL' | 'FLAT' })}
+                      style={inputStyle}
+                    >
+                      <option value="TRADITIONAL">Traditional Single Elimination</option>
+                      <option value="FLAT">Flat Bracket</option>
+                    </select>
+                  </div>
+
+                  {tier.bracketType === 'FLAT' && (
+                    <div>
+                      <label style={labelStyle}>Flat Width (Matches/Round)</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={16}
+                        value={tier.flatWidth || 4}
+                        onChange={e => updateTier(idx, { flatWidth: parseInt(e.target.value, 10) || 4 })}
+                        style={inputStyle}
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label style={labelStyle}>Participant Count</label>
+                    <input
+                      type="number"
+                      min={2}
+                      max={64}
+                      value={tier.playerCount}
+                      onChange={e => updateTier(idx, { playerCount: parseInt(e.target.value, 10) || 2 })}
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Best-of Default</label>
+                    <select
+                      value={tier.bestOf}
+                      onChange={e => updateTier(idx, { bestOf: parseInt(e.target.value, 10) || 3 })}
+                      style={inputStyle}
+                    >
+                      <option value={1}>Best of 1</option>
+                      <option value={3}>Best of 3</option>
+                      <option value={5}>Best of 5</option>
+                      <option value={7}>Best of 7</option>
+                    </select>
+                  </div>
+
+                  {/* Colors */}
+                  <div>
+                    <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <Palette size={12} /> Primary Color
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input
+                        type="color"
+                        value={tier.primaryColor || '#f59e0b'}
+                        onChange={e => updateTier(idx, { primaryColor: e.target.value })}
+                        style={{ width: '38px', height: '38px', borderRadius: '4px', border: 'none', cursor: 'pointer', background: 'transparent' }}
+                      />
+                      <input
+                        type="text"
+                        value={tier.primaryColor || '#f59e0b'}
+                        onChange={e => updateTier(idx, { primaryColor: e.target.value })}
+                        style={{ ...inputStyle, flex: 1 }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Save Button Bar */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', position: 'sticky', bottom: '1.5rem' }}>
+        <button
+          type="submit"
+          className="btn btn-primary"
+          style={{ padding: '0.75rem 2rem', fontSize: '1rem', boxShadow: 'var(--shadow-gold)' }}
+        >
+          <Save size={18} />
+          Save Configuration
+        </button>
+      </div>
+    </form>
+  );
+};
+
+const labelStyle: React.CSSProperties = {
+  display: 'block',
+  fontSize: '0.8rem',
+  fontWeight: 600,
+  color: 'var(--color-text-secondary)',
+  marginBottom: '0.4rem',
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
+};
+
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '0.6rem 0.85rem',
+  borderRadius: 'var(--radius-sm)',
+  border: '1px solid var(--color-border)',
+  background: 'var(--color-bg-base)',
+  color: 'var(--color-text-primary)',
+  fontSize: '0.875rem',
+};
