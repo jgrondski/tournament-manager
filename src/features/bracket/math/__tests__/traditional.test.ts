@@ -126,68 +126,80 @@ describe('generateTraditionalBracket', () => {
       expect(bracket.totalPlayers).toBe(6);
       expect(bracket.totalRounds).toBe(3);
 
+      // Total matches strictly equals totalPlayers - 1 = 5
+      expect(Object.keys(bracket.matchesById)).toHaveLength(5);
+
       const r1Matches = bracket.rounds[0].matches;
-      expect(r1Matches).toHaveLength(4);
+      // Exactly 2 active matches in Round 1
+      expect(r1Matches).toHaveLength(2);
 
-      // Match 1: Seed 1 vs BYE (opponent 8 is absent)
-      expect(r1Matches[0].player1.player?.seed).toBe(1);
-      expect(r1Matches[0].player2.isBye).toBe(true);
-      expect(r1Matches[0].isBye).toBe(true);
-      expect(r1Matches[0].winnerId).toBe('player-1');
+      // Match 1: Seed 4 vs Seed 5
+      expect(r1Matches[0].id).toBe('r1-m1');
+      expect(r1Matches[0].player1.player?.seed).toBe(4);
+      expect(r1Matches[0].player2.player?.seed).toBe(5);
+      expect(r1Matches[0].isBye).toBe(false);
 
-      // Match 2: Seed 4 vs Seed 5 (both present)
-      expect(r1Matches[1].player1.player?.seed).toBe(4);
-      expect(r1Matches[1].player2.player?.seed).toBe(5);
+      // Match 2: Seed 3 vs Seed 6
+      expect(r1Matches[1].id).toBe('r1-m2');
+      expect(r1Matches[1].player1.player?.seed).toBe(3);
+      expect(r1Matches[1].player2.player?.seed).toBe(6);
       expect(r1Matches[1].isBye).toBe(false);
 
-      // Match 3: Seed 2 vs BYE (opponent 7 is absent)
-      expect(r1Matches[2].player1.player?.seed).toBe(2);
-      expect(r1Matches[2].player2.isBye).toBe(true);
-      expect(r1Matches[2].isBye).toBe(true);
-      expect(r1Matches[2].winnerId).toBe('player-2');
-
-      // Match 4: Seed 3 vs Seed 6 (both present)
-      expect(r1Matches[3].player1.player?.seed).toBe(3);
-      expect(r1Matches[3].player2.player?.seed).toBe(6);
-      expect(r1Matches[3].isBye).toBe(false);
-
-      // Check that bye winners are auto-seeded into Round 2 (Semifinals)
+      // Check that bye players (Seed 1 and 2) are placed directly into Round 2 (Semifinals)
       const r2Matches = bracket.rounds[1].matches;
+      expect(r2Matches).toHaveLength(2);
       expect(r2Matches[0].player1.player?.seed).toBe(1);
-      expect(r2Matches[0].player1.sourceMatchId).toBe(r1Matches[0].id);
+      expect(r2Matches[0].player1.sourceMatchId).toBeUndefined();
+      expect(r2Matches[0].player2.sourceMatchId).toBe('r1-m1');
 
       expect(r2Matches[1].player1.player?.seed).toBe(2);
-      expect(r2Matches[1].player1.sourceMatchId).toBe(r1Matches[2].id);
+      expect(r2Matches[1].player1.sourceMatchId).toBeUndefined();
+      expect(r2Matches[1].player2.sourceMatchId).toBe('r1-m2');
     });
 
     it('correctly handles 5 players (3 byes: seeds 1, 2, 3)', () => {
       const players = createMockPlayers(5);
       const bracket = generateTraditionalBracket(players);
 
+      // Total matches = 5 - 1 = 4
+      expect(Object.keys(bracket.matchesById)).toHaveLength(4);
+
       const r1Matches = bracket.rounds[0].matches;
-      // Seeds 1, 2, 3 receive byes; seeds 4 and 5 play
-      const byeMatches = r1Matches.filter((m) => m.isBye);
-      const activeMatches = r1Matches.filter((m) => !m.isBye);
+      // Only 1 active match in Round 1: Seed 4 vs Seed 5
+      expect(r1Matches).toHaveLength(1);
+      expect(r1Matches[0].player1.player?.seed).toBe(4);
+      expect(r1Matches[0].player2.player?.seed).toBe(5);
+      expect(r1Matches[0].isBye).toBe(false);
 
-      expect(byeMatches).toHaveLength(3);
-      expect(activeMatches).toHaveLength(1);
+      // Round 2 (Semifinals):
+      // Match 1: Seed 1 vs (winner of 4v5)
+      // Match 2: Seed 2 vs Seed 3 (both pre-placed!)
+      const r2Matches = bracket.rounds[1].matches;
+      expect(r2Matches[0].player1.player?.seed).toBe(1);
+      expect(r2Matches[0].player2.sourceMatchId).toBe('r1-m1');
 
-      // Active match must be seed 4 vs seed 5
-      expect(activeMatches[0].player1.player?.seed).toBe(4);
-      expect(activeMatches[0].player2.player?.seed).toBe(5);
+      expect(r2Matches[1].player1.player?.seed).toBe(2);
+      expect(r2Matches[1].player2.player?.seed).toBe(3);
     });
 
     it('correctly handles 7 players (1 bye: seed 1)', () => {
       const players = createMockPlayers(7);
       const bracket = generateTraditionalBracket(players);
 
-      const r1Matches = bracket.rounds[0].matches;
-      const byeMatches = r1Matches.filter((m) => m.isBye);
-      const activeMatches = r1Matches.filter((m) => !m.isBye);
+      // Total matches = 7 - 1 = 6
+      expect(Object.keys(bracket.matchesById)).toHaveLength(6);
 
-      expect(byeMatches).toHaveLength(1);
-      expect(activeMatches).toHaveLength(3);
-      expect(byeMatches[0].player1.player?.seed).toBe(1);
+      const r1Matches = bracket.rounds[0].matches;
+      // 3 active matches in Round 1
+      expect(r1Matches).toHaveLength(3);
+      for (const m of r1Matches) {
+        expect(m.isBye).toBe(false);
+      }
+
+      // Seed 1 placed directly into Round 2
+      const r2Matches = bracket.rounds[1].matches;
+      expect(r2Matches[0].player1.player?.seed).toBe(1);
+      expect(r2Matches[0].player1.sourceMatchId).toBeUndefined();
     });
 
     it('correctly handles 9 players (7 byes, 1 active match) and names earliest round "Round 0"', () => {
@@ -196,17 +208,16 @@ describe('generateTraditionalBracket', () => {
 
       expect(bracket.totalPlayers).toBe(9);
       expect(bracket.totalRounds).toBe(4);
+      // Total matches = 9 - 1 = 8
+      expect(Object.keys(bracket.matchesById)).toHaveLength(8);
 
       const r0 = bracket.rounds[0];
-      // 9 players in 16-size: 7 byes, 1 active match
+      // 9 players in 16-size: 7 byes, 1 active match (8 vs 9)
       expect(r0.name).toBe('Round 0');
-      expect(r0.matches.filter((m) => m.isBye)).toHaveLength(7);
-      expect(r0.matches.filter((m) => !m.isBye)).toHaveLength(1);
-
-      // Active match must be 8 vs 9
-      const activeMatch = r0.matches.find((m) => !m.isBye);
-      expect(activeMatch?.player1.player?.seed).toBe(8);
-      expect(activeMatch?.player2.player?.seed).toBe(9);
+      expect(r0.matches).toHaveLength(1);
+      expect(r0.matches[0].isBye).toBe(false);
+      expect(r0.matches[0].player1.player?.seed).toBe(8);
+      expect(r0.matches[0].player2.player?.seed).toBe(9);
 
       // Subsequent rounds follow standard names
       expect(bracket.rounds[1].name).toBe('Quarterfinals');
@@ -218,10 +229,33 @@ describe('generateTraditionalBracket', () => {
       // 11 players: 5 byes, 3 active matches (3 < 5) -> Round 0
       const bracket11 = generateTraditionalBracket(createMockPlayers(11));
       expect(bracket11.rounds[0].name).toBe('Round 0');
+      expect(Object.keys(bracket11.matchesById)).toHaveLength(10); // 11 - 1 = 10
 
       // 12 players: 4 byes, 4 active matches (4 == 4, not less) -> Not Round 0
       const bracket12 = generateTraditionalBracket(createMockPlayers(12));
       expect(bracket12.rounds[0].name).not.toBe('Round 0');
+      expect(Object.keys(bracket12.matchesById)).toHaveLength(11); // 12 - 1 = 11
+    });
+
+    it('correctly handles 11 players with direct Round 2 placement of seeds 1-5', () => {
+      const players = createMockPlayers(11);
+      const bracket = generateTraditionalBracket(players);
+
+      expect(Object.keys(bracket.matchesById)).toHaveLength(10); // 11 - 1
+      expect(bracket.rounds[0].matches).toHaveLength(3); // 3 active matches in R0 (6v11, 7v10, 8v9)
+      expect(bracket.rounds[1].matches).toHaveLength(4); // 4 QF matches
+
+      // In Round 2 (QF):
+      // QF1: Seed 1 vs (winner of 8v9)
+      // QF2: Seed 4 vs Seed 5 (both byes directly placed!)
+      // QF3: Seed 2 vs (winner of 7v10)
+      // QF4: Seed 3 vs (winner of 6v11)
+      const qf = bracket.rounds[1].matches;
+      expect(qf[0].player1.player?.seed).toBe(1);
+      expect(qf[1].player1.player?.seed).toBe(4);
+      expect(qf[1].player2.player?.seed).toBe(5);
+      expect(qf[2].player1.player?.seed).toBe(2);
+      expect(qf[3].player1.player?.seed).toBe(3);
     });
   });
 

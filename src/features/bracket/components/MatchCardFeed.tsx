@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Tournament, TournamentTier } from '../../tournament/types';
-import { BracketMatch } from '../types';
+import { BracketMatch, isMatchPlayable } from '../types';
 import { MatchScoreDrawer } from './MatchScoreDrawer';
 import { Clock, CheckCircle2, ChevronRight, Trophy } from 'lucide-react';
 
@@ -47,20 +47,23 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
           const record = tournament.matchScores[match.id];
           const p1 = match.player1.player;
           const p2 = match.player2.player;
-          const p1Name = p1?.name || (match.player1.isBye ? 'BYE' : 'TBD');
-          const p2Name = p2?.name || (match.player2.isBye ? 'BYE' : 'TBD');
+          const p1Name = p1?.name || (match.player1.sourceMatchId ? `Winner of Match #${tier.bracket.matchesById[match.player1.sourceMatchId]?.matchNumber || '?'}` : 'TBD');
+          const p2Name = p2?.name || (match.player2.sourceMatchId ? `Winner of Match #${tier.bracket.matchesById[match.player2.sourceMatchId]?.matchNumber || '?'}` : 'TBD');
 
           const p1Wins = record?.player1Wins || 0;
           const p2Wins = record?.player2Wins || 0;
-          const isComplete = match.winnerId !== null || record?.isComplete;
+          const isPlayable = isMatchPlayable(match);
+          const isComplete = Boolean((p1?.id && match.winnerId === p1.id) || (p2?.id && match.winnerId === p2.id) || record?.isComplete);
           const inProgress = !isComplete && (p1Wins > 0 || p2Wins > 0);
-          const p1Won = match.winnerId === p1?.id || record?.winnerPlayerId === p1?.id;
-          const p2Won = match.winnerId === p2?.id || record?.winnerPlayerId === p2?.id;
+          const p1Won = Boolean(p1?.id && (match.winnerId === p1.id || record?.winnerPlayerId === p1.id));
+          const p2Won = Boolean(p2?.id && (match.winnerId === p2.id || record?.winnerPlayerId === p2.id));
 
           return (
             <div
               key={match.id}
-              onClick={() => setActiveMatch(match)}
+              onClick={() => {
+                if (isPlayable) setActiveMatch(match);
+              }}
               style={{
                 background: 'var(--color-bg-surface)',
                 borderRadius: 'var(--radius-md)',
@@ -71,7 +74,8 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
                   : '1px solid var(--color-border-subtle)',
                 boxShadow: inProgress ? '0 0 12px rgba(245, 158, 11, 0.25)' : 'var(--shadow-sm)',
                 padding: '1rem',
-                cursor: 'pointer',
+                cursor: isPlayable ? 'pointer' : 'default',
+                opacity: isPlayable ? 1 : 0.65,
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '0.75rem',

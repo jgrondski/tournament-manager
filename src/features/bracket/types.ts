@@ -47,3 +47,7 @@ export interface GenerateBracketOptions {
   tierId?: string;
   bestOf?: number;
 }
+
+export const isMatchPlayable = (match: BracketMatch): boolean => {
+  return match.player1.player !== null && match.player2.player !== null && !match.isBye;
+};

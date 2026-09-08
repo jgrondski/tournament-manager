@@ -94,12 +94,12 @@ describe('advanceMatchWinner', () => {
     expect(bracket.matchesById['r2-m2'].player1.player?.seed).toBe(2);
 
     // Play active Round 1 matches:
-    // r1-m2: Seed 4 vs Seed 5
-    // r1-m4: Seed 3 vs Seed 6
-    bracket = advanceMatchWinner(bracket, 'r1-m2', 'player-4');
+    // r1-m1: Seed 4 vs Seed 5
+    // r1-m2: Seed 3 vs Seed 6
+    bracket = advanceMatchWinner(bracket, 'r1-m1', 'player-4');
     expect(bracket.matchesById['r2-m1'].player2.player?.seed).toBe(4);
 
-    bracket = advanceMatchWinner(bracket, 'r1-m4', 'player-6');
+    bracket = advanceMatchWinner(bracket, 'r1-m2', 'player-6');
     expect(bracket.matchesById['r2-m2'].player2.player?.seed).toBe(6);
 
     // Semifinals:

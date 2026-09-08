@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Tournament, TournamentTier, MatchScoreRecord } from '../../tournament/types';
-import { BracketMatch } from '../types';
+import { BracketMatch, isMatchPlayable } from '../types';
 import { MatchScoreDrawer } from './MatchScoreDrawer';
 import { Filter, Check, ChevronDown, Trophy, Clock, CheckCircle2 } from 'lucide-react';
 
@@ -11,15 +11,16 @@ interface OrganizerSheetMatrixProps {
 
 // Compute status for any match
 function getMatchStatus(match: BracketMatch, record?: MatchScoreRecord, defaultBestOf: number = 5) {
-  if (match.isBye) {
-    return { label: 'BYE', type: 'bye' as const };
-  }
   const currentBestOf = record?.bestOf || match.bestOf || defaultBestOf;
   const threshold = Math.ceil(currentBestOf / 2);
   const p1Wins = record?.player1Wins || 0;
   const p2Wins = record?.player2Wins || 0;
 
-  if (record?.isComplete || p1Wins >= threshold || p2Wins >= threshold || match.winnerId) {
+  const p1Id = match.player1.player?.id;
+  const p2Id = match.player2.player?.id;
+  const hasWinner = Boolean((p1Id && match.winnerId === p1Id) || (p2Id && match.winnerId === p2Id) || record?.isComplete);
+
+  if (hasWinner || p1Wins >= threshold || p2Wins >= threshold) {
     return { label: 'Complete', type: 'complete' as const };
   }
   const hasAnyGameScore = record?.games.some(g => g.player1Points !== null || g.player2Points !== null || g.winnerPlayerId !== null);
@@ -275,15 +276,16 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
 
                     const p1 = match.player1.player;
                     const p2 = match.player2.player;
-                    const p1Name = p1?.name || (match.player1.isBye ? 'BYE' : 'TBD');
-                    const p2Name = p2?.name || (match.player2.isBye ? 'BYE' : 'TBD');
+                    const p1Name = p1?.name || (match.player1.sourceMatchId ? `Winner of Match #${tier.bracket.matchesById[match.player1.sourceMatchId]?.matchNumber || '?'}` : 'TBD');
+                    const p2Name = p2?.name || (match.player2.sourceMatchId ? `Winner of Match #${tier.bracket.matchesById[match.player2.sourceMatchId]?.matchNumber || '?'}` : 'TBD');
 
                     const p1Wins = record?.player1Wins || 0;
                     const p2Wins = record?.player2Wins || 0;
                     const matchBestOf = record?.bestOf || match.bestOf || tier.bestOf || 5;
 
-                    const p1IsWinner = match.winnerId === p1?.id || (record?.isComplete && record?.winnerPlayerId === p1?.id);
-                    const p2IsWinner = match.winnerId === p2?.id || (record?.isComplete && record?.winnerPlayerId === p2?.id);
+                    const p1IsWinner = Boolean(p1?.id && (match.winnerId === p1.id || (record?.isComplete && record?.winnerPlayerId === p1.id)));
+                    const p2IsWinner = Boolean(p2?.id && (match.winnerId === p2.id || (record?.isComplete && record?.winnerPlayerId === p2.id)));
+                    const isPlayable = isMatchPlayable(match);
 
                     // Block background color for alternating match groups
                     const blockBg = isHovered
@@ -298,12 +300,15 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                       <React.Fragment key={match.id}>
                         {/* Row 1: Player 1 */}
                         <tr
-                          onClick={() => setSelectedMatch({ match, roundName: round.name })}
+                          onClick={() => {
+                            if (isPlayable) setSelectedMatch({ match, roundName: round.name });
+                          }}
                           onMouseEnter={() => setHoveredMatchId(match.id)}
                           onMouseLeave={() => setHoveredMatchId(null)}
                           style={{
                             background: blockBg,
-                            cursor: 'pointer',
+                            cursor: isPlayable ? 'pointer' : 'default',
+                            opacity: isPlayable ? 1 : 0.75,
                             transition: 'background 0.1s ease',
                           }}
                         >
@@ -396,20 +401,20 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                             {status.type === 'not_started' && (
                               <span className="badge badge-muted" style={{ fontSize: '0.75rem' }}>Waiting</span>
                             )}
-                            {status.type === 'bye' && (
-                              <span className="badge badge-blue" style={{ fontSize: '0.75rem' }}>BYE</span>
-                            )}
                           </td>
                         </tr>
 
                         {/* Row 2: Player 2 */}
                         <tr
-                          onClick={() => setSelectedMatch({ match, roundName: round.name })}
+                          onClick={() => {
+                            if (isPlayable) setSelectedMatch({ match, roundName: round.name });
+                          }}
                           onMouseEnter={() => setHoveredMatchId(match.id)}
                           onMouseLeave={() => setHoveredMatchId(null)}
                           style={{
                             background: blockBg,
-                            cursor: 'pointer',
+                            cursor: isPlayable ? 'pointer' : 'default',
+                            opacity: isPlayable ? 1 : 0.75,
                             transition: 'background 0.1s ease',
                           }}
                         >

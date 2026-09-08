@@ -145,5 +145,20 @@ describe('generateFlatBracket', () => {
         expect(round.matches.length).toBeLessThanOrEqual(8);
       }
     });
+
+    it('correctly structures N=24 and flatWidth=4 with strictly N-1 matches and zero phantom byes', () => {
+      const players = createMockPlayers(24);
+      const bracket = generateFlatBracket(players, 4);
+
+      // Total matches must strictly equal 24 - 1 = 23
+      expect(Object.keys(bracket.matchesById)).toHaveLength(23);
+
+      for (const round of bracket.rounds) {
+        expect(round.matches.length).toBeLessThanOrEqual(4);
+        for (const match of round.matches) {
+          expect(match.isBye).toBe(false);
+        }
+      }
+    });
   });
 });

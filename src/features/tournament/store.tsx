@@ -23,7 +23,7 @@ interface TournamentContextType {
   resetTournamentData: (tournamentId?: string) => void;
 }
 
-const STORAGE_KEY = 'ctwc_tournaments_v1';
+const STORAGE_KEY = 'ctwc_tournaments_v2';
 
 const TournamentContext = createContext<TournamentContextType | null>(null);
 

@@ -49,8 +49,8 @@ export const MatchScoreDrawer: React.FC<MatchScoreDrawerProps> = ({
 
   const p1 = match.player1.player;
   const p2 = match.player2.player;
-  const p1Name = p1?.name || (match.player1.isBye ? 'BYE' : 'TBD');
-  const p2Name = p2?.name || (match.player2.isBye ? 'BYE' : 'TBD');
+  const p1Name = p1?.name || (match.player1.sourceMatchId ? 'Feeder Winner' : 'TBD');
+  const p2Name = p2?.name || (match.player2.sourceMatchId ? 'Feeder Winner' : 'TBD');
 
   const handleScoreChange = (gameIndex: number, playerSlot: 1 | 2, value: string) => {
     // Only allow digits

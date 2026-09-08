@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BracketStructure, BracketMatch } from '../types';
+import { BracketStructure, BracketMatch, isMatchPlayable } from '../types';
 import { Tournament, TournamentTier } from '../../tournament/types';
 import { MatchScoreDrawer } from './MatchScoreDrawer';
 import { Trophy } from 'lucide-react';
@@ -98,21 +98,22 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                 const record = tournament.matchScores[match.id];
                 const p1 = match.player1.player;
                 const p2 = match.player2.player;
-                const p1Name = p1?.name || (match.player1.isBye ? 'BYE' : 'TBD');
-                const p2Name = p2?.name || (match.player2.isBye ? 'BYE' : 'TBD');
+                const p1Name = p1?.name || (match.player1.sourceMatchId ? `Winner of M#${bracket.matchesById[match.player1.sourceMatchId]?.matchNumber || '?'}` : 'TBD');
+                const p2Name = p2?.name || (match.player2.sourceMatchId ? `Winner of M#${bracket.matchesById[match.player2.sourceMatchId]?.matchNumber || '?'}` : 'TBD');
 
                 const p1Wins = record?.player1Wins || 0;
                 const p2Wins = record?.player2Wins || 0;
-                const p1Won = match.winnerId === p1?.id || record?.winnerPlayerId === p1?.id;
-                const p2Won = match.winnerId === p2?.id || record?.winnerPlayerId === p2?.id;
-                const isComplete = match.winnerId !== null || record?.isComplete;
+                const isPlayable = isMatchPlayable(match);
+                const isComplete = Boolean((p1?.id && match.winnerId === p1.id) || (p2?.id && match.winnerId === p2.id) || record?.isComplete);
                 const inProgress = !isComplete && (p1Wins > 0 || p2Wins > 0);
+                const p1Won = Boolean(p1?.id && (match.winnerId === p1.id || record?.winnerPlayerId === p1.id));
+                const p2Won = Boolean(p2?.id && (match.winnerId === p2.id || record?.winnerPlayerId === p2.id));
 
                 return (
                   <div
                     key={match.id}
                     onClick={() => {
-                      if (!isObsMode && canManage) {
+                      if (!isObsMode && canManage && isPlayable) {
                         setSelectedMatch({ match, roundName: round.name });
                       }
                     }}
@@ -127,7 +128,8 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                       boxShadow: inProgress
                         ? '0 0 12px rgba(245, 158, 11, 0.3)'
                         : 'var(--shadow-sm)',
-                      cursor: !isObsMode && canManage ? 'pointer' : 'default',
+                      cursor: !isObsMode && canManage && isPlayable ? 'pointer' : 'default',
+                      opacity: isPlayable ? 1 : 0.7,
                       overflow: 'hidden',
                       transition: 'all 0.15s ease',
                     }}

@@ -72,12 +72,6 @@ export function advanceMatchWinner(
         sourceMatchId: m.id,
       };
     }
-
-    // Auto-advance if downstream match is a bye
-    if (nextMatch.isBye) {
-      nextMatch.winnerId = winner.id;
-      propagateWinner(nextMatch, winner);
-    }
   };
 
   propagateWinner(updatedMatch, winnerPlayer);
