@@ -22,6 +22,8 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
     deleteQualifierScore,
     togglePlayerDisqualification,
     togglePlayerQualsCompleted,
+    globalPlayers,
+    importPlayersToTournament,
   } = useTournament();
 
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerProfile | null>(
@@ -51,6 +53,13 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
   const isScoreValid = Boolean(selectedPlayer) && !isNaN(numericScore) && numericScore > 0;
 
   const handlePlayerSelected = (player: PlayerProfile) => {
+    setSelectedPlayer(player);
+    setPbInput(player.personalBest ? String(player.personalBest) : '');
+    setPlaystyleInput(player.playstyle || 'Rolling');
+  };
+
+  const handleSelectGlobalPlayer = (player: PlayerProfile) => {
+    importPlayersToTournament(tournament.id, [player]);
     setSelectedPlayer(player);
     setPbInput(player.personalBest ? String(player.personalBest) : '');
     setPlaystyleInput(player.playstyle || 'Rolling');
@@ -169,8 +178,10 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
             <label style={labelStyle}>Competitor (Creatable Combobox)</label>
             <CreatablePlayerSelect
               playersPool={tournament.playersPool}
+              globalPlayers={globalPlayers}
               selectedPlayer={selectedPlayer}
               onSelectPlayer={handlePlayerSelected}
+              onSelectGlobalPlayer={handleSelectGlobalPlayer}
               onCreatePlayer={handleCreatePlayer}
             />
           </div>

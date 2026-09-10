@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   calculateHighScore,
+  calculateMaxoutAndKicker,
+  MAXOUT_THRESHOLD,
   calculateAverageOfX,
   calculatePoints,
   deriveLeaderboard,
@@ -19,6 +21,35 @@ describe('Qualifiers Scoring Engine', () => {
   it('calculates HIGH_SCORE correctly as MAX(score)', () => {
     expect(calculateHighScore(dummySubs)).toBe(1150000);
     expect(calculateHighScore([])).toBe(0);
+  });
+
+  describe('calculateMaxoutAndKicker', () => {
+    it('accurately counts maxouts (>= 999,999) and finds highest sub-maxout kicker', () => {
+      expect(MAXOUT_THRESHOLD).toBe(999999);
+      // dummySubs: 950k, 1150k (maxout), 800k -> 1 maxout, kicker 950k, best 1150k
+      const res = calculateMaxoutAndKicker(dummySubs);
+      expect(res.maxoutCount).toBe(1);
+      expect(res.kickerScore).toBe(950000);
+      expect(res.bestScore).toBe(1150000);
+    });
+
+    it('returns kicker 0 when competitor has only maxouts', () => {
+      const allMaxouts: QualifierSubmission[] = [
+        { id: 'm1', tournamentId: 't1', playerId: 'p1', score: 1000000, submittedAt: 1 },
+        { id: 'm2', tournamentId: 't1', playerId: 'p1', score: 1050000, submittedAt: 2 },
+      ];
+      const res = calculateMaxoutAndKicker(allMaxouts);
+      expect(res.maxoutCount).toBe(2);
+      expect(res.kickerScore).toBe(0);
+      expect(res.bestScore).toBe(1050000);
+    });
+
+    it('returns 0 maxouts and 0 kicker when submissions list is empty', () => {
+      const res = calculateMaxoutAndKicker([]);
+      expect(res.maxoutCount).toBe(0);
+      expect(res.kickerScore).toBe(0);
+      expect(res.bestScore).toBe(0);
+    });
   });
 
   describe('calculateAverageOfX', () => {
@@ -199,6 +230,99 @@ describe('Qualifiers Scoring Engine', () => {
       expect(rows[0].rank).toBe(1);
       expect(rows[1].player.id).toBe('p1');
       expect(rows[1].rank).toBe(2);
+    });
+
+    it('sorts competitors according to exact Maxout count + kicker hierarchy in HIGH_SCORE mode', () => {
+      // Competitor 1: 2 Maxouts (1.1M, 1.05M) + 900k kicker -> Rank 1
+      // Competitor 2: 2 Maxouts (1.2M, 1.0M) + 850k kicker -> Rank 2 (2 maxouts, lower kicker)
+      // Competitor 3: 1 Maxout (1.3M) + 950k kicker -> Rank 3 (1 maxout beats 0 maxouts)
+      // Competitor 4: 1 Maxout (1.0M) + 800k kicker -> Rank 4 (1 maxout, lower kicker)
+      // Competitor 5: 0 Maxouts (980k best) -> Rank 5
+      // Competitor 6: 0 Maxouts (950k best) -> Rank 6
+      const maxoutPlayers: PlayerProfile[] = [
+        { id: 'c1', name: 'Two Max High Kicker', personalBest: 1200000, playstyle: 'Rolling' },
+        { id: 'c2', name: 'Two Max Low Kicker', personalBest: 1200000, playstyle: 'Rolling' },
+        { id: 'c3', name: 'One Max High Kicker', personalBest: 1300000, playstyle: 'Rolling' },
+        { id: 'c4', name: 'One Max Low Kicker', personalBest: 1100000, playstyle: 'Rolling' },
+        { id: 'c5', name: 'Zero Max 980k', personalBest: 980000, playstyle: 'DAS' },
+        { id: 'c6', name: 'Zero Max 950k', personalBest: 950000, playstyle: 'DAS' },
+      ];
+
+      const maxoutSubmissions: QualifierSubmission[] = [
+        // c1: 2 maxouts, kicker 900k
+        { id: 's1', tournamentId: 't-max', playerId: 'c1', score: 1100000, submittedAt: 1 },
+        { id: 's2', tournamentId: 't-max', playerId: 'c1', score: 1050000, submittedAt: 2 },
+        { id: 's3', tournamentId: 't-max', playerId: 'c1', score: 900000, submittedAt: 3 },
+        // c2: 2 maxouts, kicker 850k
+        { id: 's4', tournamentId: 't-max', playerId: 'c2', score: 1200000, submittedAt: 4 },
+        { id: 's5', tournamentId: 't-max', playerId: 'c2', score: 1000000, submittedAt: 5 },
+        { id: 's6', tournamentId: 't-max', playerId: 'c2', score: 850000, submittedAt: 6 },
+        // c3: 1 maxout (1.3M), kicker 950k
+        { id: 's7', tournamentId: 't-max', playerId: 'c3', score: 1300000, submittedAt: 7 },
+        { id: 's8', tournamentId: 't-max', playerId: 'c3', score: 950000, submittedAt: 8 },
+        // c4: 1 maxout (1.0M), kicker 800k
+        { id: 's9', tournamentId: 't-max', playerId: 'c4', score: 1000000, submittedAt: 9 },
+        { id: 's10', tournamentId: 't-max', playerId: 'c4', score: 800000, submittedAt: 10 },
+        // c5: 0 maxouts, best 980k
+        { id: 's11', tournamentId: 't-max', playerId: 'c5', score: 980000, submittedAt: 11 },
+        // c6: 0 maxouts, best 950k
+        { id: 's12', tournamentId: 't-max', playerId: 'c6', score: 950000, submittedAt: 12 },
+      ];
+
+      const maxoutTournament: Tournament = {
+        id: 't-max',
+        slug: 't-max',
+        name: 'Maxout Championship',
+        date: '2026-09-10',
+        location: 'Online',
+        qualFormat: 'HIGH_SCORE',
+        isLocked: false,
+        tiers: mockTiers,
+        matchScores: {},
+        playersPool: maxoutPlayers,
+        qualifierSubmissions: maxoutSubmissions,
+        tournamentPlayers: {},
+      };
+
+      const rows = deriveLeaderboard(maxoutTournament);
+
+      expect(rows).toHaveLength(6);
+
+      // Rank 1: c1 (2 maxouts, kicker 900k)
+      expect(rows[0].player.id).toBe('c1');
+      expect(rows[0].rank).toBe(1);
+      expect(rows[0].maxoutCount).toBe(2);
+      expect(rows[0].kickerScore).toBe(900000);
+
+      // Rank 2: c2 (2 maxouts, kicker 850k)
+      expect(rows[1].player.id).toBe('c2');
+      expect(rows[1].rank).toBe(2);
+      expect(rows[1].maxoutCount).toBe(2);
+      expect(rows[1].kickerScore).toBe(850000);
+
+      // Rank 3: c3 (1 maxout, kicker 950k)
+      expect(rows[2].player.id).toBe('c3');
+      expect(rows[2].rank).toBe(3);
+      expect(rows[2].maxoutCount).toBe(1);
+      expect(rows[2].kickerScore).toBe(950000);
+
+      // Rank 4: c4 (1 maxout, kicker 800k)
+      expect(rows[3].player.id).toBe('c4');
+      expect(rows[3].rank).toBe(4);
+      expect(rows[3].maxoutCount).toBe(1);
+      expect(rows[3].kickerScore).toBe(800000);
+
+      // Rank 5: c5 (0 maxouts, best 980k)
+      expect(rows[4].player.id).toBe('c5');
+      expect(rows[4].rank).toBe(5);
+      expect(rows[4].maxoutCount).toBe(0);
+      expect(rows[4].finalScore).toBe(980000);
+
+      // Rank 6: c6 (0 maxouts, best 950k)
+      expect(rows[5].player.id).toBe('c6');
+      expect(rows[5].rank).toBe(6);
+      expect(rows[5].maxoutCount).toBe(0);
+      expect(rows[5].finalScore).toBe(950000);
     });
 
     it('dynamically generates draft brackets with tier-relative seeding', () => {

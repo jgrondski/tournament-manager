@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Tournament, TournamentTier } from '../features/tournament/types';
 import { useTournament } from '../features/tournament/store';
 import { colorWithAlpha } from '../features/bracket/colorUtils';
-import { Layers, ExternalLink, ChevronDown, Video, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Layers, ExternalLink, ChevronDown, Video, ShieldCheck, AlertTriangle, Users } from 'lucide-react';
 
 interface TournamentNavbarProps {
   tournament: Tournament;
@@ -109,6 +109,18 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
 
         {/* Global Toolbar Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          {/* Global Player Pool Link */}
+          <Link
+            to="/players"
+            onClick={e => handleLinkClick(e, '/players')}
+            className="btn btn-secondary"
+            title="Open Global Player Pool Directory"
+            style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem' }}
+          >
+            <Users size={14} color="var(--color-gold-bright)" />
+            <span>Player Pool</span>
+          </Link>
+
           {/* OBS Mode Direct Link */}
           <a
             href={`/${tournament.slug}/${currentTierSlug}?obs=true`}

@@ -111,6 +111,55 @@ export function generateRealisticPlayers(count: number, existingPool: PlayerProf
 }
 
 /**
+ * Generate exactly `count` new simulated competitors to append to a player pool.
+ */
+export function generateAdditionalFakePlayers(
+  count: number,
+  existingPool: PlayerProfile[] = []
+): PlayerProfile[] {
+  const existingNames = new Set(existingPool.map(p => p.name.toLowerCase()));
+  const newPlayers: PlayerProfile[] = [];
+
+  let nameIdx = 0;
+  let customId = existingPool.length + 1;
+
+  while (newPlayers.length < count) {
+    let name = '';
+    while (nameIdx < REALISTIC_PLAYER_NAMES.length) {
+      const candidate = REALISTIC_PLAYER_NAMES[nameIdx++];
+      if (!existingNames.has(candidate.toLowerCase())) {
+        name = candidate;
+        break;
+      }
+    }
+
+    if (!name) {
+      name = `Player ${customId++}`;
+      while (existingNames.has(name.toLowerCase())) {
+        name = `Player ${customId++}`;
+      }
+    }
+
+    existingNames.add(name.toLowerCase());
+
+    const playstyle = PLAYSTYLES[Math.floor(Math.random() * PLAYSTYLES.length)];
+    const country = COUNTRIES[Math.floor(Math.random() * COUNTRIES.length)];
+    const personalBest = Math.floor(700000 + Math.random() * 650000);
+
+    newPlayers.push({
+      id: `p_sim_${Date.now()}_${existingPool.length + newPlayers.length + 1}_${Math.random().toString(36).substring(2, 6)}`,
+      name,
+      personalBest,
+      playstyle,
+      country,
+      notes: 'Simulated competitor',
+    });
+  }
+
+  return newPlayers;
+}
+
+/**
  * Generate simulated qualifier scores for a tournament based on its capacity and format.
  * Generates scores for (total bracket capacity + 4 DNQ) players.
  */

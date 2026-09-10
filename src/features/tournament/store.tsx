@@ -9,10 +9,15 @@ import {
 } from './types';
 import { advanceMatchWinner } from '../bracket/math';
 import { generateDraftBracketsForTournament } from '../qualifiers/scoring';
-import { generateSimulatedQualifiers, runFullSimulation } from './simulation';
+import {
+  generateSimulatedQualifiers,
+  runFullSimulation,
+  generateAdditionalFakePlayers,
+} from './simulation';
 
 interface TournamentContextType {
   tournaments: Tournament[];
+  globalPlayers: PlayerProfile[];
   getTournamentBySlug: (slug: string) => Tournament | undefined;
   getTierBySlug: (
     tournamentSlug: string,
@@ -61,10 +66,21 @@ interface TournamentContextType {
   seedQualifiers: (tournamentId: string) => void;
   simulateFullTournament: (tournamentId: string) => void;
   deleteTournament: (tournamentId: string) => void;
+  addGlobalPlayer: (player: Omit<PlayerProfile, 'id'>) => PlayerProfile;
+  updateGlobalPlayer: (playerId: string, updates: Partial<PlayerProfile>) => void;
+  deleteGlobalPlayer: (playerId: string) => void;
+  clearAllGlobalPlayers: () => void;
+  generateFakeGlobalPlayers: (count: number) => PlayerProfile[];
+  importPlayersToTournament: (tournamentId: string, players: PlayerProfile[]) => void;
+  removePlayerFromTournament: (
+    tournamentId: string,
+    playerId: string
+  ) => { success: boolean; error?: string };
 }
 
 const STORAGE_KEY = 'tournament_manager_tournaments_v3';
 const LEGACY_STORAGE_KEY = 'ctwc_tournaments_v3';
+const GLOBAL_PLAYERS_STORAGE_KEY = 'classic_tetris_global_players';
 
 const TournamentContext = createContext<TournamentContextType | null>(null);
 
@@ -94,6 +110,21 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return [];
   });
 
+  const [globalPlayers, setGlobalPlayers] = useState<PlayerProfile[]>(() => {
+    try {
+      const saved = localStorage.getItem(GLOBAL_PLAYERS_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed;
+        }
+      }
+    } catch {
+      // ignore parse errors and fallback
+    }
+    return [];
+  });
+
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(tournaments));
@@ -101,6 +132,14 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       // storage quota or private mode fallback
     }
   }, [tournaments]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(GLOBAL_PLAYERS_STORAGE_KEY, JSON.stringify(globalPlayers));
+    } catch {
+      // storage quota or private mode fallback
+    }
+  }, [globalPlayers]);
 
   const getTournamentBySlug = (slug: string) => {
     return tournaments.find(t => t.slug === slug || t.id === slug);
@@ -176,6 +215,14 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       ...player,
       id: `p_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
     };
+
+    // Also sync to global players if not already present
+    setGlobalPlayers(prev => {
+      if (prev.some(p => p.name.toLowerCase() === newPlayer.name.toLowerCase())) {
+        return prev;
+      }
+      return [...prev, newPlayer];
+    });
 
     setTournaments(prev =>
       prev.map(t => {
@@ -723,10 +770,125 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setTournaments(prev => prev.filter(t => t.id !== tournamentId && t.slug !== tournamentId));
   };
 
+  const addGlobalPlayer = (player: Omit<PlayerProfile, 'id'>): PlayerProfile => {
+    const newPlayer: PlayerProfile = {
+      ...player,
+      id: `p_global_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+    };
+    setGlobalPlayers(prev => [newPlayer, ...prev]);
+    return newPlayer;
+  };
+
+  const updateGlobalPlayer = (playerId: string, updates: Partial<PlayerProfile>) => {
+    setGlobalPlayers(prev =>
+      prev.map(p => (p.id === playerId ? { ...p, ...updates } : p))
+    );
+
+    // Propagate updates to any tournament currently containing this player
+    setTournaments(prev =>
+      prev.map(t => {
+        const hasPlayer = (t.playersPool || []).some(p => p.id === playerId);
+        if (!hasPlayer) return t;
+        const updatedPool = t.playersPool.map(p =>
+          p.id === playerId ? { ...p, ...updates } : p
+        );
+        const updated = { ...t, playersPool: updatedPool };
+        if (!updated.isLocked) {
+          updated.tiers = generateDraftBracketsForTournament(updated);
+        }
+        return updated;
+      })
+    );
+  };
+
+  const deleteGlobalPlayer = (playerId: string) => {
+    setGlobalPlayers(prev => prev.filter(p => p.id !== playerId));
+  };
+
+  const clearAllGlobalPlayers = () => {
+    setGlobalPlayers([]);
+  };
+
+  const generateFakeGlobalPlayers = (count: number): PlayerProfile[] => {
+    const newPlayers = generateAdditionalFakePlayers(count, globalPlayers);
+    setGlobalPlayers(prev => [...prev, ...newPlayers]);
+    return newPlayers;
+  };
+
+  const importPlayersToTournament = (tournamentId: string, playersToImport: PlayerProfile[]) => {
+    setTournaments(prev =>
+      prev.map(t => {
+        if (t.id !== tournamentId) return t;
+        const existingPool = t.playersPool || [];
+        const existingIds = new Set(existingPool.map(p => p.id));
+        const existingNames = new Set(existingPool.map(p => p.name.toLowerCase()));
+
+        const toAdd = playersToImport.filter(
+          p => !existingIds.has(p.id) && !existingNames.has(p.name.toLowerCase())
+        );
+
+        if (toAdd.length === 0) return t;
+
+        const updated = { ...t, playersPool: [...existingPool, ...toAdd] };
+        if (!updated.isLocked) {
+          updated.tiers = generateDraftBracketsForTournament(updated);
+        }
+        return updated;
+      })
+    );
+  };
+
+  const removePlayerFromTournament = (
+    tournamentId: string,
+    playerId: string
+  ): { success: boolean; error?: string } => {
+    const tournament = tournaments.find(t => t.id === tournamentId);
+    if (!tournament) return { success: false, error: 'Tournament not found' };
+
+    // Check if player has recorded match play
+    const hasRecordedMatches = Object.values(tournament.matchScores || {}).some(
+      m =>
+        (m.winnerPlayerId === playerId || m.loserPlayerId === playerId) ||
+        (m.isComplete && (m.games || []).length > 0)
+    );
+    if (hasRecordedMatches) {
+      return {
+        success: false,
+        error: 'Cannot remove competitor who has recorded matches. Clear match scores first.',
+      };
+    }
+
+    setTournaments(prev =>
+      prev.map(t => {
+        if (t.id !== tournamentId) return t;
+        const updatedPool = (t.playersPool || []).filter(p => p.id !== playerId);
+        const updatedSubs = (t.qualifierSubmissions || []).filter(s => s.playerId !== playerId);
+        const updatedQuals = (t.qualifiers || []).filter(q => q.playerId !== playerId);
+        const updatedTournamentPlayers = { ...(t.tournamentPlayers || {}) };
+        delete updatedTournamentPlayers[playerId];
+
+        const updated: Tournament = {
+          ...t,
+          playersPool: updatedPool,
+          qualifierSubmissions: updatedSubs,
+          qualifiers: updatedQuals,
+          tournamentPlayers: updatedTournamentPlayers,
+        };
+        if (!updated.isLocked) {
+          updated.tiers = generateDraftBracketsForTournament(updated);
+        }
+        return updated;
+      })
+    );
+
+    return { success: true };
+  };
+
   return (
     <TournamentContext.Provider
       value={{
         tournaments,
+        globalPlayers,
         getTournamentBySlug,
         getTierBySlug,
         createTournament,
@@ -751,6 +913,13 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         seedQualifiers,
         simulateFullTournament,
         deleteTournament,
+        addGlobalPlayer,
+        updateGlobalPlayer,
+        deleteGlobalPlayer,
+        clearAllGlobalPlayers,
+        generateFakeGlobalPlayers,
+        importPlayersToTournament,
+        removePlayerFromTournament,
       }}
     >
       {children}

@@ -118,14 +118,25 @@ export const TournamentSwitcherPage: React.FC = () => {
             Organizer command center, public broadcast brackets, and mobile floor judge portal for competitive gaming tournaments.
           </p>
 
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="btn btn-primary"
-            style={{ padding: '0.65rem 1.5rem', fontSize: '0.95rem', boxShadow: 'var(--shadow-gold)' }}
-          >
-            <Plus size={18} />
-            Create New Tournament
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="btn btn-primary"
+              style={{ padding: '0.65rem 1.5rem', fontSize: '0.95rem', boxShadow: 'var(--shadow-gold)' }}
+            >
+              <Plus size={18} />
+              Create New Tournament
+            </button>
+
+            <Link
+              to="/players"
+              className="btn btn-secondary"
+              style={{ padding: '0.65rem 1.25rem', fontSize: '0.95rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none' }}
+            >
+              <Users size={18} color="var(--color-gold-bright)" />
+              Global Player Pool
+            </Link>
+          </div>
         </header>
 
         {/* Tournament Grid / Empty State */}

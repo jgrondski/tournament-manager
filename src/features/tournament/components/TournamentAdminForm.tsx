@@ -1,8 +1,29 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Tournament, TournamentTier, QualFormat, PointsThreshold } from '../types';
+import { Tournament, TournamentTier, QualFormat, PointsThreshold, PlayerProfile } from '../types';
 import { useTournament } from '../store';
-import { Plus, Trash2, ArrowUp, ArrowDown, Save, CheckCircle2, Shield, Palette, X, AlertTriangle, ShieldCheck, Sparkles, Play } from 'lucide-react';
+import {
+  Plus,
+  Trash2,
+  ArrowUp,
+  ArrowDown,
+  Save,
+  CheckCircle2,
+  Shield,
+  Palette,
+  X,
+  AlertTriangle,
+  ShieldCheck,
+  Sparkles,
+  Play,
+  Users,
+  UserPlus,
+  Download,
+  UserX,
+  Search,
+} from 'lucide-react';
 import { generateTraditionalBracket, generateFlatBracket } from '../../bracket/math';
+import { ImportFromGlobalModal } from '../../players/components/ImportFromGlobalModal';
+import { PlayerEditModal } from '../../players/components/PlayerEditModal';
 
 interface TournamentAdminFormProps {
   tournament: Tournament;
@@ -23,6 +44,10 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
     clearAllTournamentData,
     seedQualifiers,
     simulateFullTournament,
+    globalPlayers,
+    importPlayersToTournament,
+    removePlayerFromTournament,
+    addPlayerToPool,
   } = useTournament();
 
   // Tournament Fields State
@@ -46,6 +71,26 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
   const [tierToDelete, setTierToDelete] = useState<{ index: number; tier: TournamentTier } | null>(null);
   const [dataActionToConfirm, setDataActionToConfirm] = useState<'MATCHES' | 'QUALS' | 'ALL' | null>(null);
   const [simFeedback, setSimFeedback] = useState<string | null>(null);
+
+  // Roster Management State
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [playerToRemove, setPlayerToRemove] = useState<PlayerProfile | null>(null);
+  const [rosterSearch, setRosterSearch] = useState('');
+  const [rosterFeedback, setRosterFeedback] = useState<string | null>(null);
+  const [rosterError, setRosterError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!rosterFeedback) return;
+    const timer = setTimeout(() => setRosterFeedback(null), 4000);
+    return () => clearTimeout(timer);
+  }, [rosterFeedback]);
+
+  useEffect(() => {
+    if (!rosterError) return;
+    const timer = setTimeout(() => setRosterError(null), 5000);
+    return () => clearTimeout(timer);
+  }, [rosterError]);
 
   useEffect(() => {
     if (!simFeedback) return;
@@ -328,6 +373,78 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
     runningPlayerCount = end;
     return { start, end };
   });
+
+  // Roster helpers
+  const totalCapacity = useMemo(() => {
+    return tiers.reduce((acc, t) => acc + (t.playerCount || 0), 0);
+  }, [tiers]);
+
+  const availableGlobalCount = useMemo(() => {
+    const existingIds = new Set((tournament.playersPool || []).map(p => p.id));
+    const existingNames = new Set((tournament.playersPool || []).map(p => p.name.toLowerCase()));
+    return globalPlayers.filter(
+      p => !existingIds.has(p.id) && !existingNames.has(p.name.toLowerCase())
+    ).length;
+  }, [globalPlayers, tournament.playersPool]);
+
+  const filteredRoster = useMemo(() => {
+    if (!rosterSearch.trim()) return tournament.playersPool || [];
+    const q = rosterSearch.toLowerCase().trim();
+    return (tournament.playersPool || []).filter(
+      p =>
+        p.name.toLowerCase().includes(q) ||
+        p.country?.toLowerCase().includes(q) ||
+        p.playstyle?.toLowerCase().includes(q)
+    );
+  }, [tournament.playersPool, rosterSearch]);
+
+  const existingRosterNames = useMemo(
+    () => (tournament.playersPool || []).map(p => p.name),
+    [tournament.playersPool]
+  );
+
+  const playerToRemoveHasMatches = useMemo(() => {
+    if (!playerToRemove) return false;
+    return Object.values(tournament.matchScores || {}).some(
+      m =>
+        m.winnerPlayerId === playerToRemove.id ||
+        m.loserPlayerId === playerToRemove.id ||
+        (m.isComplete && (m.games || []).length > 0)
+    );
+  }, [playerToRemove, tournament.matchScores]);
+
+  const handleImportGlobalPlayers = (playersToImport: PlayerProfile[]) => {
+    importPlayersToTournament(tournament.id, playersToImport);
+    setRosterFeedback(`Imported ${playersToImport.length} competitor(s) into tournament roster.`);
+  };
+
+  const handleImportAllGlobal = () => {
+    const existingIds = new Set((tournament.playersPool || []).map(p => p.id));
+    const existingNames = new Set((tournament.playersPool || []).map(p => p.name.toLowerCase()));
+    const toImport = globalPlayers.filter(
+      p => !existingIds.has(p.id) && !existingNames.has(p.name.toLowerCase())
+    );
+    if (toImport.length > 0) {
+      importPlayersToTournament(tournament.id, toImport);
+      setRosterFeedback(`Imported all ${toImport.length} available global competitor(s).`);
+    }
+  };
+
+  const handleRegisterNewCompetitor = (playerData: Omit<PlayerProfile, 'id'>) => {
+    addPlayerToPool(tournament.id, playerData);
+    setRosterFeedback(`Registered ${playerData.name} into tournament roster.`);
+  };
+
+  const handleRemoveCompetitorConfirm = () => {
+    if (!playerToRemove) return;
+    const res = removePlayerFromTournament(tournament.id, playerToRemove.id);
+    if (!res.success) {
+      setRosterError(res.error || 'Failed to remove competitor.');
+    } else {
+      setRosterFeedback(`Removed ${playerToRemove.name} from tournament roster.`);
+      setPlayerToRemove(null);
+    }
+  };
 
   return (
     <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -771,7 +888,292 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
         </div>
       </section>
 
-      {/* Section 3: Data Management & Reset */}
+      {/* Section 3: Tournament Roster Management */}
+      <section
+        style={{
+          background: 'var(--color-bg-surface)',
+          borderRadius: 'var(--radius-lg)',
+          border: '1px solid var(--color-border)',
+          padding: '1.5rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1.25rem',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Users size={20} color="var(--color-gold-bright)" />
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
+                Tournament Roster
+              </h2>
+            </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem', margin: 0 }}>
+              Registered competitors for this tournament. Import from the global catalog or register new players directly.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => setIsImportModalOpen(true)}
+              className="btn btn-secondary"
+              style={{ padding: '0.45rem 0.85rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+            >
+              <Download size={14} color="var(--color-gold-bright)" />
+              Import from Global Pool
+            </button>
+
+            {availableGlobalCount > 0 && (
+              <button
+                type="button"
+                onClick={handleImportAllGlobal}
+                className="btn btn-secondary"
+                style={{ padding: '0.45rem 0.85rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                Import All Available ({availableGlobalCount})
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setIsRegisterModalOpen(true)}
+              className="btn btn-primary"
+              style={{ padding: '0.45rem 0.95rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+            >
+              <UserPlus size={14} />
+              Register Competitor
+            </button>
+          </div>
+        </div>
+
+        {/* Feedback / Error Alerts */}
+        {rosterFeedback && (
+          <div
+            style={{
+              padding: '0.75rem 1rem',
+              background: 'rgba(34, 197, 94, 0.12)',
+              border: '1px solid rgba(34, 197, 94, 0.4)',
+              borderRadius: 'var(--radius-sm)',
+              color: '#4ade80',
+              fontSize: '0.85rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}
+          >
+            <CheckCircle2 size={16} />
+            <span>{rosterFeedback}</span>
+          </div>
+        )}
+
+        {rosterError && (
+          <div
+            style={{
+              padding: '0.75rem 1rem',
+              background: 'rgba(239, 68, 68, 0.15)',
+              border: '1px solid rgba(239, 68, 68, 0.4)',
+              borderRadius: 'var(--radius-sm)',
+              color: '#f87171',
+              fontSize: '0.85rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}
+          >
+            <AlertTriangle size={16} />
+            <span>{rosterError}</span>
+          </div>
+        )}
+
+        {/* Capacity Summary Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+          <div style={{ padding: '0.85rem 1rem', background: 'var(--color-bg-surface-elevated)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)' }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+              Registered Competitors
+            </div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: (tournament.playersPool || []).length > 0 ? 'var(--color-gold-bright)' : 'var(--color-text-secondary)' }}>
+              {(tournament.playersPool || []).length}
+            </div>
+          </div>
+
+          <div style={{ padding: '0.85rem 1rem', background: 'var(--color-bg-surface-elevated)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)' }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+              Total Bracket Capacity
+            </div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+              {totalCapacity}
+            </div>
+          </div>
+
+          <div style={{ padding: '0.85rem 1rem', background: 'var(--color-bg-surface-elevated)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)' }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+              Roster Status
+            </div>
+            <div style={{ fontSize: '0.95rem', fontWeight: 700, marginTop: '0.25rem' }}>
+              {(tournament.playersPool || []).length < totalCapacity ? (
+                <span style={{ color: 'var(--color-gold-bright)' }}>
+                  Underfilled ({(tournament.playersPool || []).length}/{totalCapacity})
+                </span>
+              ) : (tournament.playersPool || []).length === totalCapacity ? (
+                <span style={{ color: '#4ade80' }}>
+                  Full Capacity ({totalCapacity}/{totalCapacity})
+                </span>
+              ) : (
+                <span style={{ color: '#60a5fa' }}>
+                  Ready ({totalCapacity} in tiers + {(tournament.playersPool || []).length - totalCapacity} DNQ)
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Competitor Search & List */}
+        {(tournament.playersPool || []).length === 0 ? (
+          <div
+            style={{
+              padding: '2.5rem 1rem',
+              background: 'var(--color-bg-base)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px dashed var(--color-border)',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '0.75rem',
+            }}
+          >
+            <p style={{ fontSize: '0.95rem', color: 'var(--color-text-secondary)', margin: 0 }}>
+              No competitors registered in this tournament roster yet.
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.25rem' }}>
+              <button
+                type="button"
+                onClick={() => setIsImportModalOpen(true)}
+                className="btn btn-secondary"
+                style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <Download size={14} color="var(--color-gold-bright)" />
+                Import from Global Pool
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsRegisterModalOpen(true)}
+                className="btn btn-primary"
+                style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <UserPlus size={14} />
+                Register Competitor
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ position: 'relative', maxWidth: '320px' }}>
+              <input
+                type="text"
+                placeholder="Search registered competitors..."
+                value={rosterSearch}
+                onChange={e => setRosterSearch(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.45rem 0.75rem 0.45rem 2.1rem',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--color-border)',
+                  background: 'var(--color-bg-base)',
+                  color: 'var(--color-text-primary)',
+                  fontSize: '0.8rem',
+                }}
+              />
+              <Search
+                size={14}
+                color="var(--color-text-muted)"
+                style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)' }}
+              />
+            </div>
+
+            <div style={{ overflowX: 'auto', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: 'var(--color-bg-surface-elevated)', borderBottom: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}>
+                    <th style={{ padding: '0.65rem 0.85rem', width: '40px', textAlign: 'center' }}>#</th>
+                    <th style={{ padding: '0.65rem 0.85rem' }}>Competitor</th>
+                    <th style={{ padding: '0.65rem 0.85rem' }}>Country</th>
+                    <th style={{ padding: '0.65rem 0.85rem' }}>Playstyle</th>
+                    <th style={{ padding: '0.65rem 0.85rem' }}>Personal Best</th>
+                    <th style={{ padding: '0.65rem 0.85rem' }}>Qual Attempts</th>
+                    <th style={{ padding: '0.65rem 0.85rem' }}>Status</th>
+                    <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRoster.map((player, pIdx) => {
+                    const qualAttempts = (tournament.qualifierSubmissions || []).filter(
+                      s => s.playerId === player.id
+                    ).length;
+                    return (
+                      <tr
+                        key={player.id}
+                        style={{
+                          borderBottom: '1px solid var(--color-border-subtle)',
+                          background: player.isDisqualified ? 'rgba(239, 68, 68, 0.05)' : 'transparent',
+                        }}
+                      >
+                        <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                          {pIdx + 1}
+                        </td>
+                        <td style={{ padding: '0.65rem 0.85rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                          {player.name}
+                        </td>
+                        <td style={{ padding: '0.65rem 0.85rem' }}>
+                          {player.country ? (
+                            <span style={{ padding: '0.1rem 0.35rem', borderRadius: 'var(--radius-sm)', background: 'var(--color-bg-surface-highlight)', fontSize: '0.7rem', fontWeight: 700 }}>
+                              {player.country}
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td style={{ padding: '0.65rem 0.85rem' }}>
+                          <span className="badge badge-muted" style={{ fontSize: '0.65rem' }}>
+                            {player.playstyle}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.65rem 0.85rem', fontFamily: 'monospace' }}>
+                          {player.personalBest ? player.personalBest.toLocaleString() : '—'}
+                        </td>
+                        <td style={{ padding: '0.65rem 0.85rem' }}>
+                          <span style={{ fontWeight: 600, color: qualAttempts > 0 ? 'var(--color-gold-bright)' : 'var(--color-text-muted)' }}>
+                            {qualAttempts} attempt{qualAttempts === 1 ? '' : 's'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.65rem 0.85rem' }}>
+                          {player.isDisqualified ? (
+                            <span style={{ color: '#f87171', fontSize: '0.7rem', fontWeight: 700 }}>DQ</span>
+                          ) : (
+                            <span style={{ color: '#4ade80', fontSize: '0.7rem', fontWeight: 600 }}>Active</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>
+                          <button
+                            type="button"
+                            onClick={() => setPlayerToRemove(player)}
+                            className="btn btn-secondary"
+                            style={{ padding: '0.25rem 0.55rem', fontSize: '0.7rem', color: 'var(--color-red)' }}
+                            title="Remove competitor from tournament"
+                          >
+                            <UserX size={13} /> Remove
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Section 4: Data Management & Simulation */}
       <section
         style={{
           background: 'var(--color-bg-surface)',
@@ -1258,6 +1660,126 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
               >
                 Yes, Clear Data
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import from Global Pool Modal */}
+      <ImportFromGlobalModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        globalPlayers={globalPlayers}
+        currentTournamentPlayers={tournament.playersPool || []}
+        onImport={handleImportGlobalPlayers}
+      />
+
+      {/* Register New Competitor Modal */}
+      <PlayerEditModal
+        isOpen={isRegisterModalOpen}
+        onClose={() => setIsRegisterModalOpen(false)}
+        onSave={handleRegisterNewCompetitor}
+        existingNames={existingRosterNames}
+      />
+
+      {/* Remove Competitor Speedbump Modal */}
+      {playerToRemove && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem',
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'var(--color-bg-surface)',
+              borderRadius: 'var(--radius-lg)',
+              border: playerToRemoveHasMatches ? '1px solid var(--color-border)' : '1px solid var(--color-red)',
+              maxWidth: '460px',
+              width: '100%',
+              boxShadow: 'var(--shadow-xl)',
+              overflow: 'hidden',
+              animation: 'fadeIn 0.2s ease-out',
+            }}
+          >
+            <div
+              style={{
+                padding: '1.25rem 1.5rem',
+                background: 'var(--color-bg-surface-elevated)',
+                borderBottom: '1px solid var(--color-border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: playerToRemoveHasMatches ? 'var(--color-gold-bright)' : 'var(--color-red)' }}>
+                {playerToRemoveHasMatches ? <AlertTriangle size={20} /> : <UserX size={20} />}
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
+                  {playerToRemoveHasMatches ? 'Cannot Remove Competitor' : 'Remove from Roster?'}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPlayerToRemove(null)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '0.25rem' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {playerToRemoveHasMatches ? (
+                <p style={{ fontSize: '0.9rem', color: 'var(--color-text-primary)', lineHeight: 1.5, margin: 0 }}>
+                  <strong>{playerToRemove.name}</strong> cannot be removed from this tournament because they have recorded bracket matches. To remove this competitor, first clear match scores in the Data Maintenance section.
+                </p>
+              ) : (
+                <>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--color-text-primary)', lineHeight: 1.5, margin: 0 }}>
+                    Are you sure you want to remove <strong>{playerToRemove.name}</strong> from this tournament roster?
+                  </p>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', lineHeight: 1.4, margin: 0 }}>
+                    Any qualifier scores submitted by this competitor for this tournament will also be removed. The competitor remains in the global catalog.
+                  </p>
+                </>
+              )}
+            </div>
+
+            <div
+              style={{
+                padding: '1rem 1.5rem',
+                background: 'var(--color-bg-surface-elevated)',
+                borderTop: '1px solid var(--color-border)',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '0.75rem',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setPlayerToRemove(null)}
+                className="btn btn-secondary"
+                style={{ padding: '0.5rem 1rem' }}
+              >
+                {playerToRemoveHasMatches ? 'Close' : 'Cancel'}
+              </button>
+              {!playerToRemoveHasMatches && (
+                <button
+                  type="button"
+                  onClick={handleRemoveCompetitorConfirm}
+                  className="btn btn-danger"
+                  style={{ padding: '0.5rem 1.25rem' }}
+                >
+                  Remove Competitor
+                </button>
+              )}
             </div>
           </div>
         </div>

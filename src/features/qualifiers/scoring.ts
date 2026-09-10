@@ -8,6 +8,14 @@ import {
 import { SeededPlayer } from '../bracket/types';
 import { generateTraditionalBracket, generateFlatBracket } from '../bracket/math';
 
+export const MAXOUT_THRESHOLD = 999999;
+
+export interface MaxoutKickerResult {
+  maxoutCount: number;
+  kickerScore: number;
+  bestScore: number;
+}
+
 export interface LeaderboardRankRow {
   rank: number | 'DQ';
   globalRank: number; // numerical sort position (DQ players at the bottom)
@@ -15,6 +23,8 @@ export interface LeaderboardRankRow {
   attempts: number[];
   formattedDetail: string; // e.g. "Ao2 (3 attempts)", "Max of 4", "180 pts"
   finalScore: number;
+  maxoutCount?: number;
+  kickerScore?: number;
   isDisqualified: boolean;
   assignedTier?: TournamentTier;
   tierSeed?: number;
@@ -28,6 +38,22 @@ export interface LeaderboardRankRow {
 export function calculateHighScore(submissions: QualifierSubmission[]): number {
   if (submissions.length === 0) return 0;
   return Math.max(...submissions.map(s => s.score));
+}
+
+/**
+ * Calculates maxout count (>= 999,999), kicker score (highest sub-maxout attempt, or 0),
+ * and best overall score across qualifier submissions.
+ */
+export function calculateMaxoutAndKicker(submissions: QualifierSubmission[]): MaxoutKickerResult {
+  if (submissions.length === 0) {
+    return { maxoutCount: 0, kickerScore: 0, bestScore: 0 };
+  }
+  const scores = submissions.map(s => s.score);
+  const maxoutCount = scores.filter(s => s >= MAXOUT_THRESHOLD).length;
+  const nonMaxouts = scores.filter(s => s < MAXOUT_THRESHOLD);
+  const kickerScore = nonMaxouts.length > 0 ? Math.max(...nonMaxouts) : 0;
+  const bestScore = Math.max(...scores);
+  return { maxoutCount, kickerScore, bestScore };
 }
 
 /**
@@ -115,10 +141,23 @@ export function deriveLeaderboard(tournament: Tournament): LeaderboardRankRow[] 
 
     let finalScore = 0;
     let formattedDetail = 'No attempts';
+    let maxoutCount: number | undefined = undefined;
+    let kickerScore: number | undefined = undefined;
 
     if (tournament.qualFormat === 'HIGH_SCORE') {
-      finalScore = calculateHighScore(playerSubs);
-      formattedDetail = playerSubs.length > 0 ? `Max of ${playerSubs.length}` : '0 attempts';
+      const res = calculateMaxoutAndKicker(playerSubs);
+      finalScore = res.bestScore;
+      maxoutCount = res.maxoutCount;
+      kickerScore = res.kickerScore;
+      if (res.maxoutCount > 0) {
+        formattedDetail = res.kickerScore > 0
+          ? `${res.maxoutCount}x Max (Kicker: ${res.kickerScore.toLocaleString()})`
+          : `${res.maxoutCount}x Max`;
+      } else {
+        formattedDetail = playerSubs.length > 0
+          ? `${playerSubs.length} ${playerSubs.length === 1 ? 'attempt' : 'attempts'}`
+          : '0 attempts';
+      }
     } else if (tournament.qualFormat === 'AVERAGE_OF_X') {
       const targetX = tournament.qualAverageCount || 2;
       const res = calculateAverageOfX(playerSubs, targetX, isCompleted);
@@ -139,6 +178,8 @@ export function deriveLeaderboard(tournament: Tournament): LeaderboardRankRow[] 
       attempts: playerSubs.map(s => s.score),
       formattedDetail,
       finalScore,
+      maxoutCount,
+      kickerScore,
       isDisqualified,
       earliestTimestamp,
     };
@@ -146,16 +187,44 @@ export function deriveLeaderboard(tournament: Tournament): LeaderboardRankRow[] 
 
   // Sort rows deterministically:
   // 1. Non-disqualified come before disqualified
-  // 2. Higher finalScore first
+  // 2. If HIGH_SCORE:
+  //    a. maxout_count descending
+  //    b. If maxout_count > 0: kicker_score descending
+  //    c. If maxout_count == 0: highest score descending
+  //    If other formats: finalScore descending
   // 3. Earlier timestamp first (for ties)
   // 4. Player ID ascending fallback
   rawRows.sort((a, b) => {
     if (a.isDisqualified !== b.isDisqualified) {
       return a.isDisqualified ? 1 : -1;
     }
-    if (b.finalScore !== a.finalScore) {
-      return b.finalScore - a.finalScore;
+
+    if (tournament.qualFormat === 'HIGH_SCORE') {
+      const aMax = a.maxoutCount || 0;
+      const bMax = b.maxoutCount || 0;
+      if (bMax !== aMax) {
+        return bMax - aMax;
+      }
+      if (bMax > 0) {
+        const aKicker = a.kickerScore || 0;
+        const bKicker = b.kickerScore || 0;
+        if (bKicker !== aKicker) {
+          return bKicker - aKicker;
+        }
+        if (b.finalScore !== a.finalScore) {
+          return b.finalScore - a.finalScore;
+        }
+      } else {
+        if (b.finalScore !== a.finalScore) {
+          return b.finalScore - a.finalScore;
+        }
+      }
+    } else {
+      if (b.finalScore !== a.finalScore) {
+        return b.finalScore - a.finalScore;
+      }
     }
+
     if (a.earliestTimestamp !== b.earliestTimestamp) {
       return a.earliestTimestamp - b.earliestTimestamp;
     }

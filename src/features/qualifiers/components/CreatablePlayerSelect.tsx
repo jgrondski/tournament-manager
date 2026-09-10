@@ -4,16 +4,20 @@ import { User, Plus, Search, Check } from 'lucide-react';
 
 interface CreatablePlayerSelectProps {
   playersPool: PlayerProfile[];
+  globalPlayers?: PlayerProfile[];
   selectedPlayer: PlayerProfile | null;
   onSelectPlayer: (player: PlayerProfile) => void;
   onCreatePlayer: (name: string) => PlayerProfile;
+  onSelectGlobalPlayer?: (player: PlayerProfile) => void;
 }
 
 export const CreatablePlayerSelect: React.FC<CreatablePlayerSelectProps> = ({
   playersPool,
+  globalPlayers = [],
   selectedPlayer,
   onSelectPlayer,
   onCreatePlayer,
+  onSelectGlobalPlayer,
 }) => {
   const [query, setQuery] = useState(selectedPlayer?.name || '');
   const [isOpen, setIsOpen] = useState(false);
@@ -36,16 +40,41 @@ export const CreatablePlayerSelect: React.FC<CreatablePlayerSelectProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const filtered = playersPool.filter(p =>
-    p.name.toLowerCase().includes(query.toLowerCase())
+  const queryTrimmed = query.trim().toLowerCase();
+
+  const filteredInTournament = playersPool.filter(p =>
+    p.name.toLowerCase().includes(queryTrimmed)
   );
 
-  const exactMatch = playersPool.find(
-    p => p.name.toLowerCase() === query.trim().toLowerCase()
+  const existingInTournamentNames = new Set(playersPool.map(p => p.name.toLowerCase()));
+  const existingInTournamentIds = new Set(playersPool.map(p => p.id));
+
+  const filteredGlobal = globalPlayers.filter(p =>
+    !existingInTournamentIds.has(p.id) &&
+    !existingInTournamentNames.has(p.name.toLowerCase()) &&
+    p.name.toLowerCase().includes(queryTrimmed)
   );
+
+  const exactMatchInTournament = playersPool.find(
+    p => p.name.toLowerCase() === queryTrimmed
+  );
+  const exactMatchInGlobal = globalPlayers.find(
+    p => p.name.toLowerCase() === queryTrimmed
+  );
+  const exactMatch = exactMatchInTournament || exactMatchInGlobal;
 
   const handleSelect = (p: PlayerProfile) => {
     onSelectPlayer(p);
+    setQuery(p.name);
+    setIsOpen(false);
+  };
+
+  const handleSelectGlobal = (p: PlayerProfile) => {
+    if (onSelectGlobalPlayer) {
+      onSelectGlobalPlayer(p);
+    } else {
+      onSelectPlayer(p);
+    }
     setQuery(p.name);
     setIsOpen(false);
   };
@@ -104,7 +133,8 @@ export const CreatablePlayerSelect: React.FC<CreatablePlayerSelectProps> = ({
             zIndex: 1000,
           }}
         >
-          {filtered.map(p => {
+          {/* In-Tournament Players */}
+          {filteredInTournament.map(p => {
             const isSelected = selectedPlayer?.id === p.id;
             return (
               <div
@@ -125,6 +155,11 @@ export const CreatablePlayerSelect: React.FC<CreatablePlayerSelectProps> = ({
                   <span style={{ fontWeight: isSelected ? 700 : 500, color: 'var(--color-text-primary)' }}>
                     {p.name}
                   </span>
+                  {p.country && (
+                    <span style={{ fontSize: '0.65rem', padding: '0.1rem 0.35rem', borderRadius: 'var(--radius-sm)', background: 'var(--color-bg-surface-highlight)', color: 'var(--color-text-secondary)', fontWeight: 600 }}>
+                      {p.country}
+                    </span>
+                  )}
                   {p.playstyle && (
                     <span className="badge badge-muted" style={{ fontSize: '0.65rem' }}>
                       {p.playstyle}
@@ -135,6 +170,71 @@ export const CreatablePlayerSelect: React.FC<CreatablePlayerSelectProps> = ({
               </div>
             );
           })}
+
+          {/* Global Players Section */}
+          {filteredGlobal.length > 0 && (
+            <div>
+              <div
+                style={{
+                  padding: '0.4rem 0.85rem',
+                  background: 'var(--color-bg-base)',
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  color: 'var(--color-gold-bright)',
+                  letterSpacing: '0.05em',
+                  borderTop: filteredInTournament.length > 0 ? '1px solid var(--color-border)' : 'none',
+                  borderBottom: '1px solid var(--color-border-subtle)',
+                }}
+              >
+                From Global Player Pool (Auto-imports to tournament)
+              </div>
+              {filteredGlobal.map(p => (
+                <div
+                  key={p.id}
+                  onClick={() => handleSelectGlobal(p)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '0.6rem 0.85rem',
+                    cursor: 'pointer',
+                    borderBottom: '1px solid var(--color-border-subtle)',
+                    background: 'transparent',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <User size={15} color="var(--color-gold-bright)" />
+                    <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                      {p.name}
+                    </span>
+                    {p.country && (
+                      <span style={{ fontSize: '0.65rem', padding: '0.1rem 0.35rem', borderRadius: 'var(--radius-sm)', background: 'var(--color-bg-surface-highlight)', color: 'var(--color-text-secondary)', fontWeight: 600 }}>
+                        {p.country}
+                      </span>
+                    )}
+                    {p.playstyle && (
+                      <span className="badge badge-muted" style={{ fontSize: '0.65rem' }}>
+                        {p.playstyle}
+                      </span>
+                    )}
+                  </div>
+                  <span
+                    style={{
+                      fontSize: '0.65rem',
+                      padding: '0.15rem 0.4rem',
+                      borderRadius: 'var(--radius-sm)',
+                      background: 'rgba(245, 158, 11, 0.15)',
+                      color: 'var(--color-gold-bright)',
+                      fontWeight: 600,
+                    }}
+                  >
+                    + Import
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Creatable option */}
           {query.trim().length > 0 && !exactMatch && (
@@ -158,7 +258,7 @@ export const CreatablePlayerSelect: React.FC<CreatablePlayerSelectProps> = ({
             </div>
           )}
 
-          {filtered.length === 0 && query.trim().length === 0 && (
+          {filteredInTournament.length === 0 && filteredGlobal.length === 0 && query.trim().length === 0 && (
             <div style={{ padding: '0.75rem', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
               Type a name to search or add a player
             </div>

@@ -9,6 +9,7 @@ import { ManageJudgePage } from './routes/ManageJudgePage';
 import { ManageTournamentSettingsPage } from './routes/ManageTournamentSettingsPage';
 import { FinalStandingsPage } from './routes/FinalStandingsPage';
 import { SlugRedirectPage } from './routes/SlugRedirectPage';
+import { PlayerDirectoryPage } from './routes/PlayerDirectoryPage';
 
 export const App: React.FC = () => {
   return (
@@ -17,6 +18,9 @@ export const App: React.FC = () => {
         <Routes>
           {/* Home: Tournaments Switcher */}
           <Route path="/" element={<TournamentSwitcherPage />} />
+
+          {/* Global Player Directory */}
+          <Route path="/players" element={<PlayerDirectoryPage />} />
 
           {/* Tournament Shortlinks & Cutoffs */}
           <Route path="/:slug" element={<SlugRedirectPage />} />

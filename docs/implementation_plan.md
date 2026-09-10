@@ -133,37 +133,60 @@ To facilitate manual testing and focused reviews, the work is organized into **1
 
 ---
 
-### Priority 4: Qualifiers Table Density & Competitor Detail Drawer [NEXT]
+### Priority 4: Qualifiers Table Density & Competitor Detail Drawer [COMPLETE]
 
-#### Commit 4.1: Maxout Count & Kicker Engine + Format-Dense Leaderboard Columns
+#### Commit 4.1: Maxout Count & Kicker Engine + Format-Dense Leaderboard Columns [COMPLETE]
 * **Objective:** Implement Maxout count (>= 999,999) + kicker score sorting engine for `HIGH_SCORE` mode and declutter leaderboard table columns based on format.
+* **Status:** Verified with 13 comprehensive unit tests covering maxout counting, kicker extraction, and the full sorting hierarchy.
 * **Changes:**
-  * [scoring.ts](../src/features/qualifiers/scoring.ts): Maxout rule (>= 999,999), `maxout_count` and `kicker_score` sorting hierarchy.
-  * [LeaderboardTable.tsx](../src/features/qualifiers/components/LeaderboardTable.tsx): Format-dense column layout (`2x Max` badge and kicker for High Score, AoX chips and running average, Points).
+  * [scoring.ts](../src/features/qualifiers/scoring.ts):
+    * Defined `MAXOUT_THRESHOLD = 999999`.
+    * Implemented `calculateMaxoutAndKicker(submissions: QualifierSubmission[])`.
+    * Updated `LeaderboardRankRow` with `maxoutCount` and `kickerScore`.
+    * Implemented full sorting hierarchy: `maxout_count` descending -> `kicker_score` descending -> peak score -> earlier timestamp -> player ID.
+  * [LeaderboardTable.tsx](../src/features/qualifiers/components/LeaderboardTable.tsx):
+    * Format-dense column layout adapting to `HIGH_SCORE` (Maxout & Kicker badges, High Score, Attempts), `AVERAGE_OF_X` (individual attempt chips, running/final average), and `POINTS` (attempt points breakdown, total points).
 
-#### Commit 4.2: Competitor Detail Slide-Out Drawer (`PlayerDetailDrawer`)
+#### Commit 4.2: Competitor Detail Slide-Out Drawer (`PlayerDetailDrawer`) [COMPLETE]
 * **Objective:** Provide an in-depth slide-out drawer when clicking any player on the leaderboard, showing attempt audit history and tournament match stats.
+* **Status:** Built and verified with zero type errors, smooth animations, and backdrop dismissal disabled.
 * **Changes:**
-  * **[NEW]** `src/features/qualifiers/components/PlayerDetailDrawer.tsx`: Attempt audit log + tournament match play record. Backdrop click dismissal disabled.
-  * [LeaderboardTable.tsx](../src/features/qualifiers/components/LeaderboardTable.tsx): Connect row click to open drawer.
+  * **[NEW]** [PlayerDetailDrawer.tsx](../src/features/qualifiers/components/PlayerDetailDrawer.tsx):
+    * Competitor profile overview (PB, Playstyle, Seed/Tier assignment, Country, Notes).
+    * Chronological audit log of all qualifier submissions for this tournament (timestamp, score, maxout/kicker indicators, points earned).
+    * Tournament bracket match play performance and game-by-game logs.
+    * Backdrop click dismissal disabled.
+  * [LeaderboardTable.tsx](../src/features/qualifiers/components/LeaderboardTable.tsx): Connected row click to open drawer.
 
 ---
 
-### Priority 5: Global Player Pool Directory & Tournament Roster
+### Priority 5: Global Player Pool Directory & Tournament Roster [COMPLETE]
 
-#### Commit 5.1: Global Player Pool Directory (`classic_tetris_global_players` & `/players` Route)
+#### Commit 5.1: Global Player Pool Directory (`classic_tetris_global_players` & `/players` Route) [COMPLETE]
 * **Objective:** Provide a master player pool catalog independent of individual tournaments to manage players, manual PBs, playstyles, countries, and notes under LocalStorage key `classic_tetris_global_players`.
 * **"Generate Fake Players" Modal:**
-  * Include a prominent "Generate Fake Players" button in the global player directory.
-  * Modal prompts for the number of players to generate with a numeric input, "OK" button, and "Cancel" button.
-  * On "OK", generates that count of realistic fake players with randomized names, playstyles (DAS, Rolling, Hypertap), personal bests (600k–1.4M), countries, and notes, appending them to `classic_tetris_global_players`.
+  * Prominent "Generate Fake Players" button in the global player directory.
+  * Modal prompts for the number of players to generate with a numeric input (default 16, min 1, max 200), quick presets (`+8`, `+16`, `+32`, `+64`), "OK" button, and "Cancel" button.
+  * On "OK", generates realistic fake players with randomized names, playstyles (DAS, Rolling, Hypertap), personal bests (700k–1.35M), countries, and notes, appending them to `classic_tetris_global_players`.
+  * Backdrop click dismissal disabled.
 * **Changes:**
-  * [store.tsx](../src/features/tournament/store.tsx): Introduce `classic_tetris_global_players` CRUD and bulk generate action.
-  * **[NEW]** `src/features/players/components/PlayerDirectoryPage.tsx`: Master player pool table, "+ Add Player" modal, and "Generate Fake Players" modal.
-  * [App.tsx](../src/App.tsx): Add route `/players`.
+  * [store.tsx](../src/features/tournament/store.tsx): Introduced `classic_tetris_global_players` state, persistence effect, CRUD actions (`addGlobalPlayer`, `updateGlobalPlayer`, `deleteGlobalPlayer`, `clearAllGlobalPlayers`, `generateFakeGlobalPlayers`), and synced `addPlayerToPool` to master directory.
+  * **[NEW]** [GenerateFakePlayersModal.tsx](../src/features/players/components/GenerateFakePlayersModal.tsx): Numeric prompt modal with presets and OK/Cancel buttons.
+  * **[NEW]** [PlayerEditModal.tsx](../src/features/players/components/PlayerEditModal.tsx): Form for adding and editing competitor metadata (name unique validation, country, PB, playstyle, notes, DQ flag).
+  * **[NEW]** [PlayerDirectory.tsx](../src/features/players/components/PlayerDirectory.tsx): Master player table, stat cards (Total Players, Style breakdown, Top PB, Avg PB), search filter, playstyle filter pills, sort dropdown, and actions.
+  * **[NEW]** [PlayerDirectoryPage.tsx](../src/routes/PlayerDirectoryPage.tsx): Clean route wrapper with global navigation bar.
+  * [App.tsx](../src/App.tsx): Added route `/players`.
+  * [TournamentNavbar.tsx](../src/components/TournamentNavbar.tsx) & [TournamentSwitcherPage.tsx](../src/routes/TournamentSwitcherPage.tsx): Added quick links to `/players`.
 
-#### Commit 5.2: Tournament Roster Management & Registration
+#### Commit 5.2: Tournament Roster Management & Registration [COMPLETE]
 * **Objective:** Allow tournaments to import players from the global pool or add new competitors directly into the tournament roster.
 * **Changes:**
-  * [TournamentAdminForm.tsx](../src/features/tournament/components/TournamentAdminForm.tsx): Add "Tournament Roster" section (import from master pool, view roster).
-  * [CreatablePlayerSelect.tsx](../src/features/qualifiers/components/CreatablePlayerSelect.tsx): Suggest players from global pool.
+  * **[NEW]** [ImportFromGlobalModal.tsx](../src/features/players/components/ImportFromGlobalModal.tsx): Searchable modal with checkboxes, "Select All", and import action to add global players into tournament roster.
+  * [TournamentAdminForm.tsx](../src/features/tournament/components/TournamentAdminForm.tsx):
+    * Added Section 3: "Tournament Roster" with capacity analytics (Registered, Bracket Capacity, Status), "Import from Global Pool", "Import All Available", and "+ Register Competitor" buttons.
+    * Integrated registered competitor table with search filter and safe competitor removal (blocks removal if competitor has recorded matches).
+  * [CreatablePlayerSelect.tsx](../src/features/qualifiers/components/CreatablePlayerSelect.tsx):
+    * Accepts `globalPlayers` and suggests players from both in-tournament roster and the global catalog.
+    * Auto-imports global player into tournament roster upon selection.
+  * [QualifierEntryModal.tsx](../src/features/qualifiers/components/QualifierEntryModal.tsx): Connected `globalPlayers` and `importPlayersToTournament` to `CreatablePlayerSelect`.
+  * [players.test.ts](../src/features/players/__tests__/players.test.ts): Added 5 unit tests covering player generation, deduplication, fallback naming, import deduplication, and safe removal constraints.
