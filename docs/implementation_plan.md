@@ -41,7 +41,7 @@ To facilitate manual testing and focused reviews, the work is organized into **1
   * [MatchScoreDrawer.tsx](../src/features/bracket/components/MatchScoreDrawer.tsx): Remove backdrop click dismissal (`onClick={onClose}` on overlay removed; dismissal requires explicit Cancel, Save, or `X`).
   * [QualifierEntryModal.tsx](../src/features/qualifiers/components/QualifierEntryModal.tsx): Remove backdrop click dismissal (`onClick={onClose}` on overlay removed).
 
-#### Commit 1.2: Admin Form Dirty Tracking, Navigation Guard & Dynamic Tier Colors [NEXT]
+#### Commit 1.2: Admin Form Dirty Tracking, Navigation Guard & Dynamic Tier Colors [COMPLETE]
 * **Objective:** Add dirty state tracking to `TournamentAdminForm`, guard unsaved changes when navigating away from settings, guard qualifier submission inputs, speedbump confirmation modal for tier deletion (allowing deleting all tiers), and bind tier colors to visual bracket elements.
 * **Changes:**
   * [TournamentAdminForm.tsx](../src/features/tournament/components/TournamentAdminForm.tsx):
@@ -50,17 +50,19 @@ To facilitate manual testing and focused reviews, the work is organized into **1
     * Add unsaved changes confirmation modal ("Stay" vs "Discard & Leave").
     * Remove `disabled={tiers.length <= 1}` on tier delete; add speedbump confirmation modal for deleting any bracket.
     * Handle empty tier state cleanly (`tiers.length === 0`).
+    * Provide "Discard Changes" button to revert edits back to saved values.
   * [TournamentSwitcherPage.tsx](../src/routes/TournamentSwitcherPage.tsx):
     * Add delete tournament button with safety check (disabled if scores exist) and speedbump confirmation modal.
   * [TournamentNavbar.tsx](../src/components/TournamentNavbar.tsx): Hook navigation through settings guard if dirty.
-  * [QualifierEntryModal.tsx](../src/features/qualifiers/components/QualifierEntryModal.tsx): Guard submit button (`disabled={!isValid || !isDirty}`) until player and score are non-empty and valid (> 0).
+  * [ManageTournamentSettingsPage.tsx](../src/routes/ManageTournamentSettingsPage.tsx): Intercept navigation if settings form is dirty and show unsaved changes confirmation modal.
+  * [QualifierEntryModal.tsx](../src/features/qualifiers/components/QualifierEntryModal.tsx): Guard submit button (`disabled={!isScoreValid}`) until player is selected and score is a non-empty integer `> 0`.
   * [BracketVisualizer.tsx](../src/features/bracket/components/BracketVisualizer.tsx) & [MatchCardFeed.tsx](../src/features/bracket/components/MatchCardFeed.tsx): Dynamically bind `tier.primaryColor` and `tier.secondaryColor` to round header badges, match card borders, winner slot backgrounds, and trophy icons.
 
 ---
 
 ### Priority 2: Tournament Lifecycle & Data Simulation Controls
 
-#### Commit 2.1: Unify Lifecycle to `isLocked`, Clean Slate Defaults & Purge Legacy Reset Demo
+#### Commit 2.1: Unify Lifecycle to `isLocked`, Clean Slate Defaults & Purge Legacy Reset Demo [NEXT]
 * **Objective:** Replace legacy `isVerified` and `qualsClosed` with single source of truth `isLocked: boolean`, initialize new tournaments with 0 data, and remove the legacy "Reset Demo" button.
 * **Changes:**
   * [types.ts](../src/features/tournament/types.ts): Update `Tournament` interface: replace `isVerified` and `qualsClosed` with `isLocked: boolean`.

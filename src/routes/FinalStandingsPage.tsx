@@ -21,13 +21,10 @@ export const FinalStandingsPage: React.FC = () => {
     );
   }
 
-  const defaultTier = tournament.tiers[0];
-
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <TournamentNavbar
         tournament={tournament}
-        activeTier={defaultTier}
         activeView="standings"
       />
       <main style={{ flex: 1, padding: '2rem 1.5rem', maxWidth: '1200px', width: '100%', margin: '0 auto' }}>

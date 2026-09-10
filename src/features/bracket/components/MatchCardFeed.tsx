@@ -3,6 +3,7 @@ import { Tournament, TournamentTier } from '../../tournament/types';
 import { BracketMatch, isMatchPlayable } from '../types';
 import { MatchScoreDrawer } from './MatchScoreDrawer';
 import { BracketDraftBanner } from './BracketDraftBanner';
+import { colorWithAlpha } from '../colorUtils';
 import { Clock, CheckCircle2, ChevronRight, Trophy, Lock } from 'lucide-react';
 
 interface MatchCardFeedProps {
@@ -16,6 +17,7 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
 
   const rounds = tier.bracket.rounds;
   const currentRound = rounds[selectedRoundIdx] || rounds[0];
+  const primaryColor = tier.primaryColor || '#f59e0b';
 
   return (
     <div style={{ maxWidth: '680px', margin: '0 auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -30,9 +32,9 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
             style={{
               padding: '0.5rem 1rem',
               borderRadius: 'var(--radius-full)',
-              border: selectedRoundIdx === idx ? '1px solid var(--color-gold)' : '1px solid var(--color-border)',
-              background: selectedRoundIdx === idx ? 'var(--color-gold-bg)' : 'var(--color-bg-surface-elevated)',
-              color: selectedRoundIdx === idx ? 'var(--color-gold-bright)' : 'var(--color-text-secondary)',
+              border: selectedRoundIdx === idx ? `1px solid ${colorWithAlpha(primaryColor, 0.6, 'var(--color-gold)')}` : '1px solid var(--color-border)',
+              background: selectedRoundIdx === idx ? colorWithAlpha(primaryColor, 0.15, 'var(--color-gold-bg)') : 'var(--color-bg-surface-elevated)',
+              color: selectedRoundIdx === idx ? primaryColor : 'var(--color-text-secondary)',
               fontWeight: 600,
               fontSize: '0.85rem',
               whiteSpace: 'nowrap',
@@ -71,11 +73,11 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
                 background: 'var(--color-bg-surface)',
                 borderRadius: 'var(--radius-md)',
                 border: inProgress
-                  ? '2px solid var(--color-gold-bright)'
+                  ? `2px solid ${primaryColor}`
                   : isComplete
                   ? '1px solid var(--color-border)'
                   : '1px solid var(--color-border-subtle)',
-                boxShadow: inProgress ? '0 0 12px rgba(245, 158, 11, 0.25)' : 'var(--shadow-sm)',
+                boxShadow: inProgress ? `0 0 12px ${colorWithAlpha(primaryColor, 0.3, 'rgba(245, 158, 11, 0.25)')}` : 'var(--shadow-sm)',
                 padding: '1rem',
                 cursor: isPlayable && tournament.isVerified ? 'pointer' : 'default',
                 display: 'flex',
@@ -87,7 +89,19 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
             >
               {/* Card Top */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span className="badge badge-gold">Match #{match.matchNumber}</span>
+                <span
+                  style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    padding: '0.2rem 0.55rem',
+                    borderRadius: 'var(--radius-sm)',
+                    background: colorWithAlpha(primaryColor, 0.15, 'var(--color-gold-bg)'),
+                    color: primaryColor,
+                    border: `1px solid ${colorWithAlpha(primaryColor, 0.4, 'var(--color-gold)')}`,
+                  }}
+                >
+                  Match #{match.matchNumber}
+                </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   {!tournament.isVerified ? (
                     <span className="badge badge-muted" title="Scores locked during Qualifiers Mode">
@@ -98,7 +112,21 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
                       <CheckCircle2 size={12} /> Complete
                     </span>
                   ) : inProgress ? (
-                    <span className="badge badge-gold animate-pulse-border">
+                    <span
+                      style={{
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                        padding: '0.15rem 0.5rem',
+                        borderRadius: 'var(--radius-sm)',
+                        background: colorWithAlpha(primaryColor, 0.15, 'var(--color-gold-bg)'),
+                        color: primaryColor,
+                        border: `1px solid ${colorWithAlpha(primaryColor, 0.4, 'var(--color-gold)')}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                      }}
+                      className="animate-pulse-border"
+                    >
                       <Clock size={12} /> Live (Bo{record?.bestOf || match.bestOf || tier.bestOf})
                     </span>
                   ) : (
@@ -117,17 +145,17 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
                     alignItems: 'center',
                     padding: '0.5rem 0.75rem',
                     borderRadius: 'var(--radius-sm)',
-                    background: p1Won ? 'var(--color-gold-bg)' : 'var(--color-bg-surface-elevated)',
+                    background: p1Won ? colorWithAlpha(primaryColor, 0.18, 'var(--color-gold-bg)') : 'var(--color-bg-surface-elevated)',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     {p1?.seed && <span style={badgeSeedStyle}>#{p1.seed}</span>}
-                    <span style={{ fontWeight: p1Won ? 700 : 500, color: p1Won ? 'var(--color-gold-bright)' : 'var(--color-text-primary)' }}>
+                    <span style={{ fontWeight: p1Won ? 700 : 500, color: p1Won ? primaryColor : 'var(--color-text-primary)' }}>
                       {p1Name}
                     </span>
-                    {p1Won && <Trophy size={14} color="#fbbf24" />}
+                    {p1Won && <Trophy size={14} color={primaryColor} />}
                   </div>
-                  <span className="tabular-nums" style={{ fontSize: '1.25rem', fontWeight: 800, color: p1Won ? 'var(--color-gold-bright)' : 'inherit' }}>
+                  <span className="tabular-nums" style={{ fontSize: '1.25rem', fontWeight: 800, color: p1Won ? primaryColor : 'inherit' }}>
                     {p1Wins}
                   </span>
                 </div>
@@ -139,17 +167,17 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
                     alignItems: 'center',
                     padding: '0.5rem 0.75rem',
                     borderRadius: 'var(--radius-sm)',
-                    background: p2Won ? 'var(--color-gold-bg)' : 'var(--color-bg-surface-elevated)',
+                    background: p2Won ? colorWithAlpha(primaryColor, 0.18, 'var(--color-gold-bg)') : 'var(--color-bg-surface-elevated)',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     {p2?.seed && <span style={badgeSeedStyle}>#{p2.seed}</span>}
-                    <span style={{ fontWeight: p2Won ? 700 : 500, color: p2Won ? 'var(--color-gold-bright)' : 'var(--color-text-primary)' }}>
+                    <span style={{ fontWeight: p2Won ? 700 : 500, color: p2Won ? primaryColor : 'var(--color-text-primary)' }}>
                       {p2Name}
                     </span>
-                    {p2Won && <Trophy size={14} color="#fbbf24" />}
+                    {p2Won && <Trophy size={14} color={primaryColor} />}
                   </div>
-                  <span className="tabular-nums" style={{ fontSize: '1.25rem', fontWeight: 800, color: p2Won ? 'var(--color-gold-bright)' : 'inherit' }}>
+                  <span className="tabular-nums" style={{ fontSize: '1.25rem', fontWeight: 800, color: p2Won ? primaryColor : 'inherit' }}>
                     {p2Wins}
                   </span>
                 </div>

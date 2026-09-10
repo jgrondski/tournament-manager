@@ -1,15 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Tournament, TournamentTier, QualFormat, PointsThreshold } from '../types';
 import { useTournament } from '../store';
-import { Plus, Trash2, ArrowUp, ArrowDown, Save, CheckCircle2, Shield, Palette, X } from 'lucide-react';
+import { Plus, Trash2, ArrowUp, ArrowDown, Save, CheckCircle2, Shield, Palette, X, AlertTriangle } from 'lucide-react';
 import { generateTraditionalBracket, generateFlatBracket } from '../../bracket/math';
 
 interface TournamentAdminFormProps {
   tournament: Tournament;
   onSaved?: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
-export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({ tournament, onSaved }) => {
+export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
+  tournament,
+  onSaved,
+  onDirtyChange,
+}) => {
   const {
     updateTournament,
     saveTiers,
@@ -45,6 +50,114 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({ tourna
     m => m.isComplete || m.player1Wins > 0 || m.player2Wins > 0 ||
       m.games?.some(g => g.player1Points !== null || g.player2Points !== null)
   ).length;
+
+  // Track dirty state
+  const isDirty = useMemo(() => {
+    if (name !== (tournament.name || '')) return true;
+    if (slug !== (tournament.slug || '')) return true;
+    if (date !== (tournament.date || '')) return true;
+    if (location !== (tournament.location || '')) return true;
+    if (qualFormat !== (tournament.qualFormat || 'AVERAGE_OF_X')) return true;
+    if (qualAverageCount !== (tournament.qualAverageCount || 2)) return true;
+    if (qualsClosed !== Boolean(tournament.qualsClosed)) return true;
+
+    // Points config
+    const initialPoints = tournament.pointsConfig || [
+      { minScore: 1200000, points: 100 },
+      { minScore: 1000000, points: 50 },
+      { minScore: 800000, points: 25 },
+    ];
+    if (pointsConfig.length !== initialPoints.length) return true;
+    for (let i = 0; i < pointsConfig.length; i++) {
+      if (
+        pointsConfig[i].minScore !== initialPoints[i].minScore ||
+        pointsConfig[i].points !== initialPoints[i].points
+      ) {
+        return true;
+      }
+    }
+
+    // Tiers
+    const initialTiers = tournament.tiers || [];
+    if (tiers.length !== initialTiers.length) return true;
+    for (let i = 0; i < tiers.length; i++) {
+      const a = tiers[i];
+      const b = initialTiers[i];
+      if (!b) return true;
+      if (
+        a.id !== b.id ||
+        a.slug !== b.slug ||
+        a.name !== b.name ||
+        a.priority !== b.priority ||
+        a.bracketType !== b.bracketType ||
+        a.playerCount !== b.playerCount ||
+        a.bestOf !== b.bestOf ||
+        a.primaryColor !== b.primaryColor ||
+        a.secondaryColor !== b.secondaryColor ||
+        a.flatWidth !== b.flatWidth
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }, [name, slug, date, location, qualFormat, qualAverageCount, qualsClosed, pointsConfig, tiers, tournament]);
+
+  // Notify parent of dirty state changes
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
+
+  // Hook browser window beforeunload warning if dirty
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isDirty]);
+
+  // Re-sync fields when tournament changes if form is clean
+  useEffect(() => {
+    if (!isDirty) {
+      setName(tournament.name || '');
+      setSlug(tournament.slug || '');
+      setDate(tournament.date || '');
+      setLocation(tournament.location || '');
+      setQualFormat(tournament.qualFormat || 'AVERAGE_OF_X');
+      setQualAverageCount(tournament.qualAverageCount || 2);
+      setQualsClosed(Boolean(tournament.qualsClosed));
+      setPointsConfig(
+        tournament.pointsConfig || [
+          { minScore: 1200000, points: 100 },
+          { minScore: 1000000, points: 50 },
+          { minScore: 800000, points: 25 },
+        ]
+      );
+      setTiers(tournament.tiers || []);
+    }
+  }, [tournament, isDirty]);
+
+  const handleDiscardChanges = () => {
+    setName(tournament.name || '');
+    setSlug(tournament.slug || '');
+    setDate(tournament.date || '');
+    setLocation(tournament.location || '');
+    setQualFormat(tournament.qualFormat || 'AVERAGE_OF_X');
+    setQualAverageCount(tournament.qualAverageCount || 2);
+    setQualsClosed(Boolean(tournament.qualsClosed));
+    setPointsConfig(
+      tournament.pointsConfig || [
+        { minScore: 1200000, points: 100 },
+        { minScore: 1000000, points: 50 },
+        { minScore: 800000, points: 25 },
+      ]
+    );
+    setTiers(tournament.tiers || []);
+  };
 
   // Helper to auto-derive slug from name
   const handleNameChange = (newName: string) => {
@@ -728,11 +841,71 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({ tourna
       </section>
 
       {/* Save Button Bar */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', position: 'sticky', bottom: '1.5rem' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+          gap: '1rem',
+          position: 'sticky',
+          bottom: '1.5rem',
+          background: 'var(--color-bg-surface-elevated)',
+          padding: '1rem 1.5rem',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid var(--color-border)',
+          boxShadow: 'var(--shadow-lg)',
+          zIndex: 10,
+        }}
+      >
+        <span
+          style={{
+            fontSize: '0.85rem',
+            color: isDirty ? 'var(--color-gold-bright)' : 'var(--color-text-muted)',
+            fontWeight: 600,
+            marginRight: 'auto',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+          }}
+        >
+          {isDirty ? (
+            <>
+              <AlertTriangle size={16} /> Unsaved changes
+            </>
+          ) : (
+            <>
+              <CheckCircle2 size={16} color="var(--color-green)" /> All changes saved
+            </>
+          )}
+        </span>
+
+        <button
+          type="button"
+          onClick={handleDiscardChanges}
+          disabled={!isDirty}
+          className="btn btn-secondary"
+          style={{
+            padding: '0.65rem 1.25rem',
+            fontSize: '0.9rem',
+            opacity: !isDirty ? 0.4 : 1,
+            cursor: !isDirty ? 'not-allowed' : 'pointer',
+          }}
+          title={!isDirty ? 'No changes to discard' : 'Revert unsaved changes'}
+        >
+          Discard Changes
+        </button>
+
         <button
           type="submit"
+          disabled={!isDirty}
           className="btn btn-primary"
-          style={{ padding: '0.75rem 2rem', fontSize: '1rem', boxShadow: 'var(--shadow-gold)' }}
+          style={{
+            padding: '0.65rem 1.75rem',
+            fontSize: '0.95rem',
+            boxShadow: isDirty ? 'var(--shadow-gold)' : 'none',
+            opacity: !isDirty ? 0.45 : 1,
+            cursor: !isDirty ? 'not-allowed' : 'pointer',
+          }}
         >
           <Save size={18} />
           Save Configuration

@@ -3,6 +3,7 @@ import { Tournament, TournamentTier, MatchScoreRecord } from '../../tournament/t
 import { BracketMatch, isMatchPlayable } from '../types';
 import { MatchScoreDrawer } from './MatchScoreDrawer';
 import { BracketDraftBanner } from './BracketDraftBanner';
+import { colorWithAlpha } from '../colorUtils';
 import { Filter, Check, ChevronDown, Trophy, Clock, CheckCircle2 } from 'lucide-react';
 
 interface OrganizerSheetMatrixProps {
@@ -35,6 +36,8 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
   const [selectedMatch, setSelectedMatch] = useState<{ match: BracketMatch; roundName: string } | null>(null);
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [hoveredMatchId, setHoveredMatchId] = useState<string | null>(null);
+
+  const primaryColor = tier.primaryColor || '#f59e0b';
 
   // Available rounds in this tier
   const allRounds = tier.bracket.rounds;
@@ -208,7 +211,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
               Matches: <strong style={{ color: 'var(--color-text-primary)' }}>{telemetry.completed} / {telemetry.total}</strong>
             </span>
             {telemetry.inProgress > 0 && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--color-gold-bright)' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: primaryColor }}>
                 <Clock size={16} />
                 Live: <strong>{telemetry.inProgress} active</strong>
               </span>
@@ -258,7 +261,15 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                 <React.Fragment key={round.roundNumber}>
                   {/* Sticky Round Divider Banner */}
                   <tr style={roundDividerRowStyle}>
-                    <td colSpan={11} style={roundDividerCellStyle}>
+                    <td
+                      colSpan={11}
+                      style={{
+                        ...roundDividerCellStyle,
+                        color: primaryColor,
+                        borderTop: `2px solid ${colorWithAlpha(primaryColor, 0.45, 'var(--color-border)')}`,
+                        background: colorWithAlpha(primaryColor, 0.05, 'transparent'),
+                      }}
+                    >
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <span>
                           <strong>{round.name}</strong> • {round.filteredMatches.length} Matches
@@ -292,7 +303,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
 
                     // Block background color for alternating match groups
                     const blockBg = isHovered
-                      ? 'rgba(245, 158, 11, 0.08)'
+                      ? colorWithAlpha(primaryColor, 0.08, 'rgba(245, 158, 11, 0.08)')
                       : isEvenBlock
                       ? 'var(--color-bg-surface)'
                       : 'var(--color-bg-surface-elevated)';
@@ -317,7 +328,17 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                         >
                           {/* Match # (RowSpan 2) */}
                           <td rowSpan={2} style={{ ...tdMergedStyle, borderTop: borderTopStyle, textAlign: 'center', fontWeight: 700 }}>
-                            <span className="badge badge-gold" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>
+                            <span
+                              style={{
+                                fontSize: '0.8rem',
+                                padding: '0.2rem 0.5rem',
+                                borderRadius: 'var(--radius-sm)',
+                                fontWeight: 700,
+                                background: colorWithAlpha(primaryColor, 0.15, 'var(--color-gold-bg)'),
+                                color: primaryColor,
+                                border: `1px solid ${colorWithAlpha(primaryColor, 0.4, 'var(--color-gold)')}`,
+                              }}
+                            >
                               #{match.matchNumber}
                             </span>
                           </td>
@@ -338,15 +359,15 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                               {p1?.seed && (
                                 <span style={seedBadgeStyle}>#{p1.seed}</span>
                               )}
-                              <span style={{ fontWeight: p1IsWinner ? 700 : 500, color: p1IsWinner ? 'var(--color-gold-bright)' : 'var(--color-text-primary)' }}>
+                              <span style={{ fontWeight: p1IsWinner ? 700 : 500, color: p1IsWinner ? primaryColor : 'var(--color-text-primary)' }}>
                                 {p1Name}
                               </span>
-                              {p1IsWinner && <Trophy size={14} color="#fbbf24" />}
+                              {p1IsWinner && <Trophy size={14} color={primaryColor} />}
                             </div>
                           </td>
 
                           {/* Player 1 Series Score */}
-                          <td style={{ ...tdStyle, borderTop: borderTopStyle, textAlign: 'center', fontWeight: 700, fontSize: '1rem', color: p1IsWinner ? 'var(--color-gold-bright)' : 'var(--color-text-primary)' }}>
+                          <td style={{ ...tdStyle, borderTop: borderTopStyle, textAlign: 'center', fontWeight: 700, fontSize: '1rem', color: p1IsWinner ? primaryColor : 'var(--color-text-primary)' }}>
                             <span className="tabular-nums">{p1Wins}</span>
                           </td>
 
@@ -377,10 +398,10 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                                     style={{
                                       padding: '0.15rem 0.4rem',
                                       borderRadius: 'var(--radius-sm)',
-                                      background: p1WonGame ? 'var(--color-gold-bg)' : 'transparent',
-                                      color: p1WonGame ? 'var(--color-gold-bright)' : 'inherit',
+                                      background: p1WonGame ? colorWithAlpha(primaryColor, 0.18, 'var(--color-gold-bg)') : 'transparent',
+                                      color: p1WonGame ? primaryColor : 'inherit',
                                       fontWeight: p1WonGame ? 700 : 400,
-                                      border: p1WonGame ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid transparent',
+                                      border: p1WonGame ? `1px solid ${colorWithAlpha(primaryColor, 0.4, 'rgba(245, 158, 11, 0.3)')}` : '1px solid transparent',
                                       display: 'inline-block',
                                     }}
                                   >
@@ -399,7 +420,20 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                               <span className="badge badge-green" style={{ fontSize: '0.75rem' }}>Complete</span>
                             )}
                             {status.type === 'in_progress' && (
-                              <span className="badge badge-gold animate-pulse-border" style={{ fontSize: '0.75rem' }}>Live</span>
+                              <span
+                                style={{
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  padding: '0.15rem 0.5rem',
+                                  borderRadius: 'var(--radius-sm)',
+                                  background: colorWithAlpha(primaryColor, 0.15, 'var(--color-gold-bg)'),
+                                  color: primaryColor,
+                                  border: `1px solid ${colorWithAlpha(primaryColor, 0.4, 'var(--color-gold)')}`,
+                                }}
+                                className="animate-pulse-border"
+                              >
+                                Live
+                              </span>
                             )}
                             {status.type === 'not_started' && (
                               <span className="badge badge-muted" style={{ fontSize: '0.75rem' }}>Waiting</span>
@@ -427,15 +461,15 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                               {p2?.seed && (
                                 <span style={seedBadgeStyle}>#{p2.seed}</span>
                               )}
-                              <span style={{ fontWeight: p2IsWinner ? 700 : 500, color: p2IsWinner ? 'var(--color-gold-bright)' : 'var(--color-text-primary)' }}>
+                              <span style={{ fontWeight: p2IsWinner ? 700 : 500, color: p2IsWinner ? primaryColor : 'var(--color-text-primary)' }}>
                                 {p2Name}
                               </span>
-                              {p2IsWinner && <Trophy size={14} color="#fbbf24" />}
+                              {p2IsWinner && <Trophy size={14} color={primaryColor} />}
                             </div>
                           </td>
 
                           {/* Player 2 Series Score */}
-                          <td style={{ ...tdStyle, borderBottom: '1px solid var(--color-border-subtle)', textAlign: 'center', fontWeight: 700, fontSize: '1rem', color: p2IsWinner ? 'var(--color-gold-bright)' : 'var(--color-text-primary)' }}>
+                          <td style={{ ...tdStyle, borderBottom: '1px solid var(--color-border-subtle)', textAlign: 'center', fontWeight: 700, fontSize: '1rem', color: p2IsWinner ? primaryColor : 'var(--color-text-primary)' }}>
                             <span className="tabular-nums">{p2Wins}</span>
                           </td>
 
@@ -466,10 +500,10 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                                     style={{
                                       padding: '0.15rem 0.4rem',
                                       borderRadius: 'var(--radius-sm)',
-                                      background: p2WonGame ? 'var(--color-gold-bg)' : 'transparent',
-                                      color: p2WonGame ? 'var(--color-gold-bright)' : 'inherit',
+                                      background: p2WonGame ? colorWithAlpha(primaryColor, 0.18, 'var(--color-gold-bg)') : 'transparent',
+                                      color: p2WonGame ? primaryColor : 'inherit',
                                       fontWeight: p2WonGame ? 700 : 400,
-                                      border: p2WonGame ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid transparent',
+                                      border: p2WonGame ? `1px solid ${colorWithAlpha(primaryColor, 0.4, 'rgba(245, 158, 11, 0.3)')}` : '1px solid transparent',
                                       display: 'inline-block',
                                     }}
                                   >

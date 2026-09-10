@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Tournament } from '../types';
 import { calculateTierStandings, StandingsPlacement } from '../standings';
+import { colorWithAlpha } from '../../bracket/colorUtils';
 import { Trophy, Medal, Award, User, Layers } from 'lucide-react';
 
 interface FinalStandingsTableProps {
@@ -40,6 +41,7 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
         <div style={{ display: 'flex', gap: '0.4rem', background: 'var(--color-bg-surface)', padding: '0.25rem', borderRadius: 'var(--radius-full)', border: '1px solid var(--color-border)' }}>
           {tiers.map(t => {
             const isSelected = t.id === activeTier?.id;
+            const tColor = t.primaryColor || '#f59e0b';
             return (
               <button
                 key={t.id}
@@ -47,15 +49,17 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
                 style={{
                   padding: '0.4rem 1rem',
                   borderRadius: 'var(--radius-full)',
-                  border: 'none',
-                  background: isSelected ? 'var(--color-gold-bg)' : 'transparent',
-                  color: isSelected ? 'var(--color-gold-bright)' : 'var(--color-text-secondary)',
+                  border: isSelected ? `1px solid ${colorWithAlpha(tColor, 0.6, 'var(--color-gold)')}` : `1px solid ${colorWithAlpha(tColor, 0.2, 'transparent')}`,
+                  background: isSelected ? colorWithAlpha(tColor, 0.18, 'var(--color-gold-bg)') : colorWithAlpha(tColor, 0.04, 'transparent'),
+                  color: isSelected ? tColor : 'var(--color-text-secondary)',
                   fontWeight: isSelected ? 700 : 500,
                   fontSize: '0.85rem',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.4rem',
+                  gap: '0.45rem',
+                  transition: 'all 0.15s ease',
+                  boxShadow: isSelected ? `0 0 10px ${colorWithAlpha(tColor, 0.25, 'rgba(245, 158, 11, 0.2)')}` : 'none',
                 }}
               >
                 <span
@@ -63,10 +67,12 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
                     width: '8px',
                     height: '8px',
                     borderRadius: '50%',
-                    background: t.primaryColor || 'var(--color-gold)',
+                    background: tColor,
+                    boxShadow: isSelected ? `0 0 6px ${tColor}` : 'none',
+                    opacity: isSelected ? 1 : 0.7,
                   }}
                 />
-                {t.name}
+                <span>{t.name}</span>
               </button>
             );
           })}

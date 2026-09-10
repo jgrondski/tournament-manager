@@ -47,6 +47,9 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
     selectedPlayer && tournament.tournamentPlayers[selectedPlayer.id]?.qualsCompleted
   );
 
+  const numericScore = parseInt(scoreInput, 10);
+  const isScoreValid = Boolean(selectedPlayer) && !isNaN(numericScore) && numericScore > 0;
+
   const handlePlayerSelected = (player: PlayerProfile) => {
     setSelectedPlayer(player);
     setPbInput(player.personalBest ? String(player.personalBest) : '');
@@ -69,10 +72,7 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
 
   const handleSubmitScore = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPlayer) return;
-
-    const numericScore = parseInt(scoreInput, 10);
-    if (!numericScore || isNaN(numericScore)) return;
+    if (!selectedPlayer || !isScoreValid) return;
 
     submitQualifierScore(tournament.id, selectedPlayer.id, numericScore);
     setScoreInput('');
@@ -283,9 +283,20 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
                   />
                   <button
                     type="submit"
-                    disabled={!scoreInput}
+                    disabled={!isScoreValid}
                     className="btn btn-primary"
-                    style={{ padding: '0.5rem 1.25rem' }}
+                    style={{
+                      padding: '0.5rem 1.25rem',
+                      opacity: !isScoreValid ? 0.45 : 1,
+                      cursor: !isScoreValid ? 'not-allowed' : 'pointer',
+                    }}
+                    title={
+                      !selectedPlayer
+                        ? 'Select a competitor first'
+                        : !isScoreValid
+                        ? 'Enter a valid score greater than 0'
+                        : 'Submit qualifier score'
+                    }
                   >
                     <Plus size={16} /> Submit
                   </button>

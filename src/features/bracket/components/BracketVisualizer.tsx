@@ -3,6 +3,7 @@ import { BracketStructure, BracketMatch, isMatchPlayable } from '../types';
 import { Tournament, TournamentTier } from '../../tournament/types';
 import { MatchScoreDrawer } from './MatchScoreDrawer';
 import { BracketDraftBanner } from './BracketDraftBanner';
+import { colorWithAlpha } from '../colorUtils';
 import { Trophy } from 'lucide-react';
 
 interface BracketVisualizerProps {
@@ -22,6 +23,8 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
 
   const bracket: BracketStructure = tier.bracket;
   const rounds = bracket.rounds;
+  const primaryColor = tier.primaryColor || '#f59e0b';
+  const secondaryColor = tier.secondaryColor || '#fbbf24';
 
   // Find final match winner if tournament is concluded
   const finalRound = rounds[rounds.length - 1];
@@ -83,12 +86,12 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                 marginBottom: '1.25rem',
                 fontSize: '0.85rem',
                 fontWeight: 700,
-                color: 'var(--color-gold-bright)',
+                color: primaryColor,
                 textTransform: 'uppercase',
                 letterSpacing: '0.06em',
-                background: isObsMode ? 'rgba(0,0,0,0.6)' : 'var(--color-bg-surface-elevated)',
+                background: isObsMode ? 'rgba(0,0,0,0.6)' : colorWithAlpha(primaryColor, 0.08, 'var(--color-bg-surface-elevated)'),
                 borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--color-border)',
+                border: `1px solid ${colorWithAlpha(primaryColor, 0.35, 'var(--color-border)')}`,
               }}
             >
               {round.name}
@@ -131,12 +134,12 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                       background: isObsMode ? 'rgba(15, 23, 42, 0.95)' : 'var(--color-bg-surface)',
                       borderRadius: 'var(--radius-sm)',
                       border: inProgress
-                        ? '2px solid var(--color-gold-bright)'
+                        ? `2px solid ${primaryColor}`
                         : isComplete
                         ? '1px solid var(--color-border)'
                         : '1px solid var(--color-border-subtle)',
                       boxShadow: inProgress
-                        ? '0 0 12px rgba(245, 158, 11, 0.3)'
+                        ? `0 0 12px ${colorWithAlpha(primaryColor, 0.35, 'rgba(245, 158, 11, 0.3)')}`
                         : 'var(--shadow-sm)',
                       cursor: !isObsMode && canManage && isPlayable && tournament.isVerified ? 'pointer' : 'default',
                       opacity: isPlayable ? 1 : 0.7,
@@ -168,7 +171,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                         justifyContent: 'space-between',
                         padding: '0.45rem 0.65rem',
                         borderBottom: '1px solid var(--color-border-subtle)',
-                        background: p1Won ? 'var(--color-gold-bg)' : 'transparent',
+                        background: p1Won ? colorWithAlpha(primaryColor, 0.18, 'var(--color-gold-bg)') : 'transparent',
                         opacity: isComplete && !p1Won ? 0.45 : 1,
                       }}
                     >
@@ -182,7 +185,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                           style={{
                             fontSize: '0.85rem',
                             fontWeight: p1Won ? 700 : 500,
-                            color: p1Won ? 'var(--color-gold-bright)' : 'var(--color-text-primary)',
+                            color: p1Won ? primaryColor : 'var(--color-text-primary)',
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
@@ -196,7 +199,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                         style={{
                           fontSize: '0.9rem',
                           fontWeight: 700,
-                          color: p1Won ? 'var(--color-gold-bright)' : 'var(--color-text-secondary)',
+                          color: p1Won ? primaryColor : 'var(--color-text-secondary)',
                           marginLeft: '0.5rem',
                         }}
                       >
@@ -211,7 +214,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         padding: '0.45rem 0.65rem',
-                        background: p2Won ? 'var(--color-gold-bg)' : 'transparent',
+                        background: p2Won ? colorWithAlpha(primaryColor, 0.18, 'var(--color-gold-bg)') : 'transparent',
                         opacity: isComplete && !p2Won ? 0.45 : 1,
                       }}
                     >
@@ -225,7 +228,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                           style={{
                             fontSize: '0.85rem',
                             fontWeight: p2Won ? 700 : 500,
-                            color: p2Won ? 'var(--color-gold-bright)' : 'var(--color-text-primary)',
+                            color: p2Won ? primaryColor : 'var(--color-text-primary)',
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
@@ -239,7 +242,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                         style={{
                           fontSize: '0.9rem',
                           fontWeight: 700,
-                          color: p2Won ? 'var(--color-gold-bright)' : 'var(--color-text-secondary)',
+                          color: p2Won ? primaryColor : 'var(--color-text-secondary)',
                           marginLeft: '0.5rem',
                         }}
                       >
@@ -260,24 +263,34 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
               width: '240px',
               padding: '1.5rem 1rem',
               borderRadius: 'var(--radius-md)',
-              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(180, 83, 9, 0.25) 100%)',
-              border: '2px solid var(--color-gold-bright)',
+              background: `linear-gradient(135deg, ${colorWithAlpha(primaryColor, 0.18, 'rgba(245, 158, 11, 0.15)')} 0%, ${colorWithAlpha(secondaryColor, 0.28, 'rgba(180, 83, 9, 0.25)')} 100%)`,
+              border: `2px solid ${primaryColor}`,
               textAlign: 'center',
-              boxShadow: 'var(--shadow-gold)',
+              boxShadow: `0 0 24px ${colorWithAlpha(primaryColor, 0.35, 'rgba(245, 158, 11, 0.25)')}`,
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               gap: '0.5rem',
             }}
           >
-            <Trophy size={36} color="#fbbf24" />
-            <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-gold-bright)', fontWeight: 700 }}>
+            <Trophy size={36} color={primaryColor} />
+            <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: primaryColor, fontWeight: 700 }}>
               {tier.name} Champion
             </div>
             <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ffffff' }}>
               {championPlayer.name}
             </div>
-            <div className="badge badge-gold" style={{ fontSize: '0.7rem' }}>
+            <div
+              style={{
+                fontSize: '0.7rem',
+                fontWeight: 700,
+                padding: '0.2rem 0.6rem',
+                borderRadius: 'var(--radius-sm)',
+                background: colorWithAlpha(primaryColor, 0.2, 'var(--color-gold-bg)'),
+                color: primaryColor,
+                border: `1px solid ${colorWithAlpha(primaryColor, 0.5, 'var(--color-gold)')}`,
+              }}
+            >
               Seed #{championPlayer.seed}
             </div>
           </div>

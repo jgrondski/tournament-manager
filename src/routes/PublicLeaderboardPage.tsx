@@ -21,13 +21,10 @@ export const PublicLeaderboardPage: React.FC = () => {
     );
   }
 
-  const defaultTier = tournament.tiers[0];
-
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <TournamentNavbar
         tournament={tournament}
-        activeTier={defaultTier}
         activeView="leaderboard"
       />
       <main style={{ flex: 1, padding: '1rem 0' }}>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTournament } from '../features/tournament/store';
+import { colorWithAlpha } from '../features/bracket/colorUtils';
 import { Calendar, MapPin, Users, Layers, Plus, Settings, Trophy, ShieldCheck, AlertTriangle, X, Trash2 } from 'lucide-react';
 import { QualFormat, Tournament, TournamentTier } from '../features/tournament/types';
 import { generateTraditionalBracket } from '../features/bracket/math';
@@ -215,30 +216,43 @@ export const TournamentSwitcherPage: React.FC = () => {
 
                   {/* Tier Badges */}
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-                    {tournament.tiers.map(t => (
-                      <Link
-                        key={t.id}
-                        to={`/${tournament.slug}/${t.slug}`}
-                        style={{
-                          textDecoration: 'none',
-                          padding: '0.35rem 0.75rem',
-                          background: 'var(--color-bg-surface-elevated)',
-                          borderRadius: 'var(--radius-sm)',
-                          border: `1px solid ${t.primaryColor || 'var(--color-border)'}`,
-                          fontSize: '0.8rem',
-                          fontWeight: 600,
-                          color: 'var(--color-text-primary)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.4rem',
-                        }}
-                      >
-                        <span>{t.name}</span>
-                        <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>
-                          ({t.playerCount}p • {t.bracketType})
-                        </span>
-                      </Link>
-                    ))}
+                    {tournament.tiers.map(t => {
+                      const tColor = t.primaryColor || '#f59e0b';
+                      return (
+                        <Link
+                          key={t.id}
+                          to={`/${tournament.slug}/${t.slug}`}
+                          style={{
+                            textDecoration: 'none',
+                            padding: '0.35rem 0.75rem',
+                            background: colorWithAlpha(tColor, 0.08, 'var(--color-bg-surface-elevated)'),
+                            borderRadius: 'var(--radius-sm)',
+                            border: `1px solid ${colorWithAlpha(tColor, 0.35, 'var(--color-border)')}`,
+                            fontSize: '0.8rem',
+                            fontWeight: 600,
+                            color: 'var(--color-text-primary)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.45rem',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          <span
+                            style={{
+                              width: '7px',
+                              height: '7px',
+                              borderRadius: '50%',
+                              background: tColor,
+                              flexShrink: 0,
+                            }}
+                          />
+                          <span style={{ color: tColor }}>{t.name}</span>
+                          <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>
+                            ({t.playerCount}p • {t.bracketType})
+                          </span>
+                        </Link>
+                      );
+                    })}
                   </div>
                 </div>
 
