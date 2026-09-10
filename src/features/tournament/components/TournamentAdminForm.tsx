@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Tournament, TournamentTier, QualFormat, PointsThreshold } from '../types';
 import { useTournament } from '../store';
-import { Plus, Trash2, ArrowUp, ArrowDown, Save, CheckCircle2, Shield, Palette, X, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Plus, Trash2, ArrowUp, ArrowDown, Save, CheckCircle2, Shield, Palette, X, AlertTriangle, ShieldCheck, Sparkles, Play } from 'lucide-react';
 import { generateTraditionalBracket, generateFlatBracket } from '../../bracket/math';
 
 interface TournamentAdminFormProps {
@@ -21,6 +21,8 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
     clearMatchScores,
     clearQualifierScores,
     clearAllTournamentData,
+    seedQualifiers,
+    simulateFullTournament,
   } = useTournament();
 
   // Tournament Fields State
@@ -43,6 +45,13 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [tierToDelete, setTierToDelete] = useState<{ index: number; tier: TournamentTier } | null>(null);
   const [dataActionToConfirm, setDataActionToConfirm] = useState<'MATCHES' | 'QUALS' | 'ALL' | null>(null);
+  const [simFeedback, setSimFeedback] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!simFeedback) return;
+    const timer = setTimeout(() => setSimFeedback(null), 4000);
+    return () => clearTimeout(timer);
+  }, [simFeedback]);
 
   const qualifierCount = (tournament.qualifierSubmissions?.length || 0) + (tournament.qualifiers?.length || 0);
   const recordedMatchCount = Object.values(tournament.matchScores || {}).filter(
@@ -244,9 +253,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
     });
   };
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const saveCurrentConfig = () => {
     // Re-generate bracket structures for tiers if player count or type changed
     const updatedTiers = tiers.map(tier => {
       const dummyPlayers = Array.from({ length: tier.playerCount }, (_, i) => ({
@@ -277,11 +284,40 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
     });
 
     saveTiers(tournament.id, updatedTiers);
+    setTiers(updatedTiers);
+    return updatedTiers;
+  };
 
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    saveCurrentConfig();
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
-
     if (onSaved) onSaved();
+  };
+
+  const hasRecordedMatches = recordedMatchCount > 0;
+  const hasQualifiers = qualifierCount > 0;
+  const hasTiers = tiers.length > 0;
+
+  const handleSeedQualifiers = () => {
+    if (isDirty) {
+      saveCurrentConfig();
+    }
+    seedQualifiers(tournament.id);
+    setSimFeedback('Seeded realistic competitors and qualifier attempts in draft mode.');
+  };
+
+  const handleSimulate = () => {
+    if (isDirty) {
+      saveCurrentConfig();
+    }
+    simulateFullTournament(tournament.id);
+    setSimFeedback(
+      hasQualifiers
+        ? 'Built brackets from current qualifiers and simulated all matches to champion!'
+        : 'Seeded qualifiers, locked brackets, and simulated all matches to champion!'
+    );
   };
 
   // Calculate auto-thresholds for display
@@ -749,12 +785,33 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
       >
         <div style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '0.75rem' }}>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-            Data Management
+            Data Management & Simulation
           </h2>
           <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-            Clear match records or qualifier data to reset brackets or allow deleting this tournament.
+            Simulate realistic tournament data for end-to-end testing, or reset match records and qualifier submissions.
           </p>
         </div>
+
+        {/* Feedback message banner if any */}
+        {simFeedback && (
+          <div
+            style={{
+              padding: '0.75rem 1rem',
+              background: 'rgba(34, 197, 94, 0.12)',
+              border: '1px solid rgba(34, 197, 94, 0.4)',
+              borderRadius: 'var(--radius-sm)',
+              color: '#4ade80',
+              fontSize: '0.85rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              animation: 'fadeIn 0.2s ease-out',
+            }}
+          >
+            <CheckCircle2 size={16} />
+            <span>{simFeedback}</span>
+          </div>
+        )}
 
         {/* Data Status Summary */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
@@ -776,55 +833,140 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
           </div>
         </div>
 
+        {/* Sandbox Simulation Controls */}
+        <div
+          style={{
+            padding: '1.1rem',
+            background: 'var(--color-bg-surface-elevated)',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--color-border-subtle)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.75rem',
+          }}
+        >
+          <div>
+            <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+              Sandbox Simulation
+            </div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+              Seed realistic competitors or run an entire tournament simulation with round-by-round match results.
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={handleSeedQualifiers}
+              disabled={!hasTiers || hasQualifiers || hasRecordedMatches}
+              className="btn btn-secondary"
+              style={{
+                padding: '0.55rem 1.1rem',
+                fontSize: '0.85rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                opacity: (!hasTiers || hasQualifiers || hasRecordedMatches) ? 0.45 : 1,
+                cursor: (!hasTiers || hasQualifiers || hasRecordedMatches) ? 'not-allowed' : 'pointer',
+              }}
+              title={
+                !hasTiers
+                  ? 'Add at least one bracket tier first'
+                  : hasRecordedMatches
+                  ? 'Match play has begun. Clear match scores or all tournament data to re-seed.'
+                  : hasQualifiers
+                  ? 'Qualifiers have already been seeded. Clear qualifier scores to re-seed.'
+                  : 'Generate realistic competitors and qualifier attempts'
+              }
+            >
+              <Sparkles size={15} style={{ color: 'var(--color-gold-bright)' }} />
+              Seed Qualifiers Only
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSimulate}
+              disabled={!hasTiers || hasRecordedMatches}
+              className="btn btn-secondary"
+              style={{
+                padding: '0.55rem 1.1rem',
+                fontSize: '0.85rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                opacity: (!hasTiers || hasRecordedMatches) ? 0.45 : 1,
+                cursor: (!hasTiers || hasRecordedMatches) ? 'not-allowed' : 'pointer',
+              }}
+              title={
+                !hasTiers
+                  ? 'Add at least one bracket tier first'
+                  : hasRecordedMatches
+                  ? 'Match results have already been recorded. Clear match scores to simulate again.'
+                  : hasQualifiers
+                  ? 'Lock brackets from current qualifiers and simulate all match results to champion'
+                  : 'Seed qualifiers, lock brackets, and simulate all tournament matches'
+              }
+            >
+              <Play size={15} style={{ color: '#60a5fa' }} />
+              {hasQualifiers ? 'Simulate Matches' : 'Seed & Simulate Tournament'}
+            </button>
+          </div>
+        </div>
+
         {/* Action Buttons */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
-          <button
-            type="button"
-            onClick={() => setDataActionToConfirm('MATCHES')}
-            disabled={recordedMatchCount === 0}
-            className="btn btn-secondary"
-            style={{
-              padding: '0.5rem 1rem',
-              fontSize: '0.85rem',
-              opacity: recordedMatchCount === 0 ? 0.4 : 1,
-              cursor: recordedMatchCount === 0 ? 'not-allowed' : 'pointer',
-            }}
-            title={recordedMatchCount === 0 ? 'No recorded match scores to clear' : 'Clear all recorded match scores'}
-          >
-            Clear Match Scores ({recordedMatchCount})
-          </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+            Data Maintenance
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={() => setDataActionToConfirm('MATCHES')}
+              disabled={recordedMatchCount === 0}
+              className="btn btn-secondary"
+              style={{
+                padding: '0.5rem 1rem',
+                fontSize: '0.85rem',
+                opacity: recordedMatchCount === 0 ? 0.4 : 1,
+                cursor: recordedMatchCount === 0 ? 'not-allowed' : 'pointer',
+              }}
+              title={recordedMatchCount === 0 ? 'No recorded match scores to clear' : 'Clear all recorded match scores'}
+            >
+              Clear Match Scores ({recordedMatchCount})
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setDataActionToConfirm('QUALS')}
-            disabled={qualifierCount === 0}
-            className="btn btn-secondary"
-            style={{
-              padding: '0.5rem 1rem',
-              fontSize: '0.85rem',
-              opacity: qualifierCount === 0 ? 0.4 : 1,
-              cursor: qualifierCount === 0 ? 'not-allowed' : 'pointer',
-            }}
-            title={qualifierCount === 0 ? 'No qualifier scores to clear' : 'Clear all qualifier submissions'}
-          >
-            Clear Qualifier Scores ({qualifierCount})
-          </button>
+            <button
+              type="button"
+              onClick={() => setDataActionToConfirm('QUALS')}
+              disabled={qualifierCount === 0}
+              className="btn btn-secondary"
+              style={{
+                padding: '0.5rem 1rem',
+                fontSize: '0.85rem',
+                opacity: qualifierCount === 0 ? 0.4 : 1,
+                cursor: qualifierCount === 0 ? 'not-allowed' : 'pointer',
+              }}
+              title={qualifierCount === 0 ? 'No qualifier scores to clear' : 'Clear all qualifier submissions'}
+            >
+              Clear Qualifier Scores ({qualifierCount})
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setDataActionToConfirm('ALL')}
-            disabled={qualifierCount === 0 && recordedMatchCount === 0}
-            className="btn btn-danger"
-            style={{
-              padding: '0.5rem 1rem',
-              fontSize: '0.85rem',
-              opacity: qualifierCount === 0 && recordedMatchCount === 0 ? 0.4 : 1,
-              cursor: qualifierCount === 0 && recordedMatchCount === 0 ? 'not-allowed' : 'pointer',
-            }}
-            title={qualifierCount === 0 && recordedMatchCount === 0 ? 'No data to clear' : 'Clear all tournament data'}
-          >
-            <Trash2 size={14} /> Clear All Tournament Data
-          </button>
+            <button
+              type="button"
+              onClick={() => setDataActionToConfirm('ALL')}
+              disabled={qualifierCount === 0 && recordedMatchCount === 0}
+              className="btn btn-danger"
+              style={{
+                padding: '0.5rem 1rem',
+                fontSize: '0.85rem',
+                opacity: qualifierCount === 0 && recordedMatchCount === 0 ? 0.4 : 1,
+                cursor: qualifierCount === 0 && recordedMatchCount === 0 ? 'not-allowed' : 'pointer',
+              }}
+              title={qualifierCount === 0 && recordedMatchCount === 0 ? 'No data to clear' : 'Clear all tournament data'}
+            >
+              <Trash2 size={14} /> Clear All Tournament Data
+            </button>
+          </div>
         </div>
       </section>
 
@@ -1099,9 +1241,16 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  if (dataActionToConfirm === 'MATCHES') clearMatchScores(tournament.id);
-                  else if (dataActionToConfirm === 'QUALS') clearQualifierScores(tournament.id);
-                  else if (dataActionToConfirm === 'ALL') clearAllTournamentData(tournament.id);
+                  if (dataActionToConfirm === 'MATCHES') {
+                    clearMatchScores(tournament.id);
+                    setSimFeedback('Match scores cleared.');
+                  } else if (dataActionToConfirm === 'QUALS') {
+                    clearQualifierScores(tournament.id);
+                    setSimFeedback('Qualifier scores cleared.');
+                  } else if (dataActionToConfirm === 'ALL') {
+                    clearAllTournamentData(tournament.id);
+                    setSimFeedback('All tournament data cleared.');
+                  }
                   setDataActionToConfirm(null);
                 }}
                 className="btn btn-danger"

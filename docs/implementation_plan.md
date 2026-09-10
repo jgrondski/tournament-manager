@@ -83,7 +83,14 @@ To facilitate manual testing and focused reviews, the work is organized into **1
 
 #### Commit 2.2: Data Management & Simulation Controls in Settings [NEXT]
 * **Objective:** Provide sandbox simulation controls inside tournament settings: "Seed Qualifiers Only", "Simulate Full Tournament", and "Clear All Tournament Data".
+* **Note on Player Simulation & Global Pool:**
+  * To enable seamless testing of brand-new tournaments from scratch, simulation controls will auto-generate realistic competitors (bracket capacity + 4 DNQ) with distinct names, playstyles, and personal bests if the tournament roster lacks competitors.
+  * In addition, the Global Player Directory (`/players`, Priority 5) will feature a **"Generate Fake Players"** action: prompts the user for the number of players to generate with an input, OK, and Cancel button; on OK, it generates random, realistic competitors into the master global pool (`classic_tetris_global_players`).
 * **Changes:**
+  * **[NEW]** [simulation.ts](../src/features/tournament/simulation.ts): Dedicated simulation engine:
+    * `generateRealisticPlayers(count: number): PlayerProfile[]`
+    * `generateSimulatedQualifiers(tournament: Tournament): { players: PlayerProfile[]; submissions: QualifierSubmission[] }`
+    * `simulateTournamentMatches(tournament: Tournament): Record<string, MatchScoreRecord>`
   * [store.tsx](../src/features/tournament/store.tsx):
     * Add action `seedQualifiers(tournamentId: string)`: Generates bracket capacity + 4 DNQ realistic competitors with scores tailored to `qualFormat` (`HIGH_SCORE`, `AVERAGE_OF_X`, `POINTS`), leaving in Qualifiers Mode.
     * Add action `simulateFullTournament(tournamentId: string)`: Seeds qualifiers, locks brackets, and simulates game scores and winners across all rounds up to tier champions.
@@ -142,9 +149,13 @@ To facilitate manual testing and focused reviews, the work is organized into **1
 
 #### Commit 5.1: Global Player Pool Directory (`classic_tetris_global_players` & `/players` Route)
 * **Objective:** Provide a master player pool catalog independent of individual tournaments to manage players, manual PBs, playstyles, countries, and notes under LocalStorage key `classic_tetris_global_players`.
+* **"Generate Fake Players" Modal:**
+  * Include a prominent "Generate Fake Players" button in the global player directory.
+  * Modal prompts for the number of players to generate with a numeric input, "OK" button, and "Cancel" button.
+  * On "OK", generates that count of realistic fake players with randomized names, playstyles (DAS, Rolling, Hypertap), personal bests (600k–1.4M), countries, and notes, appending them to `classic_tetris_global_players`.
 * **Changes:**
-  * [store.tsx](../src/features/tournament/store.tsx): Introduce `classic_tetris_global_players` CRUD.
-  * **[NEW]** `src/features/players/components/PlayerDirectoryPage.tsx`: Master player pool table and "+ Add Player" modal.
+  * [store.tsx](../src/features/tournament/store.tsx): Introduce `classic_tetris_global_players` CRUD and bulk generate action.
+  * **[NEW]** `src/features/players/components/PlayerDirectoryPage.tsx`: Master player pool table, "+ Add Player" modal, and "Generate Fake Players" modal.
   * [App.tsx](../src/App.tsx): Add route `/players`.
 
 #### Commit 5.2: Tournament Roster Management & Registration

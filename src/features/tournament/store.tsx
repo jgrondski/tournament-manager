@@ -9,6 +9,7 @@ import {
 } from './types';
 import { advanceMatchWinner } from '../bracket/math';
 import { generateDraftBracketsForTournament } from '../qualifiers/scoring';
+import { generateSimulatedQualifiers, runFullSimulation } from './simulation';
 
 interface TournamentContextType {
   tournaments: Tournament[];
@@ -57,6 +58,8 @@ interface TournamentContextType {
   clearMatchScores: (tournamentId: string) => void;
   clearQualifierScores: (tournamentId: string) => void;
   clearAllTournamentData: (tournamentId: string) => void;
+  seedQualifiers: (tournamentId: string) => void;
+  simulateFullTournament: (tournamentId: string) => void;
   deleteTournament: (tournamentId: string) => void;
 }
 
@@ -645,10 +648,19 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setTournaments(prev =>
       prev.map(t => {
         if (t.id !== tournamentId) return t;
+        const hasRecordedMatches = Object.values(t.matchScores || {}).some(
+          m => m.isComplete || m.player1Wins > 0 || m.player2Wins > 0 ||
+            m.games?.some(g => g.player1Points !== null || g.player2Points !== null)
+        );
         const updated = {
           ...t,
           qualifierSubmissions: [],
           qualifiers: [],
+          isLocked: hasRecordedMatches ? t.isLocked : false,
+          tiers: t.tiers.map(tier => ({
+            ...tier,
+            isLocked: hasRecordedMatches ? tier.isLocked : false,
+          })),
         };
         if (!updated.isLocked) {
           updated.tiers = generateDraftBracketsForTournament(updated);
@@ -664,6 +676,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (t.id !== tournamentId) return t;
         const updated = {
           ...t,
+          playersPool: [],
           qualifierSubmissions: [],
           qualifiers: [],
           matchScores: {},
@@ -673,6 +686,35 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         };
         updated.tiers = generateDraftBracketsForTournament(updated);
         return updated;
+      })
+    );
+  };
+
+  const seedQualifiers = (tournamentId: string) => {
+    setTournaments(prev =>
+      prev.map(t => {
+        if (t.id !== tournamentId) return t;
+        const { players, submissions } = generateSimulatedQualifiers(t);
+        const updated: Tournament = {
+          ...t,
+          playersPool: players,
+          qualifierSubmissions: submissions,
+          qualifiers: [],
+          matchScores: {},
+          isLocked: false,
+          tiers: t.tiers.map(tier => ({ ...tier, isLocked: false })),
+        };
+        updated.tiers = generateDraftBracketsForTournament(updated);
+        return updated;
+      })
+    );
+  };
+
+  const simulateFullTournament = (tournamentId: string) => {
+    setTournaments(prev =>
+      prev.map(t => {
+        if (t.id !== tournamentId) return t;
+        return runFullSimulation(t);
       })
     );
   };
@@ -706,6 +748,8 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         clearMatchScores,
         clearQualifierScores,
         clearAllTournamentData,
+        seedQualifiers,
+        simulateFullTournament,
         deleteTournament,
       }}
     >
