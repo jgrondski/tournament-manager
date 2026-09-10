@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Tournament, TournamentTier, QualFormat, PointsThreshold } from '../types';
 import { useTournament } from '../store';
-import { Plus, Trash2, ArrowUp, ArrowDown, Save, CheckCircle2, Shield, Palette, X, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, ArrowUp, ArrowDown, Save, CheckCircle2, Shield, Palette, X, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { generateTraditionalBracket, generateFlatBracket } from '../../bracket/math';
 
 interface TournamentAdminFormProps {
@@ -30,7 +30,6 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
   const [location, setLocation] = useState(tournament.location);
   const [qualFormat, setQualFormat] = useState<QualFormat>(tournament.qualFormat || 'AVERAGE_OF_X');
   const [qualAverageCount, setQualAverageCount] = useState<number>(tournament.qualAverageCount || 2);
-  const [qualsClosed, setQualsClosed] = useState<boolean>(tournament.qualsClosed);
   const [pointsConfig, setPointsConfig] = useState<PointsThreshold[]>(
     tournament.pointsConfig || [
       { minScore: 1200000, points: 100 },
@@ -59,7 +58,6 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
     if (location !== (tournament.location || '')) return true;
     if (qualFormat !== (tournament.qualFormat || 'AVERAGE_OF_X')) return true;
     if (qualAverageCount !== (tournament.qualAverageCount || 2)) return true;
-    if (qualsClosed !== Boolean(tournament.qualsClosed)) return true;
 
     // Points config
     const initialPoints = tournament.pointsConfig || [
@@ -101,7 +99,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
     }
 
     return false;
-  }, [name, slug, date, location, qualFormat, qualAverageCount, qualsClosed, pointsConfig, tiers, tournament]);
+  }, [name, slug, date, location, qualFormat, qualAverageCount, pointsConfig, tiers, tournament]);
 
   // Notify parent of dirty state changes
   useEffect(() => {
@@ -129,7 +127,6 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
       setLocation(tournament.location || '');
       setQualFormat(tournament.qualFormat || 'AVERAGE_OF_X');
       setQualAverageCount(tournament.qualAverageCount || 2);
-      setQualsClosed(Boolean(tournament.qualsClosed));
       setPointsConfig(
         tournament.pointsConfig || [
           { minScore: 1200000, points: 100 },
@@ -148,7 +145,6 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
     setLocation(tournament.location || '');
     setQualFormat(tournament.qualFormat || 'AVERAGE_OF_X');
     setQualAverageCount(tournament.qualAverageCount || 2);
-    setQualsClosed(Boolean(tournament.qualsClosed));
     setPointsConfig(
       tournament.pointsConfig || [
         { minScore: 1200000, points: 100 },
@@ -277,7 +273,6 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
       location,
       qualFormat,
       qualAverageCount,
-      qualsClosed,
       pointsConfig,
     });
 
@@ -404,30 +399,23 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
               </select>
             </div>
 
-            {/* Qualifiers Open/Closed Global Toggle */}
+            {/* Tournament Mode Status Indicator */}
             <div>
-              <label style={labelStyle}>Qualifiers Status</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.4rem' }}>
-                <button
-                  type="button"
-                  onClick={() => setQualsClosed(!qualsClosed)}
-                  style={{
-                    padding: '0.45rem 1rem',
-                    borderRadius: 'var(--radius-sm)',
-                    border: '1px solid var(--color-border)',
-                    background: qualsClosed ? 'var(--color-red-bg)' : 'var(--color-green-bg)',
-                    color: qualsClosed ? '#f87171' : '#34d399',
-                    fontWeight: 700,
-                    fontSize: '0.85rem',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {qualsClosed ? '🔴 Qualifiers Closed' : '🟢 Qualifiers Open'}
-                </button>
+              <label style={labelStyle}>Tournament Mode</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.4rem', flexWrap: 'wrap' }}>
+                {!tournament.isLocked ? (
+                  <span className="badge badge-gold" style={{ fontSize: '0.85rem', padding: '0.45rem 1rem' }}>
+                    <AlertTriangle size={14} /> Qualifiers Mode
+                  </span>
+                ) : (
+                  <span className="badge badge-green" style={{ fontSize: '0.85rem', padding: '0.45rem 1rem' }}>
+                    <ShieldCheck size={14} /> Match Play Mode
+                  </span>
+                )}
                 <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-                  {qualsClosed
-                    ? 'In Average format, missing attempts count as 0.'
-                    : 'Running averages calculate submitted attempts only.'}
+                  {!tournament.isLocked
+                    ? 'Qualifiers active. Brackets dynamically seed with score entries.'
+                    : 'Brackets locked. Live match scoring and play active.'}
                 </span>
               </div>
             </div>

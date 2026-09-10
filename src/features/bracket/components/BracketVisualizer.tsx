@@ -126,7 +126,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                   <div
                     key={match.id}
                     onClick={() => {
-                      if (!isObsMode && canManage && isPlayable && tournament.isVerified) {
+                      if (!isObsMode && canManage && isPlayable && tournament.isLocked) {
                         setSelectedMatch({ match, roundName: round.name });
                       }
                     }}
@@ -141,7 +141,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                       boxShadow: inProgress
                         ? `0 0 12px ${colorWithAlpha(primaryColor, 0.35, 'rgba(245, 158, 11, 0.3)')}`
                         : 'var(--shadow-sm)',
-                      cursor: !isObsMode && canManage && isPlayable && tournament.isVerified ? 'pointer' : 'default',
+                      cursor: !isObsMode && canManage && isPlayable && tournament.isLocked ? 'pointer' : 'default',
                       opacity: isPlayable ? 1 : 0.7,
                       overflow: 'hidden',
                       transition: 'all 0.15s ease',

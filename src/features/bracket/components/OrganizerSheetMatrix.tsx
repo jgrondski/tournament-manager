@@ -315,13 +315,13 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                         {/* Row 1: Player 1 */}
                         <tr
                           onClick={() => {
-                            if (isPlayable && tournament.isVerified) setSelectedMatch({ match, roundName: round.name });
+                            if (isPlayable && tournament.isLocked) setSelectedMatch({ match, roundName: round.name });
                           }}
                           onMouseEnter={() => setHoveredMatchId(match.id)}
                           onMouseLeave={() => setHoveredMatchId(null)}
                           style={{
                             background: blockBg,
-                            cursor: isPlayable && tournament.isVerified ? 'pointer' : 'default',
+                            cursor: isPlayable && tournament.isLocked ? 'pointer' : 'default',
                             opacity: isPlayable ? 1 : 0.75,
                             transition: 'background 0.1s ease',
                           }}
@@ -444,13 +444,13 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                         {/* Row 2: Player 2 */}
                         <tr
                           onClick={() => {
-                            if (isPlayable && tournament.isVerified) setSelectedMatch({ match, roundName: round.name });
+                            if (isPlayable && tournament.isLocked) setSelectedMatch({ match, roundName: round.name });
                           }}
                           onMouseEnter={() => setHoveredMatchId(match.id)}
                           onMouseLeave={() => setHoveredMatchId(null)}
                           style={{
                             background: blockBg,
-                            cursor: isPlayable && tournament.isVerified ? 'pointer' : 'default',
+                            cursor: isPlayable && tournament.isLocked ? 'pointer' : 'default',
                             opacity: isPlayable ? 1 : 0.75,
                             transition: 'background 0.1s ease',
                           }}

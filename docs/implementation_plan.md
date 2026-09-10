@@ -62,7 +62,7 @@ To facilitate manual testing and focused reviews, the work is organized into **1
 
 ### Priority 2: Tournament Lifecycle & Data Simulation Controls
 
-#### Commit 2.1: Unify Lifecycle to `isLocked`, Clean Slate Defaults & Purge Legacy Reset Demo [NEXT]
+#### Commit 2.1: Unify Lifecycle to `isLocked`, Clean Slate Defaults & Purge Legacy Reset Demo [COMPLETE]
 * **Objective:** Replace legacy `isVerified` and `qualsClosed` with single source of truth `isLocked: boolean`, initialize new tournaments with 0 data, and remove the legacy "Reset Demo" button.
 * **Changes:**
   * [types.ts](../src/features/tournament/types.ts): Update `Tournament` interface: replace `isVerified` and `qualsClosed` with `isLocked: boolean`.
@@ -71,16 +71,17 @@ To facilitate manual testing and focused reviews, the work is organized into **1
     * On fresh state with 0 tournaments, start with `[]` (empty list).
     * `createTournament`: clean slate defaults (`playersPool: []`, `qualifierSubmissions: []`, `tournamentPlayers: {}`, `matchScores: {}`, `isLocked: false`).
     * Rename `verifyBrackets` to `lockTournament`, update `unlockBrackets`.
-    * Enforce unlock invariant: unlock is blocked if `Object.values(tournament.matchScores)` contains any recorded game scores with error message: *"Cannot unlock: Match play has begun. Clear recorded match scores before unlocking."*
+    * Enforce unlock invariant: unlock is blocked if `Object.values(tournament.matchScores)` contains any recorded game scores with error message: *"Cannot unlock: Match play has begun. Clear recorded scores before unlocking."*
     * Remove `resetTournamentData` legacy demo reset function.
   * [TournamentSwitcherPage.tsx](../src/routes/TournamentSwitcherPage.tsx):
     * Clean empty state when 0 tournaments exist, inviting user to click **"+ Create New Tournament"**.
-    * Update modal CTA button text to **"Create & Configure"**.
+    * Remove backdrop click dismissal on create modal.
     * On submit, navigate directly to `/:slug/manage/settings`.
-  * [VerifyBracketModal.tsx](../src/features/tournament/components/VerifyBracketModal.tsx): Update modal title and CTA to *"Lock Brackets & Begin Match Play"*.
-  * [TournamentNavbar.tsx](../src/components/TournamentNavbar.tsx): Remove the legacy "Reset Demo" button.
+  * [VerifyBracketModal.tsx](../src/features/tournament/components/VerifyBracketModal.tsx): Update to call `lockTournament`.
+  * [TournamentNavbar.tsx](../src/components/TournamentNavbar.tsx): Remove the legacy "Reset Demo" button, use `isLocked`.
+  * Update [BracketVisualizer.tsx](../src/features/bracket/components/BracketVisualizer.tsx), [MatchCardFeed.tsx](../src/features/bracket/components/MatchCardFeed.tsx), [OrganizerSheetMatrix.tsx](../src/features/bracket/components/OrganizerSheetMatrix.tsx), and [LeaderboardTable.tsx](../src/features/qualifiers/components/LeaderboardTable.tsx) to consume `isLocked`.
 
-#### Commit 2.2: Data Management & Simulation Controls in Settings
+#### Commit 2.2: Data Management & Simulation Controls in Settings [NEXT]
 * **Objective:** Provide sandbox simulation controls inside tournament settings: "Seed Qualifiers Only", "Simulate Full Tournament", and "Clear All Tournament Data".
 * **Changes:**
   * [store.tsx](../src/features/tournament/store.tsx):

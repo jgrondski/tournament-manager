@@ -47,7 +47,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
             Format: <strong style={{ color: 'var(--color-gold-bright)' }}>{tournament.qualFormat.replace(/_/g, ' ')}</strong>
             {tournament.qualFormat === 'AVERAGE_OF_X' && ` (Ao${tournament.qualAverageCount || 2})`}
             {' • '}
-            {tournament.qualsClosed ? 'Qualifiers Closed' : 'Qualifiers Open (Live Running Standings)'}
+            {tournament.isLocked ? 'Qualifiers Closed (Match Play in Progress)' : 'Qualifiers Open (Live Running Standings)'}
           </p>
         </div>
 
@@ -74,7 +74,14 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
             <button
               onClick={() => setIsEntryModalOpen(true)}
               className="btn btn-primary"
-              style={{ padding: '0.45rem 1rem', fontSize: '0.85rem' }}
+              disabled={tournament.isLocked}
+              title={tournament.isLocked ? 'Qualifiers are locked during Match Play Mode' : undefined}
+              style={{
+                padding: '0.45rem 1rem',
+                fontSize: '0.85rem',
+                opacity: tournament.isLocked ? 0.5 : 1,
+                cursor: tournament.isLocked ? 'not-allowed' : 'pointer',
+              }}
             >
               <Plus size={16} />
               Submit Score

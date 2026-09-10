@@ -90,8 +90,7 @@ export const TournamentSwitcherPage: React.FC = () => {
       location: newTourneyLocation || 'TBD',
       qualFormat: newTourneyFormat,
       qualAverageCount: newTourneyAvgCount,
-      qualsClosed: false,
-      isVerified: false,
+      isLocked: false,
       tiers: initialTiers,
     });
 
@@ -129,44 +128,91 @@ export const TournamentSwitcherPage: React.FC = () => {
           </button>
         </header>
 
-        {/* Tournament Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(480px, 1fr))', gap: '1.5rem' }}>
-          {tournaments.map(tournament => {
-            const defaultTier = tournament.tiers[0] || { slug: 'default', name: 'Bracket' };
-            const totalPlayers = tournament.tiers.reduce((acc, t) => acc + t.playerCount, 0);
+        {/* Tournament Grid / Empty State */}
+        {tournaments.length === 0 ? (
+          <div
+            style={{
+              background: 'var(--color-bg-surface)',
+              border: '1px dashed var(--color-border)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '4rem 2rem',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '1rem',
+              maxWidth: '620px',
+              margin: '1rem auto 3rem',
+            }}
+          >
+            <div
+              style={{
+                width: '60px',
+                height: '60px',
+                borderRadius: '50%',
+                background: 'var(--color-gold-bg)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--color-gold-bright)',
+                marginBottom: '0.5rem',
+              }}
+            >
+              <Trophy size={30} />
+            </div>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+              No Tournaments Created Yet
+            </h2>
+            <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.95rem', maxWidth: '440px', lineHeight: 1.5 }}>
+              Get started by creating your first competitive tournament. Configure tiers, record qualifier attempts, seed brackets, and run live match play.
+            </p>
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="btn btn-primary"
+              style={{ marginTop: '0.75rem', padding: '0.7rem 1.75rem', fontSize: '0.95rem', boxShadow: 'var(--shadow-gold)' }}
+            >
+              <Plus size={18} />
+              Create New Tournament
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(480px, 1fr))', gap: '1.5rem' }}>
+            {tournaments.map(tournament => {
+              const defaultTier = tournament.tiers[0] || { slug: 'default', name: 'Bracket' };
+              const totalPlayers = tournament.tiers.reduce((acc, t) => acc + t.playerCount, 0);
 
-            return (
-              <div
-                key={tournament.id}
-                style={{
-                  background: 'var(--color-bg-surface)',
-                  borderRadius: 'var(--radius-lg)',
-                  border: '1px solid var(--color-border)',
-                  padding: '1.75rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  gap: '1.5rem',
-                  boxShadow: 'var(--shadow-md)',
-                  transition: 'transform 0.15s ease, border-color 0.15s ease',
-                }}
-              >
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      {!tournament.isVerified ? (
-                        <span className="badge badge-gold">
-                          <AlertTriangle size={12} /> Qualifiers Mode
+              return (
+                <div
+                  key={tournament.id}
+                  style={{
+                    background: 'var(--color-bg-surface)',
+                    borderRadius: 'var(--radius-lg)',
+                    border: '1px solid var(--color-border)',
+                    padding: '1.75rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '1.5rem',
+                    boxShadow: 'var(--shadow-md)',
+                    transition: 'transform 0.15s ease, border-color 0.15s ease',
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        {!tournament.isLocked ? (
+                          <span className="badge badge-gold">
+                            <AlertTriangle size={12} /> Qualifiers Mode
+                          </span>
+                        ) : (
+                          <span className="badge badge-green">
+                            <ShieldCheck size={12} /> Match Play Mode
+                          </span>
+                        )}
+                        <span className="badge badge-muted">
+                          {tournament.qualFormat?.replace(/_/g, ' ') || 'Average'}
                         </span>
-                      ) : (
-                        <span className="badge badge-green">
-                          <ShieldCheck size={12} /> Match Play Mode
-                        </span>
-                      )}
-                      <span className="badge badge-muted">
-                        {tournament.qualFormat?.replace(/_/g, ' ') || 'Average'}
-                      </span>
-                    </div>
+                      </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                       <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
                         ID: {tournament.slug}
@@ -306,14 +352,15 @@ export const TournamentSwitcherPage: React.FC = () => {
                     <Settings size={14} /> Settings
                   </Link>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Footer */}
         <footer style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
-          Classic Tetris World Championship Tournament System • LocalStorage Enabled • OBS Broadcast Ready
+          Tournament Manager • LocalStorage Enabled • OBS Broadcast Ready
         </footer>
       </div>
 
@@ -331,7 +378,6 @@ export const TournamentSwitcherPage: React.FC = () => {
             zIndex: 9999,
             padding: '1rem',
           }}
-          onClick={() => setIsCreateModalOpen(false)}
         >
           <div
             style={{
@@ -344,7 +390,6 @@ export const TournamentSwitcherPage: React.FC = () => {
               overflow: 'hidden',
               animation: 'fadeIn 0.2s ease-out',
             }}
-            onClick={e => e.stopPropagation()}
           >
             <div
               style={{

@@ -93,8 +93,7 @@ export interface Tournament {
   qualFormat: QualFormat;
   qualAverageCount?: number; // target count X for AVERAGE_OF_X
   pointsConfig?: PointsThreshold[]; // array of { minScore, points } for POINTS
-  qualsClosed: boolean;
-  isVerified: boolean; // false = DRAFT, true = VERIFIED
+  isLocked: boolean; // false = Qualifiers Mode (Draft Preview), true = Match Play Mode (Locked)
   tiers: TournamentTier[];
   matchScores: Record<string, MatchScoreRecord>; // keyed by matchId
   playersPool: PlayerProfile[];

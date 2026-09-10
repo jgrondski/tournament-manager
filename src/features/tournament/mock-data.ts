@@ -304,8 +304,7 @@ export function createInitialTournaments(): Tournament[] {
     location: 'Kansas City, MO',
     qualFormat: 'AVERAGE_OF_X',
     qualAverageCount: 2,
-    qualsClosed: false,
-    isVerified: true,
+    isLocked: true,
     playersPool: MOCK_PLAYERS_POOL,
     qualifierSubmissions: buildMockSubmissions('kc-2026-open'),
     tournamentPlayers: {},
@@ -362,8 +361,7 @@ export function createInitialTournaments(): Tournament[] {
     date: 'March 20, 2026',
     location: 'Kansas City, MO',
     qualFormat: 'HIGH_SCORE',
-    qualsClosed: false,
-    isVerified: false, // DRAFT preview mode
+    isLocked: false, // Qualifiers Mode (Draft preview)
     playersPool: MOCK_PLAYERS_POOL,
     qualifierSubmissions: buildMockSubmissions('kc-2026-das').slice(0, 24),
     tournamentPlayers: {},

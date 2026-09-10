@@ -24,15 +24,14 @@ describe('Bracket Verification Lifecycle & Invariants', () => {
     },
   ];
 
-  const createTestTournament = (isVerified: boolean = false): Tournament => ({
+  const createTestTournament = (isLocked: boolean = false): Tournament => ({
     id: 'test-tournament',
     slug: 'test-tournament',
     name: 'Verification Test Event',
     date: '2026-03-20',
     location: 'Test City',
     qualFormat: 'HIGH_SCORE',
-    qualsClosed: false,
-    isVerified,
+    isLocked,
     tiers: mockTiers,
     matchScores: {},
     playersPool: [
@@ -114,5 +113,17 @@ describe('Bracket Verification Lifecycle & Invariants', () => {
     );
 
     expect(hasRecordedScores).toBe(false);
+  });
+
+  it('locks all tiers and marks isLocked = true on tournament', () => {
+    const tournament = createTestTournament(false);
+    expect(tournament.isLocked).toBe(false);
+    expect(tournament.tiers.every(t => !t.isLocked)).toBe(true);
+
+    const lockedTiers = tournament.tiers.map(tier => ({ ...tier, isLocked: true }));
+    const lockedTournament = { ...tournament, isLocked: true, tiers: lockedTiers };
+
+    expect(lockedTournament.isLocked).toBe(true);
+    expect(lockedTournament.tiers.every(t => t.isLocked)).toBe(true);
   });
 });

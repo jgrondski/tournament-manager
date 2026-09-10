@@ -17,7 +17,7 @@ export const BracketDraftBanner: React.FC<BracketDraftBannerProps> = ({
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
   const [unlockError, setUnlockError] = useState<string | null>(null);
 
-  const isDraft = !tournament.isVerified;
+  const isDraft = !tournament.isLocked;
 
   const handleUnlockClick = () => {
     const res = unlockBrackets(tournament.id);

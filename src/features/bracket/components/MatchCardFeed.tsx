@@ -67,7 +67,7 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
             <div
               key={match.id}
               onClick={() => {
-                if (isPlayable && tournament.isVerified) setActiveMatch(match);
+                if (isPlayable && tournament.isLocked) setActiveMatch(match);
               }}
               style={{
                 background: 'var(--color-bg-surface)',
@@ -79,7 +79,7 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
                   : '1px solid var(--color-border-subtle)',
                 boxShadow: inProgress ? `0 0 12px ${colorWithAlpha(primaryColor, 0.3, 'rgba(245, 158, 11, 0.25)')}` : 'var(--shadow-sm)',
                 padding: '1rem',
-                cursor: isPlayable && tournament.isVerified ? 'pointer' : 'default',
+                cursor: isPlayable && tournament.isLocked ? 'pointer' : 'default',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '0.85rem',
@@ -103,7 +103,7 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
                   Match #{match.matchNumber}
                 </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  {!tournament.isVerified ? (
+                  {!tournament.isLocked ? (
                     <span className="badge badge-muted" title="Scores locked during Qualifiers Mode">
                       <Lock size={12} /> Qualifiers Mode
                     </span>
@@ -132,7 +132,7 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
                   ) : (
                     <span className="badge badge-muted">Ready</span>
                   )}
-                  {tournament.isVerified && <ChevronRight size={18} color="var(--color-text-muted)" />}
+                  {tournament.isLocked && <ChevronRight size={18} color="var(--color-text-muted)" />}
                 </div>
               </div>
 

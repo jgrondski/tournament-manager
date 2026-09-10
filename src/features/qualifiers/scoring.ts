@@ -110,7 +110,7 @@ export function deriveLeaderboard(tournament: Tournament): LeaderboardRankRow[] 
       (a, b) => a.submittedAt - b.submittedAt
     );
     const tPlayer = tournamentPlayers[player.id];
-    const isCompleted = tournament.qualsClosed || Boolean(tPlayer?.qualsCompleted);
+    const isCompleted = tournament.isLocked || Boolean(tPlayer?.qualsCompleted);
     const isDisqualified = Boolean(player.isDisqualified);
 
     let finalScore = 0;

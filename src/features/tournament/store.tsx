@@ -7,7 +7,6 @@ import {
   PlayerProfile,
   QualifierSubmission,
 } from './types';
-import { createInitialTournaments, MOCK_PLAYERS_POOL } from './mock-data';
 import { advanceMatchWinner } from '../bracket/math';
 import { generateDraftBracketsForTournament } from '../qualifiers/scoring';
 
@@ -40,8 +39,7 @@ interface TournamentContextType {
     playerId: string,
     qualsCompleted: boolean
   ) => void;
-  setQualifiersClosed: (tournamentId: string, closed: boolean) => void;
-  verifyBrackets: (tournamentId: string) => void;
+  lockTournament: (tournamentId: string) => void;
   unlockBrackets: (tournamentId: string) => { success: boolean; error?: string };
   recordGameScore: (
     tournamentId: string,
@@ -60,27 +58,37 @@ interface TournamentContextType {
   clearQualifierScores: (tournamentId: string) => void;
   clearAllTournamentData: (tournamentId: string) => void;
   deleteTournament: (tournamentId: string) => void;
-  resetTournamentData: (tournamentId?: string) => void;
 }
 
-const STORAGE_KEY = 'ctwc_tournaments_v3';
+const STORAGE_KEY = 'tournament_manager_tournaments_v3';
+const LEGACY_STORAGE_KEY = 'ctwc_tournaments_v3';
 
 const TournamentContext = createContext<TournamentContextType | null>(null);
 
 export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [tournaments, setTournaments] = useState<Tournament[]>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      let saved = localStorage.getItem(STORAGE_KEY);
+      if (!saved) {
+        saved = localStorage.getItem(LEGACY_STORAGE_KEY);
+      }
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          return parsed.map((t: Tournament & { isVerified?: boolean; qualsClosed?: boolean }) => {
+            const isLocked = Boolean(t.isLocked ?? t.isVerified);
+            const { isVerified: _iv, qualsClosed: _qc, ...rest } = t;
+            return {
+              ...rest,
+              isLocked,
+            };
+          });
         }
       }
     } catch {
       // ignore parse errors and fallback
     }
-    return createInitialTournaments();
+    return [];
   });
 
   useEffect(() => {
@@ -115,11 +123,10 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       id,
       slug: data.slug || id,
       matchScores: {},
-      playersPool: [...MOCK_PLAYERS_POOL],
+      playersPool: [],
       qualifierSubmissions: [],
       tournamentPlayers: {},
-      isVerified: false,
-      qualsClosed: Boolean(data.qualsClosed),
+      isLocked: Boolean(data.isLocked),
       tiers: data.tiers || [],
     };
 
@@ -137,7 +144,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       prev.map(t => {
         if (t.id !== tournamentId) return t;
         const updated = { ...t, ...updates };
-        if (!updated.isVerified) {
+        if (!updated.isLocked) {
           updated.tiers = generateDraftBracketsForTournament(updated);
         }
         return updated;
@@ -150,7 +157,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       prev.map(t => {
         if (t.id !== tournamentId) return t;
         const updated = { ...t, tiers };
-        if (!updated.isVerified) {
+        if (!updated.isLocked) {
           updated.tiers = generateDraftBracketsForTournament(updated);
         }
         return updated;
@@ -173,7 +180,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const currentPool = t.playersPool || [];
         const updatedPool = [...currentPool, newPlayer];
         const updated = { ...t, playersPool: updatedPool };
-        if (!updated.isVerified) {
+        if (!updated.isLocked) {
           updated.tiers = generateDraftBracketsForTournament(updated);
         }
         return updated;
@@ -196,7 +203,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           p.id === playerId ? { ...p, ...updates } : p
         );
         const updated = { ...t, playersPool: updatedPool };
-        if (!updated.isVerified) {
+        if (!updated.isLocked) {
           updated.tiers = generateDraftBracketsForTournament(updated);
         }
         return updated;
@@ -218,7 +225,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const currentSubs = t.qualifierSubmissions || [];
         const updatedSubs = [...currentSubs, newSubmission];
         const updated = { ...t, qualifierSubmissions: updatedSubs };
-        if (!updated.isVerified) {
+        if (!updated.isLocked) {
           updated.tiers = generateDraftBracketsForTournament(updated);
         }
         return updated;
@@ -233,7 +240,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const currentSubs = t.qualifierSubmissions || [];
         const updatedSubs = currentSubs.filter(s => s.id !== submissionId);
         const updated = { ...t, qualifierSubmissions: updatedSubs };
-        if (!updated.isVerified) {
+        if (!updated.isLocked) {
           updated.tiers = generateDraftBracketsForTournament(updated);
         }
         return updated;
@@ -254,7 +261,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           p.id === playerId ? { ...p, isDisqualified } : p
         );
         const updated = { ...t, playersPool: updatedPool };
-        if (!updated.isVerified) {
+        if (!updated.isLocked) {
           updated.tiers = generateDraftBracketsForTournament(updated);
         }
         return updated;
@@ -280,7 +287,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           [playerId]: { ...existing, qualsCompleted },
         };
         const updated = { ...t, tournamentPlayers: updatedPlayers };
-        if (!updated.isVerified) {
+        if (!updated.isLocked) {
           updated.tiers = generateDraftBracketsForTournament(updated);
         }
         return updated;
@@ -288,20 +295,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     );
   };
 
-  const setQualifiersClosed = (tournamentId: string, closed: boolean) => {
-    setTournaments(prev =>
-      prev.map(t => {
-        if (t.id !== tournamentId) return t;
-        const updated = { ...t, qualsClosed: closed };
-        if (!updated.isVerified) {
-          updated.tiers = generateDraftBracketsForTournament(updated);
-        }
-        return updated;
-      })
-    );
-  };
-
-  const verifyBrackets = (tournamentId: string) => {
+  const lockTournament = (tournamentId: string) => {
     setTournaments(prev =>
       prev.map(t => {
         if (t.id !== tournamentId) return t;
@@ -312,7 +306,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         }));
         return {
           ...t,
-          isVerified: true,
+          isLocked: true,
           tiers: lockedTiers,
         };
       })
@@ -349,7 +343,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (t.id !== tournamentId) return t;
         const updated = {
           ...t,
-          isVerified: false,
+          isLocked: false,
           tiers: t.tiers.map(tier => ({ ...tier, isLocked: false })),
         };
         // Re-generate draft brackets with current qualifiers
@@ -604,7 +598,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           qualifierSubmissions: [...(tournament.qualifierSubmissions || []), newSub],
         };
 
-        if (!updatedTourney.isVerified) {
+        if (!updatedTourney.isLocked) {
           updatedTourney.tiers = generateDraftBracketsForTournament(updatedTourney);
         }
 
@@ -638,7 +632,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const updated = {
           ...t,
           matchScores: {},
-          isVerified: false,
+          isLocked: false,
           tiers: t.tiers.map(tier => ({ ...tier, isLocked: false })),
         };
         updated.tiers = generateDraftBracketsForTournament(updated);
@@ -656,7 +650,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           qualifierSubmissions: [],
           qualifiers: [],
         };
-        if (!updated.isVerified) {
+        if (!updated.isLocked) {
           updated.tiers = generateDraftBracketsForTournament(updated);
         }
         return updated;
@@ -674,7 +668,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           qualifiers: [],
           matchScores: {},
           tournamentPlayers: {},
-          isVerified: false,
+          isLocked: false,
           tiers: t.tiers.map(tier => ({ ...tier, isLocked: false })),
         };
         updated.tiers = generateDraftBracketsForTournament(updated);
@@ -685,21 +679,6 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const deleteTournament = (tournamentId: string) => {
     setTournaments(prev => prev.filter(t => t.id !== tournamentId && t.slug !== tournamentId));
-  };
-
-  const resetTournamentData = (tournamentId?: string) => {
-    const initial = createInitialTournaments();
-    if (!tournamentId) {
-      setTournaments(initial);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
-    } else {
-      const match = initial.find(t => t.id === tournamentId);
-      if (match) {
-        setTournaments(prev =>
-          prev.map(t => (t.id === tournamentId ? match : t))
-        );
-      }
-    }
   };
 
   return (
@@ -717,8 +696,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         deleteQualifierScore,
         togglePlayerDisqualification,
         togglePlayerQualsCompleted,
-        setQualifiersClosed,
-        verifyBrackets,
+        lockTournament,
         unlockBrackets,
         recordGameScore,
         updateMatchBestOf,
@@ -729,7 +707,6 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         clearQualifierScores,
         clearAllTournamentData,
         deleteTournament,
-        resetTournamentData,
       }}
     >
       {children}

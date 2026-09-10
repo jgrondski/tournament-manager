@@ -14,7 +14,7 @@ export const VerifyBracketModal: React.FC<VerifyBracketModalProps> = ({
   onClose,
   tournament,
 }) => {
-  const { verifyBrackets } = useTournament();
+  const { lockTournament } = useTournament();
   const [step, setStep] = useState<1 | 2>(1);
 
   if (!isOpen) return null;
@@ -22,7 +22,7 @@ export const VerifyBracketModal: React.FC<VerifyBracketModalProps> = ({
   const totalPlayers = tournament.tiers.reduce((acc, t) => acc + t.playerCount, 0);
 
   const handleConfirm = () => {
-    verifyBrackets(tournament.id);
+    lockTournament(tournament.id);
     onClose();
   };
 

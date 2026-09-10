@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Tournament, TournamentTier } from '../features/tournament/types';
 import { useTournament } from '../features/tournament/store';
 import { colorWithAlpha } from '../features/bracket/colorUtils';
-import { Layers, RotateCcw, ExternalLink, ChevronDown, Video, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Layers, ExternalLink, ChevronDown, Video, ShieldCheck, AlertTriangle } from 'lucide-react';
 
 interface TournamentNavbarProps {
   tournament: Tournament;
@@ -18,18 +18,12 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
   activeView,
   onNavigate,
 }) => {
-  const { tournaments, resetTournamentData } = useTournament();
+  const { tournaments } = useTournament();
   const navigate = useNavigate();
   const [isTournamentMenuOpen, setIsTournamentMenuOpen] = useState(false);
 
   const currentTierSlug = activeTier?.slug || tournament.tiers[0]?.slug || 'gold';
   const isBracketSpecificView = activeView === 'bracket' || activeView === 'sheet' || activeView === 'judge';
-
-  const handleReset = () => {
-    if (window.confirm('Reset this tournament data to initial state?')) {
-      resetTournamentData(tournament.id);
-    }
-  };
 
   const handleLinkClick = (e: React.MouseEvent, url: string) => {
     if (onNavigate) {
@@ -102,7 +96,7 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
           </div>
 
           {/* Verification Status Badge */}
-          {!tournament.isVerified ? (
+          {!tournament.isLocked ? (
             <span className="badge badge-gold" style={{ fontSize: '0.7rem' }} title="Brackets in dynamic qualifier preview">
               <AlertTriangle size={12} /> QUALIFIERS MODE
             </span>
@@ -128,17 +122,6 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
             <span>OBS Overlay</span>
             <ExternalLink size={12} />
           </a>
-
-          {/* Reset Demo Data */}
-          <button
-            onClick={handleReset}
-            className="btn btn-secondary"
-            title="Reset tournament data to default"
-            style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem' }}
-          >
-            <RotateCcw size={14} />
-            <span>Reset Demo</span>
-          </button>
         </div>
       </div>
 
