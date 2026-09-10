@@ -103,15 +103,16 @@ To facilitate manual testing and focused reviews, the work is organized into **1
 
 ---
 
-### Priority 3: Global Tournament Standings & Competitive Exit Tiebreakers
+### Priority 3: Global Tournament Standings & Competitive Exit Tiebreakers [COMPLETE]
 
-#### Commit 3.1: Competitive Intra-Round Exit Tiebreaker Engine & Global Standings Logic
+#### Commit 3.1: Competitive Intra-Round Exit Tiebreaker Engine & Global Standings Logic [COMPLETE]
 * **Objective:** Implement the exact mathematical competitive exit tiebreaker formula and sequential #1 to #N global ranking engine.
+* **Status:** Verified with 7 comprehensive unit tests covering all 5 tiebreaker hierarchy levels, forfeit 0-score loss penalties, multi-tier sequential ranking, DNQ/DQ handling, and rank delta.
 * **Changes:**
   * [standings.ts](../src/features/tournament/standings.ts):
-    * Refactor `calculateGlobalStandings(tournament: Tournament)`:
+    * `calculateGlobalStandings(tournament: Tournament)`:
       * Sequence: Tier 1 (Gold) -> Tier 2 (Silver begins at `Gold Capacity + 1`) -> Tier 3 (Bronze) -> DNQ (ranked by qualifier score) -> DQ (at bottom).
-      * Implement exact exit tiebreaker hierarchy for competitors eliminated in the same bracket round:
+      * Exact exit tiebreaker hierarchy for competitors eliminated in the same bracket round:
         1. `exit_game_wins` descending (e.g. 2–3 > 1–3 > 0–3).
         2. `avg_loss_score` descending (average score across lost games in exit match; unplayed forfeit games count as score 0).
         3. Overall tournament match record (wins minus losses).
@@ -119,17 +120,20 @@ To facilitate manual testing and focused reviews, the work is organized into **1
         5. Initial qualifying seed ascending.
       * Calculate `qualRank` and `rankDelta = qualRank - finalRank`.
 
-#### Commit 3.2: Unified Global Standings Table & Analytics UI
+#### Commit 3.2: Unified Global Standings Table & Analytics UI [COMPLETE]
 * **Objective:** Replace tier tab switcher in standings with a single continuous #1 to #N table matching the qualifiers leaderboard styling, complete with performance analytics columns and rank deltas.
+* **Status:** Built and verified with zero type errors, responsive layout, search filter, and quick jump section chips.
 * **Changes:**
   * [FinalStandingsTable.tsx](../src/features/tournament/components/FinalStandingsTable.tsx):
-    * Render continuous global table with tier divider headers (Gold, Silver, Bronze, DNQ, Disqualified).
-    * Display performance columns: Overall Score Average, Match Record, Game Record, Exit Details, Qual vs. Final Delta badge.
-  * [FinalStandingsPage.tsx](../src/routes/FinalStandingsPage.tsx): Clean up layout and integrate new global table.
+    * Continuous global table with dynamic tier divider headers (Gold, Silver, Bronze, DNQ, Disqualified).
+    * Overview stat cards: Tournament Champion, Total Competitors, Completed Matches, Active Tiers.
+    * Performance analytics columns: Rank, Competitor info (with country & playstyle badges), Qual Seed & Delta badge (`↑ +X`, `↓ -X`, `—`), Stage Reached, Exit Match & Loss Avg, Match Record, Game Record, Game Score Average.
+    * Instant search bar and quick filter pills (All, Gold, Silver, DNQ, DQ).
+  * [FinalStandingsPage.tsx](../src/routes/FinalStandingsPage.tsx): Clean layout integrated with global standings.
 
 ---
 
-### Priority 4: Qualifiers Table Density & Competitor Detail Drawer
+### Priority 4: Qualifiers Table Density & Competitor Detail Drawer [NEXT]
 
 #### Commit 4.1: Maxout Count & Kicker Engine + Format-Dense Leaderboard Columns
 * **Objective:** Implement Maxout count (>= 999,999) + kicker score sorting engine for `HIGH_SCORE` mode and declutter leaderboard table columns based on format.
