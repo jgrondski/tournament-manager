@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Tournament, TournamentTier, QualFormat, PointsThreshold } from '../types';
 import { useTournament } from '../store';
-import { Plus, Trash2, ArrowUp, ArrowDown, Save, CheckCircle2, Shield, Palette } from 'lucide-react';
+import { Plus, Trash2, ArrowUp, ArrowDown, Save, CheckCircle2, Shield, Palette, X } from 'lucide-react';
 import { generateTraditionalBracket, generateFlatBracket } from '../../bracket/math';
 
 interface TournamentAdminFormProps {
@@ -10,7 +10,13 @@ interface TournamentAdminFormProps {
 }
 
 export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({ tournament, onSaved }) => {
-  const { updateTournament, saveTiers } = useTournament();
+  const {
+    updateTournament,
+    saveTiers,
+    clearMatchScores,
+    clearQualifierScores,
+    clearAllTournamentData,
+  } = useTournament();
 
   // Tournament Fields State
   const [name, setName] = useState(tournament.name);
@@ -31,6 +37,14 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({ tourna
   // Tiers State
   const [tiers, setTiers] = useState<TournamentTier[]>(tournament.tiers || []);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [tierToDelete, setTierToDelete] = useState<{ index: number; tier: TournamentTier } | null>(null);
+  const [dataActionToConfirm, setDataActionToConfirm] = useState<'MATCHES' | 'QUALS' | 'ALL' | null>(null);
+
+  const qualifierCount = (tournament.qualifierSubmissions?.length || 0) + (tournament.qualifiers?.length || 0);
+  const recordedMatchCount = Object.values(tournament.matchScores || {}).filter(
+    m => m.isComplete || m.player1Wins > 0 || m.player2Wins > 0 ||
+      m.games?.some(g => g.player1Points !== null || g.player2Points !== null)
+  ).length;
 
   // Helper to auto-derive slug from name
   const handleNameChange = (newName: string) => {
@@ -409,8 +423,35 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({ tourna
 
         {/* Tiers List */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {tiers.map((tier, idx) => {
-            const badge = tierThresholdBadges[idx];
+          {tiers.length === 0 ? (
+            <div
+              style={{
+                padding: '2.5rem 1rem',
+                background: 'var(--color-bg-base)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px dashed var(--color-border)',
+                textAlign: 'center',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '0.75rem',
+              }}
+            >
+              <p style={{ fontSize: '0.95rem', color: 'var(--color-text-secondary)' }}>
+                No bracket tiers configured for this tournament.
+              </p>
+              <button
+                type="button"
+                onClick={addTier}
+                className="btn btn-primary"
+                style={{ padding: '0.45rem 1rem', fontSize: '0.85rem' }}
+              >
+                <Plus size={16} /> Add First Bracket Tier
+              </button>
+            </div>
+          ) : (
+            tiers.map((tier, idx) => {
+              const badge = tierThresholdBadges[idx];
 
             return (
               <div
@@ -482,11 +523,10 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({ tourna
                     </button>
                     <button
                       type="button"
-                      onClick={() => deleteTier(idx)}
-                      disabled={tiers.length <= 1}
+                      onClick={() => setTierToDelete({ index: idx, tier })}
                       className="btn btn-danger"
-                      style={{ padding: '0.25rem 0.5rem', opacity: tiers.length <= 1 ? 0.3 : 1 }}
-                      title="Delete tier"
+                      style={{ padding: '0.25rem 0.5rem' }}
+                      title="Delete bracket tier"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -590,7 +630,100 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({ tourna
                 </div>
               </div>
             );
-          })}
+          }))}
+        </div>
+      </section>
+
+      {/* Section 3: Data Management & Reset */}
+      <section
+        style={{
+          background: 'var(--color-bg-surface)',
+          borderRadius: 'var(--radius-lg)',
+          border: '1px solid var(--color-border)',
+          padding: '1.5rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1.25rem',
+        }}
+      >
+        <div style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '0.75rem' }}>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+            Data Management
+          </h2>
+          <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+            Clear match records or qualifier data to reset brackets or allow deleting this tournament.
+          </p>
+        </div>
+
+        {/* Data Status Summary */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+          <div style={{ padding: '0.85rem 1rem', background: 'var(--color-bg-surface-elevated)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)' }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+              Qualifier Attempts
+            </div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: qualifierCount > 0 ? 'var(--color-gold-bright)' : 'var(--color-text-secondary)' }}>
+              {qualifierCount}
+            </div>
+          </div>
+          <div style={{ padding: '0.85rem 1rem', background: 'var(--color-bg-surface-elevated)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)' }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+              Recorded Matches
+            </div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: recordedMatchCount > 0 ? 'var(--color-gold-bright)' : 'var(--color-text-secondary)' }}>
+              {recordedMatchCount}
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={() => setDataActionToConfirm('MATCHES')}
+            disabled={recordedMatchCount === 0}
+            className="btn btn-secondary"
+            style={{
+              padding: '0.5rem 1rem',
+              fontSize: '0.85rem',
+              opacity: recordedMatchCount === 0 ? 0.4 : 1,
+              cursor: recordedMatchCount === 0 ? 'not-allowed' : 'pointer',
+            }}
+            title={recordedMatchCount === 0 ? 'No recorded match scores to clear' : 'Clear all recorded match scores'}
+          >
+            Clear Match Scores ({recordedMatchCount})
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setDataActionToConfirm('QUALS')}
+            disabled={qualifierCount === 0}
+            className="btn btn-secondary"
+            style={{
+              padding: '0.5rem 1rem',
+              fontSize: '0.85rem',
+              opacity: qualifierCount === 0 ? 0.4 : 1,
+              cursor: qualifierCount === 0 ? 'not-allowed' : 'pointer',
+            }}
+            title={qualifierCount === 0 ? 'No qualifier scores to clear' : 'Clear all qualifier submissions'}
+          >
+            Clear Qualifier Scores ({qualifierCount})
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setDataActionToConfirm('ALL')}
+            disabled={qualifierCount === 0 && recordedMatchCount === 0}
+            className="btn btn-danger"
+            style={{
+              padding: '0.5rem 1rem',
+              fontSize: '0.85rem',
+              opacity: qualifierCount === 0 && recordedMatchCount === 0 ? 0.4 : 1,
+              cursor: qualifierCount === 0 && recordedMatchCount === 0 ? 'not-allowed' : 'pointer',
+            }}
+            title={qualifierCount === 0 && recordedMatchCount === 0 ? 'No data to clear' : 'Clear all tournament data'}
+          >
+            <Trash2 size={14} /> Clear All Tournament Data
+          </button>
         </div>
       </section>
 
@@ -605,6 +738,220 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({ tourna
           Save Configuration
         </button>
       </div>
+
+      {/* Speedbump Modal for Deleting Bracket Tier */}
+      {tierToDelete && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem',
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--color-bg-surface)',
+              borderRadius: 'var(--radius-lg)',
+              border: '1px solid var(--color-red)',
+              maxWidth: '460px',
+              width: '100%',
+              boxShadow: 'var(--shadow-lg)',
+              overflow: 'hidden',
+              animation: 'fadeIn 0.2s ease-out',
+            }}
+          >
+            <div
+              style={{
+                padding: '1.25rem 1.5rem',
+                background: 'var(--color-bg-surface-elevated)',
+                borderBottom: '1px solid var(--color-border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--color-red)' }}>
+                <Trash2 size={20} />
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                  Delete Bracket Tier
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTierToDelete(null)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '0.25rem' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <p style={{ fontSize: '0.9rem', color: 'var(--color-text-primary)', lineHeight: 1.5 }}>
+                Are you sure you want to delete bracket <strong>{tierToDelete.tier.name}</strong>?
+              </p>
+              {tiers.length === 1 && (
+                <div
+                  style={{
+                    padding: '0.75rem',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    borderRadius: 'var(--radius-sm)',
+                    color: '#f87171',
+                    fontSize: '0.8rem',
+                    lineHeight: 1.4,
+                  }}
+                >
+                  ⚠️ This is the final bracket. Deleting it will leave the tournament with 0 brackets until you add a new tier.
+                </div>
+              )}
+            </div>
+
+            <div
+              style={{
+                padding: '1rem 1.5rem',
+                background: 'var(--color-bg-surface-elevated)',
+                borderTop: '1px solid var(--color-border)',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '0.75rem',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setTierToDelete(null)}
+                className="btn btn-secondary"
+                style={{ padding: '0.5rem 1rem' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  deleteTier(tierToDelete.index);
+                  setTierToDelete(null);
+                }}
+                className="btn btn-danger"
+                style={{ padding: '0.5rem 1.25rem' }}
+              >
+                Yes, Delete Bracket
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Speedbump Modal for Clearing Tournament Data */}
+      {dataActionToConfirm && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem',
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--color-bg-surface)',
+              borderRadius: 'var(--radius-lg)',
+              border: '1px solid var(--color-red)',
+              maxWidth: '480px',
+              width: '100%',
+              boxShadow: 'var(--shadow-lg)',
+              overflow: 'hidden',
+              animation: 'fadeIn 0.2s ease-out',
+            }}
+          >
+            <div
+              style={{
+                padding: '1.25rem 1.5rem',
+                background: 'var(--color-bg-surface-elevated)',
+                borderBottom: '1px solid var(--color-border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--color-red)' }}>
+                <Trash2 size={20} />
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                  {dataActionToConfirm === 'MATCHES' && 'Clear Match Scores'}
+                  {dataActionToConfirm === 'QUALS' && 'Clear Qualifier Scores'}
+                  {dataActionToConfirm === 'ALL' && 'Clear All Tournament Data'}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDataActionToConfirm(null)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '0.25rem' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <p style={{ fontSize: '0.9rem', color: 'var(--color-text-primary)', lineHeight: 1.5 }}>
+                {dataActionToConfirm === 'MATCHES' && (
+                  <>Are you sure you want to delete all <strong>{recordedMatchCount} recorded match score(s)</strong> across all tiers? Tournament will revert to Qualifiers Mode.</>
+                )}
+                {dataActionToConfirm === 'QUALS' && (
+                  <>Are you sure you want to delete all <strong>{qualifierCount} qualifier score(s)</strong>? The qualifiers leaderboard will be emptied.</>
+                )}
+                {dataActionToConfirm === 'ALL' && (
+                  <>Are you sure you want to clear <strong>all qualifier and match score data</strong> for this tournament? This will reset the tournament data to a clean slate, allowing you to delete it or re-seed.</>
+                )}
+              </p>
+              <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', lineHeight: 1.4 }}>
+                This action cannot be undone.
+              </p>
+            </div>
+
+            <div
+              style={{
+                padding: '1rem 1.5rem',
+                background: 'var(--color-bg-surface-elevated)',
+                borderTop: '1px solid var(--color-border)',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '0.75rem',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setDataActionToConfirm(null)}
+                className="btn btn-secondary"
+                style={{ padding: '0.5rem 1rem' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (dataActionToConfirm === 'MATCHES') clearMatchScores(tournament.id);
+                  else if (dataActionToConfirm === 'QUALS') clearQualifierScores(tournament.id);
+                  else if (dataActionToConfirm === 'ALL') clearAllTournamentData(tournament.id);
+                  setDataActionToConfirm(null);
+                }}
+                className="btn btn-danger"
+                style={{ padding: '0.5rem 1.25rem' }}
+              >
+                Yes, Clear Data
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   );
 };

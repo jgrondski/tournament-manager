@@ -100,7 +100,6 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
         zIndex: 9999,
         padding: '1rem',
       }}
-      onClick={onClose}
     >
       <div
         style={{
@@ -113,7 +112,6 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
           overflow: 'hidden',
           animation: 'fadeIn 0.2s ease-out',
         }}
-        onClick={e => e.stopPropagation()}
       >
         {/* Header */}
         <div

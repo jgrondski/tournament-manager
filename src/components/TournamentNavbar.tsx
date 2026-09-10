@@ -38,7 +38,7 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
               <Layers size={18} color="#090d16" />
             </div>
             <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
-              CTWC <span style={{ color: 'var(--color-gold-bright)' }}>MANAGER</span>
+              TOURNAMENT <span style={{ color: 'var(--color-gold-bright)' }}>MANAGER</span>
             </span>
           </Link>
 
@@ -77,12 +77,12 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
 
           {/* Verification Status Badge */}
           {!tournament.isVerified ? (
-            <span className="badge badge-gold" style={{ fontSize: '0.7rem' }} title="Brackets in dynamic draft preview">
-              <AlertTriangle size={12} /> DRAFT
+            <span className="badge badge-gold" style={{ fontSize: '0.7rem' }} title="Brackets in dynamic qualifier preview">
+              <AlertTriangle size={12} /> QUALIFIERS MODE
             </span>
           ) : (
-            <span className="badge badge-green" style={{ fontSize: '0.7rem' }} title="Verified tournament match play active">
-              <ShieldCheck size={12} /> VERIFIED
+            <span className="badge badge-green" style={{ fontSize: '0.7rem' }} title="Match play active">
+              <ShieldCheck size={12} /> MATCH PLAY MODE
             </span>
           )}
         </div>

@@ -1,7 +1,7 @@
 # SPEC.md: Tournament Manager
 
 ## 1. Project Overview
-A web-based bracket and leaderboard manager built for competitive gaming tournaments (modeled on Classic Tetris World Championship standards). The application provides real-time reactive updates, CTWC-style retro OBS overlays, customizable qualifying formats (High Score, Average of X, Points), flat and traditional bracket routing, and mobile-responsive match recording for floor judges.
+A web-based bracket and leaderboard manager built for competitive gaming tournaments (modeled on Classic Tetris tournament standards). The application provides real-time reactive updates, retro OBS overlays, customizable qualifying formats (High Score, Average of X, Points), flat and traditional bracket routing, and mobile-responsive match recording for floor judges.
 
 The system prioritizes human readability, deterministic rules, minimal runtime overhead, and zero over-engineered dead code for rare edge cases.
 
@@ -14,13 +14,13 @@ The system prioritizes human readability, deterministic rules, minimal runtime o
 * **Phase 2: Reactive UI & Match Recording (Complete)**
   * Visual bracket tree, mobile-responsive match card feed, and drawer-based score submission. Multi-game score tracking, dynamic match win derivations, forfeit flags, and Best-of-X overrides.
 * **Phase 3: Unified In-Memory Pipeline & Refinements (Active Goal)**
-  * Wire the end-to-end tournament lifecycle in browser state (LocalStorage): Admin setup -> Qualifiers Mode & live leaderboard -> Match Play Mode locking -> Global Standings with CTWC exit tiebreakers and performance analytics.
+  * Wire the end-to-end tournament lifecycle in browser state (LocalStorage): Admin setup -> Qualifiers Mode & live leaderboard -> Match Play Mode locking -> Global Standings with competitive exit tiebreakers and performance analytics.
   * Execute across 5 structured priorities:
-    * **Priority 1:** UI Ergonomics, Modal Guards & Mode Terminology
+    * **Priority 1:** UI Rebranding, Ergonomics, Modal Guards & Mode Terminology
     * **Priority 2:** Tournament Lifecycle & Data Simulation Controls
-    * **Priority 3:** Global Tournament Standings & CTWC Exit Tiebreakers
+    * **Priority 3:** Global Tournament Standings & Competitive Exit Tiebreakers
     * **Priority 4:** Qualifiers Table Density & Competitor Detail Drawer
-    * **Priority 5:** Global Player Pool Directory & Tournament Roster
+    * **Priority 5:** Global Player Pool Directory (`classic_tetris_global_players`) & Tournament Roster
 * **Phase 4: Relational Persistence (Upcoming)**
   * Translate finalized TypeScript data contracts into Neon serverless PostgreSQL tables via Drizzle ORM schemas and server functions.
 * **Phase 5: Production Deployment, OBS Overlays & Polish (Upcoming)**
@@ -71,7 +71,7 @@ The system prioritizes human readability, deterministic rules, minimal runtime o
 * Finalized / Locked: missing attempts up to $X$ are computed as score 0:
   $$\text{final\_average} = \text{round}\left(\frac{\sum_{i=1}^n \text{score}_i}{\max(n, X)}\right)$$
 
-#### 3. CTWC Intra-Round Exit Tiebreaker (Final Standings):
+#### 3. Competitive Intra-Round Exit Tiebreaker (Final Standings):
 * For all players eliminated in the same bracket round $R$ (e.g., Round of 16 losers):
   * Let $M$ be the match in which the competitor was eliminated.
   * $\text{exit\_game\_wins}$: Games won by the player in match $M$.
@@ -126,9 +126,10 @@ The system prioritizes human readability, deterministic rules, minimal runtime o
 ## 5. Phase 3 Detailed Specifications & Execution Roadmap
 
 ### 5.1 Admin Tournament & Tier Setup (`/src/features/tournament`)
-* **Default Clean Slate:** New tournaments initialize 100% empty (0 players, 0 qualifier scores, 0 matches).
-* **Creation Flow:**
-  * Modal on the Tournament Switcher page captures Name/Slug/Format and navigates to `/:slug/manage/settings` to allow configuring tiers.
+* **Default Clean Slate & Fresh Onboarding:**
+  * When opening the app fresh with 0 tournaments, user lands directly on the home switcher page with a clean empty state inviting them to click **"+ Create New Tournament"**.
+  * Creating a tournament in the modal captures Name/Slug/Format/Date/Location and upon clicking **"Create & Configure"**, navigates directly to `/:slug/manage/settings` to allow configuring tiers and running simulation controls.
+  * New tournaments initialize 100% empty (0 players, 0 qualifier scores, 0 matches).
 * **Form Dirty State Tracking:**
   * The **"Save Configuration"** button on `TournamentAdminForm` remains disabled (`disabled={!isDirty}`) until the user modifies any field or tier.
 * **Unsaved Changes Navigation Guard:**
@@ -187,14 +188,15 @@ The system prioritizes human readability, deterministic rules, minimal runtime o
 
 ```
 Phase 3 Execution Roadmap
- ├── Priority 1: UI Ergonomics, Modal Guards & Mode Terminology
+ ├── Priority 1: UI Rebranding, Ergonomics, Modal Guards & Mode Terminology
  ├── Priority 2: Tournament Lifecycle & Data Simulation Controls
- ├── Priority 3: Global Tournament Standings & CTWC Exit Tiebreakers
+ ├── Priority 3: Global Tournament Standings & Competitive Exit Tiebreakers
  ├── Priority 4: Qualifiers Table Density & Competitor Detail Drawer
- └── Priority 5: Global Player Pool Directory & Tournament Roster
+ └── Priority 5: Global Player Pool Directory (classic_tetris_global_players) & Tournament Roster
 ```
 
-1. **Priority 1: UI Ergonomics, Modal Guards & Mode Terminology**
+1. **Priority 1: UI Rebranding, Ergonomics, Modal Guards & Mode Terminology**
+   - Rebrand the UI from "CTWC" to generic "Tournament Manager" across headers, logos, and document title.
    - Rename "Draft" to "Qualifiers Mode" and "Verified" to "Match Play Mode" across all views and stores.
    - Lock down match cards in `BracketVisualizer`, `OrganizerSheet`, and `MatchCardFeed` during Qualifiers Mode (drawer disabled).
    - Prevent backdrop dismiss on `MatchScoreDrawer` and `QualifierEntryModal`.
@@ -207,11 +209,11 @@ Phase 3 Execution Roadmap
    - Retire `qualsClosed` field; unify lifecycle into `isLocked: boolean` ("Qualifiers Mode" vs "Match Play Mode").
    - Streamline lifecycle transition to "Lock Brackets & Begin Match Play".
    - Enforce unlock invariant: blocking unlock if any match has recorded scores.
-   - Default new tournaments to empty data.
+   - Default fresh experience to 0 tournaments on home switcher; modal "Create & Configure" routes to `/:slug/manage/settings` with clean slate (0 data).
    - Add "Seed Qualifiers Only", "Simulate Full Tournament", and "Clear All Tournament Data" buttons in settings.
    - Purge legacy "Reset Demo" button and code.
 
-3. **Priority 3: Global Tournament Standings & CTWC Exit Tiebreakers**
+3. **Priority 3: Global Tournament Standings & Competitive Exit Tiebreakers**
    - Refactor standings engine (`standings.ts`) to output a unified #1 to #N global list across all tiers.
    - Implement exact exit-round tiebreaker formula: game wins in exit match $\rightarrow$ average score on losses (forfeits = 0s) $\rightarrow$ tournament match record $\rightarrow$ tournament game average $\rightarrow$ seed.
    - Update `FinalStandingsTable.tsx` and `FinalStandingsPage.tsx` to render the unified global standings with performance analytics and Qual vs. Final rank delta.
@@ -222,6 +224,7 @@ Phase 3 Execution Roadmap
    - Build `PlayerDetailDrawer.tsx` slide-out showing attempt logs and tournament match breakdown on player row click.
 
 5. **Priority 5: Global Player Pool Directory & Tournament Roster**
+   - Store global player pool under LocalStorage key `classic_tetris_global_players`.
    - Create `/players` route and master player directory view (name, manual PB, notes, country/tag).
    - Implement tournament roster registration (import from global pool or add new).
 

@@ -90,8 +90,8 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
                 <span className="badge badge-gold">Match #{match.matchNumber}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   {!tournament.isVerified ? (
-                    <span className="badge badge-muted" title="Scores locked until bracket is verified">
-                      <Lock size={12} /> Seeding Draft
+                    <span className="badge badge-muted" title="Scores locked during Qualifiers Mode">
+                      <Lock size={12} /> Qualifiers Mode
                     </span>
                   ) : isComplete ? (
                     <span className="badge badge-green">

@@ -39,7 +39,6 @@ export const VerifyBracketModal: React.FC<VerifyBracketModalProps> = ({
         zIndex: 9999,
         padding: '1rem',
       }}
-      onClick={onClose}
     >
       <div
         style={{
@@ -52,7 +51,6 @@ export const VerifyBracketModal: React.FC<VerifyBracketModalProps> = ({
           overflow: 'hidden',
           animation: 'fadeIn 0.2s ease-out',
         }}
-        onClick={e => e.stopPropagation()}
       >
         {/* Header */}
         <div
@@ -82,10 +80,10 @@ export const VerifyBracketModal: React.FC<VerifyBracketModalProps> = ({
             </div>
             <div>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                Verify Tournament Brackets
+                Lock Brackets &amp; Begin Match Play
               </h3>
               <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                Double-confirmation seed lock
+                Double-confirmation seed freeze
               </p>
             </div>
           </div>
@@ -120,13 +118,13 @@ export const VerifyBracketModal: React.FC<VerifyBracketModalProps> = ({
               >
                 <div style={{ fontWeight: 700, color: 'var(--color-gold-bright)', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <ShieldAlert size={16} />
-                  Freeze Seeding &amp; Initialize Match Play
+                  Freeze Seeding &amp; Initialize Match Play Mode
                 </div>
                 <p style={{ fontSize: '0.85rem', color: 'var(--color-text-primary)', lineHeight: 1.4 }}>
-                  Verifying brackets will freeze the current qualifier standings into static match entities across all <strong>{tournament.tiers.length} tiers</strong> ({totalPlayers} competitors).
+                  Locking brackets will freeze current qualifier standings into static match entities across all <strong>{tournament.tiers.length} tiers</strong> ({totalPlayers} competitors).
                 </p>
                 <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', lineHeight: 1.4 }}>
-                  Subsequent qualifier score edits will be recorded in the qualifiers table, but will <strong>not</strong> re-seed or mutate the verified match pairings.
+                  Subsequent qualifier score edits will be recorded in the qualifiers table, but will <strong>not</strong> re-seed or mutate the locked match pairings.
                 </p>
               </div>
 
@@ -185,10 +183,10 @@ export const VerifyBracketModal: React.FC<VerifyBracketModalProps> = ({
                 <Lock size={24} />
               </div>
               <h4 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#ffffff' }}>
-                Final Verification Confirmation
+                Final Match Play Confirmation
               </h4>
               <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', maxWidth: '380px' }}>
-                Are you ready to officially start the tournament? Floor judges and score submission drawers will become active immediately.
+                Are you ready to officially begin match play? Floor judges and score submission drawers will become active immediately.
               </p>
             </div>
           )}
@@ -218,7 +216,7 @@ export const VerifyBracketModal: React.FC<VerifyBracketModalProps> = ({
               className="btn btn-primary"
               style={{ padding: '0.5rem 1.25rem' }}
             >
-              Proceed to Verify
+              Proceed to Lock
             </button>
           ) : (
             <button

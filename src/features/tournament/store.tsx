@@ -56,6 +56,10 @@ interface TournamentContextType {
   forfeitMatch: (tournamentId: string, tierId: string, matchId: string, winnerPlayerId: string) => void;
   addQualifierScore: (tournamentId: string, entry: Omit<QualifierScore, 'id' | 'totalScore'>) => void;
   verifyQualifierScore: (tournamentId: string, qualifierId: string, verified: boolean) => void;
+  clearMatchScores: (tournamentId: string) => void;
+  clearQualifierScores: (tournamentId: string) => void;
+  clearAllTournamentData: (tournamentId: string) => void;
+  deleteTournament: (tournamentId: string) => void;
   resetTournamentData: (tournamentId?: string) => void;
 }
 
@@ -627,6 +631,62 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     );
   };
 
+  const clearMatchScores = (tournamentId: string) => {
+    setTournaments(prev =>
+      prev.map(t => {
+        if (t.id !== tournamentId) return t;
+        const updated = {
+          ...t,
+          matchScores: {},
+          isVerified: false,
+          tiers: t.tiers.map(tier => ({ ...tier, isLocked: false })),
+        };
+        updated.tiers = generateDraftBracketsForTournament(updated);
+        return updated;
+      })
+    );
+  };
+
+  const clearQualifierScores = (tournamentId: string) => {
+    setTournaments(prev =>
+      prev.map(t => {
+        if (t.id !== tournamentId) return t;
+        const updated = {
+          ...t,
+          qualifierSubmissions: [],
+          qualifiers: [],
+        };
+        if (!updated.isVerified) {
+          updated.tiers = generateDraftBracketsForTournament(updated);
+        }
+        return updated;
+      })
+    );
+  };
+
+  const clearAllTournamentData = (tournamentId: string) => {
+    setTournaments(prev =>
+      prev.map(t => {
+        if (t.id !== tournamentId) return t;
+        const updated = {
+          ...t,
+          qualifierSubmissions: [],
+          qualifiers: [],
+          matchScores: {},
+          tournamentPlayers: {},
+          isVerified: false,
+          tiers: t.tiers.map(tier => ({ ...tier, isLocked: false })),
+        };
+        updated.tiers = generateDraftBracketsForTournament(updated);
+        return updated;
+      })
+    );
+  };
+
+  const deleteTournament = (tournamentId: string) => {
+    setTournaments(prev => prev.filter(t => t.id !== tournamentId && t.slug !== tournamentId));
+  };
+
   const resetTournamentData = (tournamentId?: string) => {
     const initial = createInitialTournaments();
     if (!tournamentId) {
@@ -665,6 +725,10 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         forfeitMatch,
         addQualifierScore,
         verifyQualifierScore,
+        clearMatchScores,
+        clearQualifierScores,
+        clearAllTournamentData,
+        deleteTournament,
         resetTournamentData,
       }}
     >

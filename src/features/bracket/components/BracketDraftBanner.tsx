@@ -62,10 +62,10 @@ export const BracketDraftBanner: React.FC<BracketDraftBannerProps> = ({
             </div>
             <div>
               <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--color-gold-bright)', letterSpacing: '0.02em' }}>
-                DRAFT SEEDING PREVIEW — Qualifiers Active
+                QUALIFIERS MODE — Seeding preview active
               </div>
               <div style={{ fontSize: '0.8rem', color: 'var(--color-text-primary)' }}>
-                Bracket seeds update dynamically with incoming qualifier scores. Match scoring is disabled. Click &quot;Verify Brackets&quot; to lock seeds and begin match play.
+                Bracket seeds update dynamically with incoming qualifier scores. Match scoring is disabled. Click &quot;Lock Brackets &amp; Begin Match Play&quot; to start matches.
               </div>
             </div>
           </div>
@@ -77,7 +77,7 @@ export const BracketDraftBanner: React.FC<BracketDraftBannerProps> = ({
               style={{ padding: '0.45rem 1rem', fontSize: '0.85rem' }}
             >
               <Lock size={15} />
-              Verify Brackets
+              Lock Brackets &amp; Begin Match Play
             </button>
           )}
         </div>
@@ -96,8 +96,8 @@ export const BracketDraftBanner: React.FC<BracketDraftBannerProps> = ({
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#34d399' }}>
             <ShieldCheck size={16} />
-            <span style={{ fontWeight: 600 }}>Verified Brackets Active</span>
-            <span style={{ color: 'var(--color-text-muted)' }}>• Match play and score entry unlocked</span>
+            <span style={{ fontWeight: 600 }}>MATCH PLAY MODE</span>
+            <span style={{ color: 'var(--color-text-muted)' }}>• Match play and score entry active</span>
           </div>
 
           {canManage && (
@@ -111,7 +111,7 @@ export const BracketDraftBanner: React.FC<BracketDraftBannerProps> = ({
                 onClick={handleUnlockClick}
                 className="btn btn-secondary"
                 style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem' }}
-                title="Revert tournament to dynamic draft preview"
+                title="Revert tournament to Qualifiers Mode"
               >
                 <Unlock size={13} />
                 Unlock Brackets

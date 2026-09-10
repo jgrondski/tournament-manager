@@ -127,8 +127,8 @@ export const MatchScoreDrawer: React.FC<MatchScoreDrawerProps> = ({
   const matchDecided = p1Wins >= winThreshold || p2Wins >= winThreshold;
 
   return (
-    <div style={overlayStyle} onClick={onClose}>
-      <div style={drawerStyle} onClick={e => e.stopPropagation()}>
+    <div style={overlayStyle}>
+      <div style={drawerStyle}>
         {/* Header */}
         <div style={headerStyle}>
           <div>
