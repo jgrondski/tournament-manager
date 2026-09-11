@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BracketMatch } from '../types';
 import { MatchScoreRecord } from '../../tournament/types';
 import { useTournament } from '../../tournament/store';
-import { X, Trophy, Check, ShieldAlert } from 'lucide-react';
+import { X, Trophy, Check, ShieldAlert, Plus } from 'lucide-react';
 import { BestOfSelect } from './BestOfSelect';
 
 interface MatchScoreDrawerProps {
@@ -24,18 +24,21 @@ export const MatchScoreDrawer: React.FC<MatchScoreDrawerProps> = ({
   matchScoreRecord,
   roundName = 'Round',
 }) => {
-  const { recordGameScore, updateMatchBestOf, forfeitMatch } = useTournament();
+  const { saveMatchScores, updateMatchBestOf, forfeitMatch } = useTournament();
 
   const [bestOf, setBestOf] = useState<number>(match?.bestOf || 5);
   const [games, setGames] = useState<Array<{ p1: string; p2: string; winner: string | null }>>([]);
+  const [hasTiebreaker, setHasTiebreaker] = useState(false);
 
   useEffect(() => {
     if (!match) return;
     const currentBestOf = matchScoreRecord?.bestOf || match.bestOf || 5;
     setBestOf(currentBestOf);
 
+    const recordedCount = matchScoreRecord?.games?.length || 0;
+    const totalCount = Math.max(currentBestOf, recordedCount);
     const initialGames = [];
-    for (let i = 1; i <= currentBestOf; i++) {
+    for (let i = 1; i <= totalCount; i++) {
       const recorded = matchScoreRecord?.games.find(g => g.gameNumber === i);
       initialGames.push({
         p1: recorded?.player1Points !== null && recorded?.player1Points !== undefined ? String(recorded.player1Points) : '',
@@ -44,6 +47,7 @@ export const MatchScoreDrawer: React.FC<MatchScoreDrawerProps> = ({
       });
     }
     setGames(initialGames);
+    setHasTiebreaker(Boolean(matchScoreRecord?.hasTiebreaker || recordedCount > currentBestOf));
   }, [match, matchScoreRecord]);
 
   if (!isOpen || !match) return null;
@@ -63,14 +67,28 @@ export const MatchScoreDrawer: React.FC<MatchScoreDrawerProps> = ({
       updated[gameIndex].p2 = cleaned;
     }
 
-    // Auto calculate game winner if both have valid numbers
-    const num1 = cleaned && playerSlot === 1 ? parseInt(cleaned, 10) : parseInt(updated[gameIndex].p1, 10);
-    const num2 = cleaned && playerSlot === 2 ? parseInt(cleaned, 10) : parseInt(updated[gameIndex].p2, 10);
+    const val1 = updated[gameIndex].p1.trim();
+    const val2 = updated[gameIndex].p2.trim();
 
-    if (!isNaN(num1) && !isNaN(num2)) {
-      if (num1 > num2 && p1) updated[gameIndex].winner = p1.id;
-      else if (num2 > num1 && p2) updated[gameIndex].winner = p2.id;
-      else if (num1 === num2) updated[gameIndex].winner = 'TIE';
+    // If either score is cleared or empty, unselect winner automatically
+    if (val1 === '' || val2 === '') {
+      updated[gameIndex].winner = null;
+    } else {
+      const num1 = parseInt(val1, 10);
+      const num2 = parseInt(val2, 10);
+
+      if (isNaN(num1) || isNaN(num2)) {
+        updated[gameIndex].winner = null;
+      } else if (num1 === 0 && num2 === 0) {
+        // Empty / 0-0 reset: unselect winner automatically
+        updated[gameIndex].winner = null;
+      } else if (num1 > num2 && p1) {
+        updated[gameIndex].winner = p1.id;
+      } else if (num2 > num1 && p2) {
+        updated[gameIndex].winner = p2.id;
+      } else if (num1 === num2) {
+        updated[gameIndex].winner = 'TIE';
+      }
     }
 
     setGames(updated);
@@ -89,25 +107,29 @@ export const MatchScoreDrawer: React.FC<MatchScoreDrawerProps> = ({
     while (updated.length < newBestOf) {
       updated.push({ p1: '', p2: '', winner: null });
     }
-    setGames(updated.slice(0, newBestOf));
+    setGames(updated);
+  };
+
+  const handleAddTiebreakerGame = () => {
+    setGames(prev => [...prev, { p1: '', p2: '', winner: null }]);
+    setHasTiebreaker(true);
   };
 
   const handleSaveAndAdvance = () => {
-    games.forEach((g, idx) => {
-      const p1Num = g.p1.trim() !== '' ? parseInt(g.p1, 10) : null;
-      const p2Num = g.p2.trim() !== '' ? parseInt(g.p2, 10) : null;
-      if (p1Num !== null || p2Num !== null || g.winner) {
-        recordGameScore(
-          tournamentId,
-          tierId,
-          match.id,
-          idx + 1,
-          p1Num,
-          p2Num,
-          g.winner
-        );
-      }
-    });
+    const formattedGames = games.map((g, idx) => ({
+      gameNumber: idx + 1,
+      player1Points: g.p1.trim() !== '' ? parseInt(g.p1, 10) : null,
+      player2Points: g.p2.trim() !== '' ? parseInt(g.p2, 10) : null,
+      winnerPlayerId: g.winner,
+    }));
+
+    saveMatchScores(
+      tournamentId,
+      tierId,
+      match.id,
+      formattedGames,
+      hasTiebreaker || games.length > bestOf
+    );
     onClose();
   };
 
@@ -207,24 +229,38 @@ export const MatchScoreDrawer: React.FC<MatchScoreDrawerProps> = ({
 
         {/* Game by Game Breakdown */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1.25rem' }}>
-          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Games 1 through {bestOf}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Games Breakdown (Bo{bestOf}{hasTiebreaker || games.length > bestOf ? ' • Tiebreaker Active' : ''})
+            </div>
+            {hasTiebreaker && (
+              <span className="badge badge-gold" style={{ fontSize: '0.7rem' }}>
+                Tiebreaker Game(s) Added
+              </span>
+            )}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {games.slice(0, bestOf).map((game, idx) => {
+            {games.map((game, idx) => {
+              const gameNum = idx + 1;
+              const isTiebreakerGame = gameNum > bestOf;
               const num1 = parseInt(game.p1, 10);
               const num2 = parseInt(game.p2, 10);
               const hasScores = !isNaN(num1) && !isNaN(num2);
               const margin = hasScores ? Math.abs(num1 - num2).toLocaleString() : null;
 
               return (
-                <div key={idx} style={gameRowCardStyle}>
+                <div key={idx} style={{ ...gameRowCardStyle, borderColor: isTiebreakerGame ? 'rgba(245, 158, 11, 0.4)' : gameRowCardStyle.borderColor }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                        Game {idx + 1}
+                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: isTiebreakerGame ? 'var(--color-gold-bright)' : 'var(--color-text-primary)' }}>
+                        Game {gameNum} {isTiebreakerGame ? '(Tiebreaker)' : ''}
                       </span>
+                      {isTiebreakerGame && (
+                        <span className="badge badge-gold" style={{ fontSize: '0.65rem', padding: '0.05rem 0.35rem' }}>
+                          Tiebreaker
+                        </span>
+                      )}
                       {game.winner === 'TIE' && (
                         <span style={{ fontSize: '0.65rem', padding: '0.1rem 0.45rem', borderRadius: 'var(--radius-sm)', background: 'var(--color-cyan-bg)', color: 'var(--color-cyan)', fontWeight: 700, border: '1px solid rgba(6, 182, 212, 0.3)' }}>
                           TIE (NO WIN)
@@ -338,6 +374,33 @@ export const MatchScoreDrawer: React.FC<MatchScoreDrawerProps> = ({
                 </div>
               );
             })}
+          </div>
+
+          {/* Add Tiebreaker Game Button */}
+          <div style={{ marginTop: '0.875rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              type="button"
+              onClick={handleAddTiebreakerGame}
+              className="btn btn-secondary"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                fontSize: '0.8rem',
+                padding: '0.45rem 0.9rem',
+                borderColor: 'rgba(245, 158, 11, 0.4)',
+                color: 'var(--color-gold-bright)',
+                background: 'rgba(245, 158, 11, 0.08)',
+              }}
+            >
+              <Plus size={15} />
+              <span>+ Add Tiebreaker Game</span>
+            </button>
+            {games.some(g => g.winner === 'TIE') && (
+              <span style={{ fontSize: '0.725rem', color: 'var(--color-text-muted)' }}>
+                Tied game detected. Use tiebreaker games or match Best-of override if needed to resolve series.
+              </span>
+            )}
           </div>
 
           {/* Quick Forfeit Option */}

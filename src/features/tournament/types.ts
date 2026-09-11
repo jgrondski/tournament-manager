@@ -26,6 +26,7 @@ export interface MatchScoreRecord {
   isComplete: boolean;
   notes?: string;
   forfeitWinnerId?: string;
+  hasTiebreaker?: boolean;
 }
 
 export interface TournamentTier {

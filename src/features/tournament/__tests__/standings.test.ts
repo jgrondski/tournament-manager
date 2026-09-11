@@ -876,5 +876,122 @@ describe('Final Standings Rollup Engine', () => {
       expect(beta?.qualRank).toBe(2);
       expect(beta?.rankDelta).toBe(0);
     });
+
+    it('retains country and playstyle metadata for bracket players and non-bracket qualifiers in standings', () => {
+      const pool: PlayerProfile[] = [
+        makePlayer('p1', 'Alpha', { country: 'US', playstyle: 'Rolling' }),
+        makePlayer('p2', 'Beta', { country: 'JP', playstyle: 'Hypertap' }),
+        makePlayer('p3', 'Gamma', { country: 'DE', playstyle: 'DAS' }),
+        makePlayer('p4', 'Delta', { country: 'CA', playstyle: 'Hypertap' }),
+        makePlayer('p5', 'Epsilon', { country: 'FR', playstyle: 'DAS' }), // did not qualify for bracket
+      ];
+
+      const bracketPlayers = [
+        { id: 'p1', name: 'Alpha', seed: 1 },
+        { id: 'p2', name: 'Beta', seed: 2 },
+        { id: 'p3', name: 'Gamma', seed: 3 },
+        { id: 'p4', name: 'Delta', seed: 4 },
+      ];
+
+      let bracket = generateTraditionalBracket(bracketPlayers, { tierId: 'gold', bestOf: 3 });
+      const m1Id = bracket.rounds[0].matches[0].id;
+      bracket = advanceMatchWinner(bracket, m1Id, 'p1');
+      const m2Id = bracket.rounds[0].matches[1].id;
+      bracket = advanceMatchWinner(bracket, m2Id, 'p2');
+      const finalsMatchId = bracket.rounds[1].matches[0].id;
+      bracket = advanceMatchWinner(bracket, finalsMatchId, 'p1');
+
+      const matchScores: Record<string, MatchScoreRecord> = {
+        [m1Id]: {
+          matchId: m1Id,
+          tierId: 'gold',
+          bestOf: 3,
+          player1Wins: 2,
+          player2Wins: 0,
+          games: [],
+          winnerPlayerId: 'p1',
+          loserPlayerId: 'p4',
+          isComplete: true,
+        },
+        [m2Id]: {
+          matchId: m2Id,
+          tierId: 'gold',
+          bestOf: 3,
+          player1Wins: 2,
+          player2Wins: 0,
+          games: [],
+          winnerPlayerId: 'p2',
+          loserPlayerId: 'p3',
+          isComplete: true,
+        },
+        [finalsMatchId]: {
+          matchId: finalsMatchId,
+          tierId: 'gold',
+          bestOf: 3,
+          player1Wins: 2,
+          player2Wins: 0,
+          games: [],
+          winnerPlayerId: 'p1',
+          loserPlayerId: 'p2',
+          isComplete: true,
+        },
+      };
+
+      const tournament: Tournament = {
+        id: 't-chips',
+        name: 'Chip Test Tournament',
+        slug: 'chip-test',
+        date: '2026-09-10',
+        location: 'Online',
+        tournamentPlayers: {},
+        qualFormat: 'HIGH_SCORE',
+        tiers: [
+          {
+            id: 'gold',
+            slug: 'gold',
+            name: 'Gold Championship',
+            priority: 1,
+            bracketType: 'TRADITIONAL',
+            playerCount: 4,
+            bestOf: 3,
+            bracket,
+            isLocked: true,
+          },
+        ],
+        playersPool: pool,
+        qualifierSubmissions: [
+          { id: 'q1', tournamentId: 't-chips', playerId: 'p1', score: 1000, submittedAt: 1 },
+          { id: 'q2', tournamentId: 't-chips', playerId: 'p2', score: 900, submittedAt: 2 },
+          { id: 'q3', tournamentId: 't-chips', playerId: 'p3', score: 800, submittedAt: 3 },
+          { id: 'q4', tournamentId: 't-chips', playerId: 'p4', score: 700, submittedAt: 4 },
+          { id: 'q5', tournamentId: 't-chips', playerId: 'p5', score: 600, submittedAt: 5 },
+        ],
+        matchScores,
+        isLocked: true,
+      };
+
+      const standings = calculateGlobalStandings(tournament);
+
+      // Verify champion p1
+      const alpha = standings.find(s => s.player.id === 'p1');
+      expect(alpha?.player.country).toBe('US');
+      expect(alpha?.player.playstyle).toBe('Rolling');
+
+      // Verify runner-up p2
+      const beta = standings.find(s => s.player.id === 'p2');
+      expect(beta?.player.country).toBe('JP');
+      expect(beta?.player.playstyle).toBe('Hypertap');
+
+      // Verify eliminated bracket player p4
+      const delta = standings.find(s => s.player.id === 'p4');
+      expect(delta?.player.country).toBe('CA');
+      expect(delta?.player.playstyle).toBe('Hypertap');
+
+      // Verify non-bracket player p5
+      const epsilon = standings.find(s => s.player.id === 'p5');
+      expect(epsilon?.player.country).toBe('FR');
+      expect(epsilon?.player.playstyle).toBe('DAS');
+    });
   });
 });
+

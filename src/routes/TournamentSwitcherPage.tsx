@@ -5,6 +5,7 @@ import { colorWithAlpha } from '../features/bracket/colorUtils';
 import { Calendar, MapPin, Users, Layers, Plus, Settings, Trophy, ShieldCheck, AlertTriangle, X, Trash2 } from 'lucide-react';
 import { QualFormat, Tournament, TournamentTier } from '../features/tournament/types';
 import { generateTraditionalBracket } from '../features/bracket/math';
+import { ClearableNumberInput } from '../components/ClearableNumberInput';
 
 export const TournamentSwitcherPage: React.FC = () => {
   const { tournaments, createTournament, deleteTournament } = useTournament();
@@ -17,7 +18,7 @@ export const TournamentSwitcherPage: React.FC = () => {
   const [newTourneyDate, setNewTourneyDate] = useState('');
   const [newTourneyLocation, setNewTourneyLocation] = useState('');
   const [newTourneyFormat, setNewTourneyFormat] = useState<QualFormat>('AVERAGE_OF_X');
-  const [newTourneyAvgCount, setNewTourneyAvgCount] = useState('2');
+  const [newTourneyAvgCount, setNewTourneyAvgCount] = useState<number | undefined>(2);
   const [avgCountError, setAvgCountError] = useState<string | null>(null);
 
   const hasRecordedScoresOrQuals = (t: Tournament): boolean => {
@@ -86,12 +87,11 @@ export const TournamentSwitcherPage: React.FC = () => {
 
     let parsedAvgCount = 2;
     if (newTourneyFormat === 'AVERAGE_OF_X') {
-      const parsed = parseInt(newTourneyAvgCount, 10);
-      if (!newTourneyAvgCount.trim() || isNaN(parsed) || parsed < 1) {
+      if (newTourneyAvgCount === undefined || isNaN(newTourneyAvgCount) || newTourneyAvgCount < 1) {
         setAvgCountError('Please enter a valid attempt count (minimum 1)');
         return;
       }
-      parsedAvgCount = parsed;
+      parsedAvgCount = newTourneyAvgCount;
     }
 
     const created = createTournament({
@@ -497,25 +497,18 @@ export const TournamentSwitcherPage: React.FC = () => {
               {newTourneyFormat === 'AVERAGE_OF_X' && (
                 <div>
                   <label style={modalLabelStyle}>Target Attempt Count (X)</label>
-                  <input
-                    type="number"
+                  <ClearableNumberInput
                     min={1}
                     max={10}
                     value={newTourneyAvgCount}
-                    onChange={e => {
-                      setNewTourneyAvgCount(e.target.value);
+                    onChange={val => {
+                      setNewTourneyAvgCount(val);
                       if (avgCountError) setAvgCountError(null);
                     }}
-                    style={{
-                      ...modalInputStyle,
-                      borderColor: avgCountError ? 'var(--color-red)' : modalInputStyle.borderColor,
-                    }}
+                    error={avgCountError}
+                    onErrorChange={setAvgCountError}
+                    style={modalInputStyle}
                   />
-                  {avgCountError && (
-                    <div style={{ color: 'var(--color-red)', fontSize: '0.75rem', marginTop: '0.35rem' }}>
-                      {avgCountError}
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -645,7 +638,7 @@ const modalInputStyle: React.CSSProperties = {
   padding: '0.6rem 0.85rem',
   borderRadius: 'var(--radius-sm)',
   border: '1px solid var(--color-border)',
-  background: 'var(--color-bg-base)',
+  backgroundColor: 'var(--color-bg-base)',
   color: 'var(--color-text-primary)',
   fontSize: '0.875rem',
 };

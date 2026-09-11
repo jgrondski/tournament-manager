@@ -358,6 +358,7 @@ export function calculateTierStandings(
 export function calculateGlobalStandings(tournament: Tournament): GlobalStandingRow[] {
   const globalStandings: GlobalStandingRow[] = [];
   const placedPlayerIds = new Set<string>();
+  const profileMap = new Map((tournament.playersPool || []).map(p => [p.id, p]));
 
   // 1. Derive qualifiers leaderboard for seeding, score, and rank baseline
   const leaderboard: LeaderboardRankRow[] = deriveLeaderboard(tournament);
@@ -403,6 +404,7 @@ export function calculateGlobalStandings(tournament: Tournament): GlobalStanding
           const stats = calculatePlayerStats(tournament, champ.id);
           const qualRank = qualRankMap.get(champ.id);
           const finalRank = currentRank++;
+          const champProfile = profileMap.get(champ.id);
 
           globalStandings.push({
             finalRank,
@@ -412,6 +414,8 @@ export function calculateGlobalStandings(tournament: Tournament): GlobalStanding
               name: champ.name,
               seed: champ.seed,
               tierSeed: champ.seed,
+              country: champProfile?.country,
+              playstyle: champProfile?.playstyle,
             },
             tier,
             eliminationRound: 'Champion',
@@ -434,6 +438,7 @@ export function calculateGlobalStandings(tournament: Tournament): GlobalStanding
             : undefined;
           const qualRank = qualRankMap.get(runnerUp.id);
           const finalRank = currentRank++;
+          const runnerUpProfile = profileMap.get(runnerUp.id);
 
           globalStandings.push({
             finalRank,
@@ -443,6 +448,8 @@ export function calculateGlobalStandings(tournament: Tournament): GlobalStanding
               name: runnerUp.name,
               seed: runnerUp.seed,
               tierSeed: runnerUp.seed,
+              country: runnerUpProfile?.country,
+              playstyle: runnerUpProfile?.playstyle,
             },
             tier,
             eliminationRound: 'Finals',
@@ -541,6 +548,7 @@ export function calculateGlobalStandings(tournament: Tournament): GlobalStanding
       for (const elim of eliminatedInRound) {
         const qualRank = qualRankMap.get(elim.player.id);
         const finalRank = currentRank++;
+        const elimProfile = profileMap.get(elim.player.id);
 
         globalStandings.push({
           finalRank,
@@ -550,6 +558,8 @@ export function calculateGlobalStandings(tournament: Tournament): GlobalStanding
             name: elim.player.name,
             seed: elim.player.seed,
             tierSeed: elim.player.seed,
+            country: elimProfile?.country,
+            playstyle: elimProfile?.playstyle,
           },
           tier,
           eliminationRound: roundName,

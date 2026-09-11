@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { Tournament, TournamentTier, MatchScoreRecord } from '../../tournament/types';
+import { Tournament, TournamentTier, MatchScoreRecord, PlayerProfile } from '../../tournament/types';
 import { BracketMatch, isMatchPlayable } from '../types';
 import { MatchScoreDrawer } from './MatchScoreDrawer';
 import { BracketDraftBanner } from './BracketDraftBanner';
 import { colorWithAlpha } from '../colorUtils';
-import { Filter, Check, ChevronDown, Trophy, Clock, CheckCircle2 } from 'lucide-react';
+import { Filter, Check, ChevronDown, Clock, CheckCircle2, Sparkles } from 'lucide-react';
+import { PlayerDetailDrawer } from '../../qualifiers/components/PlayerDetailDrawer';
 
 interface OrganizerSheetMatrixProps {
   tournament: Tournament;
@@ -34,16 +35,29 @@ function getMatchStatus(match: BracketMatch, record?: MatchScoreRecord, defaultB
 
 export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tournament, tier }) => {
   const [selectedMatch, setSelectedMatch] = useState<{ match: BracketMatch; roundName: string } | null>(null);
-  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [hoveredMatchId, setHoveredMatchId] = useState<string | null>(null);
+  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+  const [selectedPlayerForDrawer, setSelectedPlayerForDrawer] = useState<PlayerProfile | null>(null);
+  const [isPlayerDrawerOpen, setIsPlayerDrawerOpen] = useState(false);
+  const [hoveredPlayerKey, setHoveredPlayerKey] = useState<string | null>(null);
 
   const primaryColor = tier.primaryColor || '#f59e0b';
+
+  const handlePlayerClick = (pId: string, pName: string) => {
+    const profile = (tournament.playersPool || []).find(p => p.id === pId) || {
+      id: pId,
+      name: pName,
+      personalBest: 0,
+      playstyle: 'DAS',
+    };
+    setSelectedPlayerForDrawer(profile);
+    setIsPlayerDrawerOpen(true);
+  };
 
   // Available rounds in this tier
   const allRounds = tier.bracket.rounds;
   const roundNames = useMemo(() => allRounds.map(r => r.name), [allRounds]);
 
-  // Selected round filter: 'ALL' or a Set of round names
   const [selectedRoundFilter, setSelectedRoundFilter] = useState<'ALL' | 'IN_PROGRESS' | 'COMPLETE' | string[]>('ALL');
 
   // Filtered rounds and matches
@@ -218,7 +232,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
             )}
             {telemetry.topScore > 0 && (
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--color-cyan)' }}>
-                <Trophy size={16} />
+                <Sparkles size={16} />
                 Tier High: <strong className="tabular-nums">{telemetry.topScore.toLocaleString()}</strong> by {telemetry.topScorer}
               </span>
             )}
@@ -296,6 +310,9 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                     const p1Wins = record?.player1Wins || 0;
                     const p2Wins = record?.player2Wins || 0;
                     const matchBestOf = record?.bestOf || match.bestOf || tier.bestOf || 5;
+                    const hasTiebreaker = Boolean(record?.hasTiebreaker || (record?.games && record.games.length > matchBestOf));
+                    const p1ScoreDisplay = hasTiebreaker ? `${p1Wins} (t)` : `${p1Wins}`;
+                    const p2ScoreDisplay = hasTiebreaker ? `${p2Wins} (t)` : `${p2Wins}`;
 
                     const p1IsWinner = Boolean(p1?.id && (match.winnerId === p1.id || (record?.isComplete && record?.winnerPlayerId === p1.id)));
                     const p2IsWinner = Boolean(p2?.id && (match.winnerId === p2.id || (record?.isComplete && record?.winnerPlayerId === p2.id)));
@@ -355,20 +372,40 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
 
                           {/* Player 1 Seed & Name */}
                           <td style={{ ...tdStyle, borderTop: borderTopStyle }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <div
+                              onClick={(e) => {
+                                if (p1?.id) {
+                                  e.stopPropagation();
+                                  handlePlayerClick(p1.id, p1.name);
+                                }
+                              }}
+                              onMouseEnter={() => p1?.id && setHoveredPlayerKey(`p1-${match.id}`)}
+                              onMouseLeave={() => setHoveredPlayerKey(null)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                padding: '0.2rem 0.45rem',
+                                borderRadius: 'var(--radius-sm)',
+                                background: hoveredPlayerKey === `p1-${match.id}` ? 'rgba(251, 191, 36, 0.18)' : 'transparent',
+                                boxShadow: hoveredPlayerKey === `p1-${match.id}` ? '0 0 0 1px var(--color-gold)' : 'none',
+                                cursor: p1?.id ? 'pointer' : 'inherit',
+                                transition: 'all 0.15s ease',
+                              }}
+                              title={p1?.id ? "View competitor tournament profile" : undefined}
+                            >
                               {p1?.seed && (
                                 <span style={seedBadgeStyle}>#{p1.seed}</span>
                               )}
-                              <span style={{ fontWeight: p1IsWinner ? 700 : 500, color: p1IsWinner ? primaryColor : 'var(--color-text-primary)' }}>
+                              <span style={{ fontWeight: p1IsWinner ? 700 : 500, color: hoveredPlayerKey === `p1-${match.id}` ? 'var(--color-gold-bright)' : p1IsWinner ? primaryColor : 'var(--color-text-primary)' }}>
                                 {p1Name}
                               </span>
-                              {p1IsWinner && <Trophy size={14} color={primaryColor} />}
                             </div>
                           </td>
 
                           {/* Player 1 Series Score */}
                           <td style={{ ...tdStyle, borderTop: borderTopStyle, textAlign: 'center', fontWeight: 700, fontSize: '1rem', color: p1IsWinner ? primaryColor : 'var(--color-text-primary)' }}>
-                            <span className="tabular-nums">{p1Wins}</span>
+                            <span className="tabular-nums">{p1ScoreDisplay}</span>
                           </td>
 
                           {/* Games 1 to 5 for Player 1 */}
@@ -457,20 +494,40 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                         >
                           {/* Player 2 Seed & Name */}
                           <td style={{ ...tdStyle, borderBottom: '1px solid var(--color-border-subtle)' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <div
+                              onClick={(e) => {
+                                if (p2?.id) {
+                                  e.stopPropagation();
+                                  handlePlayerClick(p2.id, p2.name);
+                                }
+                              }}
+                              onMouseEnter={() => p2?.id && setHoveredPlayerKey(`p2-${match.id}`)}
+                              onMouseLeave={() => setHoveredPlayerKey(null)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                padding: '0.2rem 0.45rem',
+                                borderRadius: 'var(--radius-sm)',
+                                background: hoveredPlayerKey === `p2-${match.id}` ? 'rgba(251, 191, 36, 0.18)' : 'transparent',
+                                boxShadow: hoveredPlayerKey === `p2-${match.id}` ? '0 0 0 1px var(--color-gold)' : 'none',
+                                cursor: p2?.id ? 'pointer' : 'inherit',
+                                transition: 'all 0.15s ease',
+                              }}
+                              title={p2?.id ? "View competitor tournament profile" : undefined}
+                            >
                               {p2?.seed && (
                                 <span style={seedBadgeStyle}>#{p2.seed}</span>
                               )}
-                              <span style={{ fontWeight: p2IsWinner ? 700 : 500, color: p2IsWinner ? primaryColor : 'var(--color-text-primary)' }}>
+                              <span style={{ fontWeight: p2IsWinner ? 700 : 500, color: hoveredPlayerKey === `p2-${match.id}` ? 'var(--color-gold-bright)' : p2IsWinner ? primaryColor : 'var(--color-text-primary)' }}>
                                 {p2Name}
                               </span>
-                              {p2IsWinner && <Trophy size={14} color={primaryColor} />}
                             </div>
                           </td>
 
                           {/* Player 2 Series Score */}
                           <td style={{ ...tdStyle, borderBottom: '1px solid var(--color-border-subtle)', textAlign: 'center', fontWeight: 700, fontSize: '1rem', color: p2IsWinner ? primaryColor : 'var(--color-text-primary)' }}>
-                            <span className="tabular-nums">{p2Wins}</span>
+                            <span className="tabular-nums">{p2ScoreDisplay}</span>
                           </td>
 
                           {/* Games 1 to 5 for Player 2 */}
@@ -536,6 +593,18 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
           match={selectedMatch.match}
           matchScoreRecord={tournament.matchScores[selectedMatch.match.id]}
           roundName={selectedMatch.roundName}
+        />
+      )}
+
+      {selectedPlayerForDrawer && (
+        <PlayerDetailDrawer
+          isOpen={isPlayerDrawerOpen}
+          onClose={() => {
+            setIsPlayerDrawerOpen(false);
+            setSelectedPlayerForDrawer(null);
+          }}
+          player={selectedPlayerForDrawer}
+          tournament={tournament}
         />
       )}
     </div>

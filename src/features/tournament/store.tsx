@@ -3,6 +3,7 @@ import {
   Tournament,
   TournamentTier,
   MatchScoreRecord,
+  GameScoreEntry,
   QualifierScore,
   PlayerProfile,
   QualifierSubmission,
@@ -55,6 +56,18 @@ interface TournamentContextType {
     p1Points: number | null,
     p2Points: number | null,
     declaredWinnerId?: string | null
+  ) => void;
+  saveMatchScores: (
+    tournamentId: string,
+    tierId: string,
+    matchId: string,
+    scoredGames: Array<{
+      gameNumber: number;
+      player1Points: number | null;
+      player2Points: number | null;
+      winnerPlayerId: string | null;
+    }>,
+    hasTiebreaker?: boolean
   ) => void;
   updateMatchBestOf: (tournamentId: string, tierId: string, matchId: string, bestOf: number) => void;
   forfeitMatch: (tournamentId: string, tierId: string, matchId: string, winnerPlayerId: string) => void;
@@ -533,6 +546,134 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     );
   };
 
+  const saveMatchScores = (
+    tournamentId: string,
+    tierId: string,
+    matchId: string,
+    scoredGames: Array<{
+      gameNumber: number;
+      player1Points: number | null;
+      player2Points: number | null;
+      winnerPlayerId: string | null;
+    }>,
+    hasTiebreaker?: boolean
+  ) => {
+    setTournaments(prev =>
+      prev.map(tournament => {
+        if (tournament.id !== tournamentId) return tournament;
+        const tier = tournament.tiers.find(t => t.id === tierId);
+        if (!tier) return tournament;
+
+        const targetMatch = tier.bracket.matchesById[matchId];
+        if (!targetMatch) return tournament;
+
+        const p1 = targetMatch.player1.player;
+        const p2 = targetMatch.player2.player;
+        const currentRecord = tournament.matchScores[matchId] || {
+          matchId,
+          tierId,
+          bestOf: targetMatch.bestOf || tier.bestOf || 5,
+          player1Wins: 0,
+          player2Wins: 0,
+          games: [],
+          winnerPlayerId: null,
+          loserPlayerId: null,
+          isComplete: false,
+        };
+
+        // Format and clean game entries:
+        // Exclude empty games or 0-0 with no declared winner
+        const cleanedGames: GameScoreEntry[] = scoredGames
+          .map(g => {
+            const isZeroZero = g.player1Points === 0 && g.player2Points === 0 && !g.winnerPlayerId;
+            const isEmpty = g.player1Points === null && g.player2Points === null && !g.winnerPlayerId;
+            if (isEmpty || isZeroZero) {
+              return {
+                gameNumber: g.gameNumber,
+                player1Points: null,
+                player2Points: null,
+                winnerPlayerId: null,
+              };
+            }
+            return {
+              gameNumber: g.gameNumber,
+              player1Points: g.player1Points,
+              player2Points: g.player2Points,
+              winnerPlayerId: g.winnerPlayerId,
+            };
+          })
+          .sort((a, b) => a.gameNumber - b.gameNumber);
+
+        // Recalculate series wins
+        let p1Wins = 0;
+        let p2Wins = 0;
+        for (const g of cleanedGames) {
+          if (p1 && g.winnerPlayerId === p1.id) p1Wins++;
+          else if (p2 && g.winnerPlayerId === p2.id) p2Wins++;
+        }
+
+        const matchBestOf = currentRecord.bestOf || targetMatch.bestOf || tier.bestOf || 5;
+        const threshold = Math.ceil(matchBestOf / 2);
+        let matchWinnerId: string | null = null;
+        let matchLoserId: string | null = null;
+        let isComplete = false;
+
+        if (p1 && p1Wins >= threshold) {
+          matchWinnerId = p1.id;
+          matchLoserId = p2 ? p2.id : null;
+          isComplete = true;
+        } else if (p2 && p2Wins >= threshold) {
+          matchWinnerId = p2.id;
+          matchLoserId = p1 ? p1.id : null;
+          isComplete = true;
+        }
+
+        const tiebreakerActive = Boolean(
+          hasTiebreaker ||
+          currentRecord.hasTiebreaker ||
+          cleanedGames.some(g => g.gameNumber > matchBestOf && (g.player1Points !== null || g.player2Points !== null || g.winnerPlayerId !== null))
+        );
+
+        const updatedRecord: MatchScoreRecord = {
+          ...currentRecord,
+          player1Wins: p1Wins,
+          player2Wins: p2Wins,
+          games: cleanedGames,
+          winnerPlayerId: matchWinnerId,
+          loserPlayerId: matchLoserId,
+          isComplete,
+          hasTiebreaker: tiebreakerActive,
+        };
+
+        let updatedBracket = tier.bracket;
+        if (matchWinnerId && isComplete) {
+          try {
+            updatedBracket = advanceMatchWinner(tier.bracket, matchId, matchWinnerId);
+          } catch {
+            // ignore advancement error
+          }
+        } else {
+          try {
+            updatedBracket = retractMatchWinner(tier.bracket, matchId);
+          } catch {
+            // ignore retraction error
+          }
+        }
+
+        return {
+          ...tournament,
+          tiers: tournament.tiers.map(t =>
+            t.id === tierId ? { ...t, bracket: updatedBracket } : t
+          ),
+          matchScores: {
+            ...tournament.matchScores,
+            [matchId]: updatedRecord,
+          },
+        };
+      })
+    );
+  };
+
   const updateMatchBestOf = (
     tournamentId: string,
     tierId: string,
@@ -985,6 +1126,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         lockTournament,
         unlockBrackets,
         recordGameScore,
+        saveMatchScores,
         updateMatchBestOf,
         forfeitMatch,
         addQualifierScore,

@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { Tournament, TournamentTier } from '../types';
+import { Tournament, TournamentTier, PlayerProfile } from '../types';
 import { calculateGlobalStandings, GlobalStandingRow } from '../standings';
 import { colorWithAlpha } from '../../bracket/colorUtils';
+import { PlayerDetailDrawer } from '../../qualifiers/components/PlayerDetailDrawer';
 import {
   Trophy,
   Medal,
@@ -28,6 +29,20 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<string>(initialTierId || 'ALL');
+  const [selectedPlayerForDrawer, setSelectedPlayerForDrawer] = useState<PlayerProfile | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  const handlePlayerClick = (pId: string, pName: string, country?: string, playstyle?: 'DAS' | 'Rolling' | 'Hypertap') => {
+    const profile = (tournament.playersPool || []).find(p => p.id === pId) || {
+      id: pId,
+      name: pName,
+      country,
+      personalBest: 0,
+      playstyle: playstyle || 'DAS',
+    };
+    setSelectedPlayerForDrawer(profile);
+    setIsDrawerOpen(true);
+  };
 
   const globalRows = useMemo(() => {
     return calculateGlobalStandings(tournament);
@@ -692,15 +707,35 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
                         <td style={tdStyle}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
-                              <span
+                              <button
+                                type="button"
+                                onClick={() => handlePlayerClick(row.player.id, row.player.name, row.player.country, row.player.playstyle)}
                                 style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  padding: 0,
+                                  cursor: 'pointer',
+                                  textAlign: 'left',
                                   fontWeight: isOverallChamp ? 800 : isRunnerUp || isTierChamp ? 700 : 600,
                                   color: isOverallChamp ? 'var(--color-gold-bright)' : '#ffffff',
                                   fontSize: isOverallChamp ? '0.98rem' : '0.9rem',
+                                  textDecoration: 'none',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  transition: 'color 0.15s ease',
                                 }}
+                                onMouseEnter={e => {
+                                  e.currentTarget.style.color = 'var(--color-gold-bright)';
+                                  e.currentTarget.style.textDecoration = 'underline';
+                                }}
+                                onMouseLeave={e => {
+                                  e.currentTarget.style.color = isOverallChamp ? 'var(--color-gold-bright)' : '#ffffff';
+                                  e.currentTarget.style.textDecoration = 'none';
+                                }}
+                                title="View player tournament profile"
                               >
                                 {row.player.name}
-                              </span>
+                              </button>
 
                               {row.player.country && (
                                 <span
@@ -947,6 +982,18 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
             </tbody>
           </table>
         </div>
+      )}
+
+      {selectedPlayerForDrawer && (
+        <PlayerDetailDrawer
+          isOpen={isDrawerOpen}
+          onClose={() => {
+            setIsDrawerOpen(false);
+            setSelectedPlayerForDrawer(null);
+          }}
+          player={selectedPlayerForDrawer}
+          tournament={tournament}
+        />
       )}
     </div>
   );

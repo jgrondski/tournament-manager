@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Users, X, Sparkles } from 'lucide-react';
+import { ClearableNumberInput } from '../../../components/ClearableNumberInput';
 
 interface GenerateFakePlayersModalProps {
   isOpen: boolean;
@@ -14,7 +15,7 @@ export const GenerateFakePlayersModal: React.FC<GenerateFakePlayersModalProps> =
   onGenerate,
   existingCount,
 }) => {
-  const [count, setCount] = useState<number>(16);
+  const [count, setCount] = useState<number | undefined>(16);
 
   if (!isOpen) return null;
 
@@ -23,7 +24,7 @@ export const GenerateFakePlayersModal: React.FC<GenerateFakePlayersModalProps> =
   };
 
   const handleConfirm = () => {
-    if (count > 0 && count <= 200) {
+    if (count !== undefined && count >= 1 && count <= 200) {
       onGenerate(count);
       onClose();
     }
@@ -142,29 +143,26 @@ export const GenerateFakePlayersModal: React.FC<GenerateFakePlayersModalProps> =
             >
               Number of Players to Generate
             </label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <input
-                id="fake-player-count-input"
-                type="number"
-                min={1}
-                max={200}
-                value={count || ''}
-                onChange={e => {
-                  const val = parseInt(e.target.value, 10);
-                  setCount(isNaN(val) ? 0 : Math.max(1, Math.min(200, val)));
-                }}
-                style={{
-                  flex: 1,
-                  padding: '0.65rem 0.85rem',
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1px solid var(--color-border)',
-                  background: 'var(--color-bg-base)',
-                  color: 'var(--color-text-primary)',
-                  fontSize: '1.1rem',
-                  fontWeight: 700,
-                }}
-              />
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+              <div style={{ flex: 1 }}>
+                <ClearableNumberInput
+                  id="fake-player-count-input"
+                  min={1}
+                  max={200}
+                  value={count}
+                  onChange={setCount}
+                  style={{
+                    padding: '0.65rem 0.85rem',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--color-border)',
+                    backgroundColor: 'var(--color-bg-base)',
+                    color: 'var(--color-text-primary)',
+                    fontSize: '1.1rem',
+                    fontWeight: 700,
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.65rem' }}>
                 <Users size={16} color="var(--color-text-muted)" />
                 <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', fontWeight: 500 }}>
                   competitors

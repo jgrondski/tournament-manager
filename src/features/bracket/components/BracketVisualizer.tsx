@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { BracketStructure, BracketMatch, isMatchPlayable } from '../types';
-import { Tournament, TournamentTier } from '../../tournament/types';
+import { Tournament, TournamentTier, PlayerProfile } from '../../tournament/types';
 import { MatchScoreDrawer } from './MatchScoreDrawer';
 import { BracketDraftBanner } from './BracketDraftBanner';
 import { colorWithAlpha } from '../colorUtils';
 import { Trophy } from 'lucide-react';
+import { PlayerDetailDrawer } from '../../qualifiers/components/PlayerDetailDrawer';
 
 interface BracketVisualizerProps {
   tournament: Tournament;
@@ -20,6 +21,21 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
   canManage = true,
 }) => {
   const [selectedMatch, setSelectedMatch] = useState<{ match: BracketMatch; roundName: string } | null>(null);
+  const [selectedPlayerForDrawer, setSelectedPlayerForDrawer] = useState<PlayerProfile | null>(null);
+  const [isPlayerDrawerOpen, setIsPlayerDrawerOpen] = useState(false);
+  const [hoveredPlayerKey, setHoveredPlayerKey] = useState<string | null>(null);
+  const [hoveredMatchId, setHoveredMatchId] = useState<string | null>(null);
+
+  const handlePlayerClick = (pId: string, pName: string) => {
+    const profile = (tournament.playersPool || []).find(p => p.id === pId) || {
+      id: pId,
+      name: pName,
+      personalBest: 0,
+      playstyle: 'DAS',
+    };
+    setSelectedPlayerForDrawer(profile);
+    setIsPlayerDrawerOpen(true);
+  };
 
   const bracket: BracketStructure = tier.bracket;
   const rounds = bracket.rounds;
@@ -116,11 +132,17 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
 
                 const p1Wins = record?.player1Wins || 0;
                 const p2Wins = record?.player2Wins || 0;
+                const matchBestOf = record?.bestOf || match.bestOf || tier.bestOf || 5;
+                const hasTiebreaker = Boolean(record?.hasTiebreaker || (record?.games && record.games.length > matchBestOf));
+                const p1ScoreDisplay = hasTiebreaker ? `${p1Wins} (t)` : `${p1Wins}`;
+                const p2ScoreDisplay = hasTiebreaker ? `${p2Wins} (t)` : `${p2Wins}`;
+
                 const isPlayable = isMatchPlayable(match);
                 const isComplete = Boolean((p1?.id && match.winnerId === p1.id) || (p2?.id && match.winnerId === p2.id) || record?.isComplete);
                 const inProgress = !isComplete && (p1Wins > 0 || p2Wins > 0);
                 const p1Won = Boolean(p1?.id && (match.winnerId === p1.id || record?.winnerPlayerId === p1.id));
                 const p2Won = Boolean(p2?.id && (match.winnerId === p2.id || record?.winnerPlayerId === p2.id));
+                const isMatchHovered = hoveredMatchId === match.id;
 
                 return (
                   <div
@@ -130,16 +152,22 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                         setSelectedMatch({ match, roundName: round.name });
                       }
                     }}
+                    onMouseEnter={() => setHoveredMatchId(match.id)}
+                    onMouseLeave={() => setHoveredMatchId(null)}
                     style={{
                       background: isObsMode ? 'rgba(15, 23, 42, 0.95)' : 'var(--color-bg-surface)',
                       borderRadius: 'var(--radius-sm)',
                       border: inProgress
                         ? `2px solid ${primaryColor}`
+                        : isMatchHovered
+                        ? `1px solid ${colorWithAlpha(primaryColor, 0.6, 'var(--color-gold)')}`
                         : isComplete
                         ? '1px solid var(--color-border)'
                         : '1px solid var(--color-border-subtle)',
                       boxShadow: inProgress
                         ? `0 0 12px ${colorWithAlpha(primaryColor, 0.35, 'rgba(245, 158, 11, 0.3)')}`
+                        : isMatchHovered
+                        ? 'var(--shadow-md)'
                         : 'var(--shadow-sm)',
                       cursor: !isObsMode && canManage && isPlayable && tournament.isLocked ? 'pointer' : 'default',
                       opacity: isPlayable ? 1 : 0.7,
@@ -160,7 +188,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                       }}
                     >
                       <span>Match #{match.matchNumber}</span>
-                      <span>Bo{record?.bestOf || match.bestOf || tier.bestOf}</span>
+                      <span>Bo{matchBestOf}</span>
                     </div>
 
                     {/* Slot 1: Player 1 */}
@@ -175,7 +203,29 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                         opacity: isComplete && !p1Won ? 0.45 : 1,
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', overflow: 'hidden' }}>
+                      <div
+                        onClick={(e) => {
+                          if (p1?.id) {
+                            e.stopPropagation();
+                            handlePlayerClick(p1.id, p1.name);
+                          }
+                        }}
+                        onMouseEnter={() => p1?.id && setHoveredPlayerKey(`p1-${match.id}`)}
+                        onMouseLeave={() => setHoveredPlayerKey(null)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.4rem',
+                          overflow: 'hidden',
+                          padding: '0.15rem 0.35rem',
+                          borderRadius: 'var(--radius-sm)',
+                          backgroundColor: hoveredPlayerKey === `p1-${match.id}` ? 'rgba(251, 191, 36, 0.18)' : 'transparent',
+                          boxShadow: hoveredPlayerKey === `p1-${match.id}` ? '0 0 0 1px var(--color-gold)' : 'none',
+                          cursor: p1?.id ? 'pointer' : 'inherit',
+                          transition: 'all 0.15s ease',
+                        }}
+                        title={p1?.id ? "View competitor tournament profile" : undefined}
+                      >
                         {p1?.seed && (
                           <span style={seedMiniStyle}>
                             {p1.seed}
@@ -185,7 +235,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                           style={{
                             fontSize: '0.85rem',
                             fontWeight: p1Won ? 700 : 500,
-                            color: p1Won ? primaryColor : 'var(--color-text-primary)',
+                            color: hoveredPlayerKey === `p1-${match.id}` ? 'var(--color-gold-bright)' : p1Won ? primaryColor : 'var(--color-text-primary)',
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
@@ -203,7 +253,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                           marginLeft: '0.5rem',
                         }}
                       >
-                        {p1Wins}
+                        {p1ScoreDisplay}
                       </span>
                     </div>
 
@@ -218,7 +268,29 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                         opacity: isComplete && !p2Won ? 0.45 : 1,
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', overflow: 'hidden' }}>
+                      <div
+                        onClick={(e) => {
+                          if (p2?.id) {
+                            e.stopPropagation();
+                            handlePlayerClick(p2.id, p2.name);
+                          }
+                        }}
+                        onMouseEnter={() => p2?.id && setHoveredPlayerKey(`p2-${match.id}`)}
+                        onMouseLeave={() => setHoveredPlayerKey(null)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.4rem',
+                          overflow: 'hidden',
+                          padding: '0.15rem 0.35rem',
+                          borderRadius: 'var(--radius-sm)',
+                          backgroundColor: hoveredPlayerKey === `p2-${match.id}` ? 'rgba(251, 191, 36, 0.18)' : 'transparent',
+                          boxShadow: hoveredPlayerKey === `p2-${match.id}` ? '0 0 0 1px var(--color-gold)' : 'none',
+                          cursor: p2?.id ? 'pointer' : 'inherit',
+                          transition: 'all 0.15s ease',
+                        }}
+                        title={p2?.id ? "View competitor tournament profile" : undefined}
+                      >
                         {p2?.seed && (
                           <span style={seedMiniStyle}>
                             {p2.seed}
@@ -228,7 +300,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                           style={{
                             fontSize: '0.85rem',
                             fontWeight: p2Won ? 700 : 500,
-                            color: p2Won ? primaryColor : 'var(--color-text-primary)',
+                            color: hoveredPlayerKey === `p2-${match.id}` ? 'var(--color-gold-bright)' : p2Won ? primaryColor : 'var(--color-text-primary)',
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
@@ -246,7 +318,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                           marginLeft: '0.5rem',
                         }}
                       >
-                        {p2Wins}
+                        {p2ScoreDisplay}
                       </span>
                     </div>
                   </div>
@@ -277,7 +349,29 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
             <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: primaryColor, fontWeight: 700 }}>
               {tier.name} Champion
             </div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ffffff' }}>
+            <div
+              onClick={() => {
+                if (championPlayer?.id) {
+                  handlePlayerClick(championPlayer.id, championPlayer.name);
+                }
+              }}
+              style={{
+                fontSize: '1.4rem',
+                fontWeight: 800,
+                color: '#ffffff',
+                cursor: championPlayer?.id ? 'pointer' : 'default',
+                padding: '0.2rem 0.5rem',
+                borderRadius: 'var(--radius-sm)',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={e => {
+                if (championPlayer?.id) e.currentTarget.style.color = 'var(--color-gold-bright)';
+              }}
+              onMouseLeave={e => {
+                if (championPlayer?.id) e.currentTarget.style.color = '#ffffff';
+              }}
+              title="View champion tournament profile"
+            >
               {championPlayer.name}
             </div>
             <div
@@ -307,6 +401,18 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
           match={selectedMatch.match}
           matchScoreRecord={tournament.matchScores[selectedMatch.match.id]}
           roundName={selectedMatch.roundName}
+        />
+      )}
+
+      {selectedPlayerForDrawer && (
+        <PlayerDetailDrawer
+          isOpen={isPlayerDrawerOpen}
+          onClose={() => {
+            setIsPlayerDrawerOpen(false);
+            setSelectedPlayerForDrawer(null);
+          }}
+          player={selectedPlayerForDrawer}
+          tournament={tournament}
         />
       )}
       </div>

@@ -11,21 +11,26 @@ import {
   Shield,
   Palette,
   X,
-  AlertTriangle,
-  ShieldCheck,
   Sparkles,
   Play,
-  Users,
   UserPlus,
+  Search,
+  Users,
+  Unlock,
+  ShieldCheck,
+  AlertTriangle,
   Download,
   UserX,
-  Search,
+  Lock,
 } from 'lucide-react';
 import { generateTraditionalBracket, generateFlatBracket } from '../../bracket/math';
 import { BestOfSelect } from '../../bracket/components/BestOfSelect';
 import { ImportFromGlobalModal } from '../../players/components/ImportFromGlobalModal';
 import { PlayerEditModal } from '../../players/components/PlayerEditModal';
 import { getAvailableRoundsForTier, pruneInvalidRoundOverrides } from '../roundOverrides';
+import { ClearableNumberInput } from '../../../components/ClearableNumberInput';
+import { PlayerDetailDrawer } from '../../qualifiers/components/PlayerDetailDrawer';
+import { VerifyBracketModal } from './VerifyBracketModal';
 
 interface TournamentAdminFormProps {
   tournament: Tournament;
@@ -48,25 +53,30 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
     simulateFullTournament,
     globalPlayers,
     importPlayersToTournament,
-    removePlayerFromTournament,
     addPlayerToPool,
+    removePlayerFromTournament,
+    unlockBrackets,
   } = useTournament();
 
   // Tournament Fields State
   const [name, setName] = useState(tournament.name);
   const [slug, setSlug] = useState(tournament.slug);
   const [date, setDate] = useState(tournament.date);
-  const [location, setLocation] = useState(tournament.location);
+  const [location, setLocation] = useState(tournament.location || '');
   const [qualFormat, setQualFormat] = useState<QualFormat>(tournament.qualFormat || 'AVERAGE_OF_X');
-  const [qualAverageCount, setQualAverageCount] = useState<string>(String(tournament.qualAverageCount || 2));
+  const [qualAverageCount, setQualAverageCount] = useState<number | undefined>(tournament.qualAverageCount || 2);
   const [avgCountError, setAvgCountError] = useState<string | null>(null);
   const [pointsConfig, setPointsConfig] = useState<PointsThreshold[]>(
     tournament.pointsConfig || [
-      { minScore: 1200000, points: 100 },
-      { minScore: 1000000, points: 50 },
-      { minScore: 800000, points: 25 },
+      { minScore: 500000, points: 10 },
+      { minScore: 400000, points: 6 },
+      { minScore: 300000, points: 3 },
     ]
   );
+  const [selectedPlayerForDrawer, setSelectedPlayerForDrawer] = useState<PlayerProfile | null>(null);
+  const [isPlayerDrawerOpen, setIsPlayerDrawerOpen] = useState(false);
+  const [isSettingsVerifyModalOpen, setIsSettingsVerifyModalOpen] = useState(false);
+  const [settingsUnlockError, setSettingsUnlockError] = useState<string | null>(null);
 
   // Tiers State
   const [tiers, setTiers] = useState<TournamentTier[]>(tournament.tiers || []);
@@ -113,24 +123,9 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
     if (slug !== (tournament.slug || '')) return true;
     if (date !== (tournament.date || '')) return true;
     if (location !== (tournament.location || '')) return true;
-    if (qualFormat !== (tournament.qualFormat || 'AVERAGE_OF_X')) return true;
-    if (qualAverageCount !== String(tournament.qualAverageCount || 2)) return true;
-
-    // Points config
-    const initialPoints = tournament.pointsConfig || [
-      { minScore: 1200000, points: 100 },
-      { minScore: 1000000, points: 50 },
-      { minScore: 800000, points: 25 },
-    ];
-    if (pointsConfig.length !== initialPoints.length) return true;
-    for (let i = 0; i < pointsConfig.length; i++) {
-      if (
-        pointsConfig[i].minScore !== initialPoints[i].minScore ||
-        pointsConfig[i].points !== initialPoints[i].points
-      ) {
-        return true;
-      }
-    }
+    if (qualFormat !== tournament.qualFormat) return true;
+    if (qualAverageCount !== (tournament.qualAverageCount || 2)) return true;
+    if (JSON.stringify(pointsConfig) !== JSON.stringify(tournament.pointsConfig || [])) return true;
 
     // Tiers
     const initialTiers = tournament.tiers || [];
@@ -184,13 +179,13 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
       setDate(tournament.date || '');
       setLocation(tournament.location || '');
       setQualFormat(tournament.qualFormat || 'AVERAGE_OF_X');
-      setQualAverageCount(String(tournament.qualAverageCount || 2));
+      setQualAverageCount(tournament.qualAverageCount || 2);
       setAvgCountError(null);
       setPointsConfig(
         tournament.pointsConfig || [
-          { minScore: 1200000, points: 100 },
-          { minScore: 1000000, points: 50 },
-          { minScore: 800000, points: 25 },
+          { minScore: 500000, points: 10 },
+          { minScore: 400000, points: 6 },
+          { minScore: 300000, points: 3 },
         ]
       );
       setTiers(tournament.tiers || []);
@@ -203,13 +198,13 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
     setDate(tournament.date || '');
     setLocation(tournament.location || '');
     setQualFormat(tournament.qualFormat || 'AVERAGE_OF_X');
-    setQualAverageCount(String(tournament.qualAverageCount || 2));
+    setQualAverageCount(tournament.qualAverageCount || 2);
     setAvgCountError(null);
     setPointsConfig(
       tournament.pointsConfig || [
-        { minScore: 1200000, points: 100 },
-        { minScore: 1000000, points: 50 },
-        { minScore: 800000, points: 25 },
+        { minScore: 500000, points: 10 },
+        { minScore: 400000, points: 6 },
+        { minScore: 300000, points: 3 },
       ]
     );
     setTiers(tournament.tiers || []);
@@ -218,7 +213,6 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
   // Helper to auto-derive slug from name
   const handleNameChange = (newName: string) => {
     setName(newName);
-    // Auto derive slug if current slug matches previous derived pattern or is default
     const derived = newName
       .toLowerCase()
       .trim()
@@ -272,11 +266,9 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
     setTiers(prev => {
       const next = [...prev];
       let target = { ...next[index], ...updates };
-      // If name changed, derive slug
       if (updates.name && !updates.slug) {
         target.slug = updates.name.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-');
       }
-      // If participant count or bracket structure changed, prune out-of-range round overrides
       if (
         updates.playerCount !== undefined ||
         updates.bracketType !== undefined ||
@@ -299,8 +291,6 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
       const temp = next[index];
       next[index] = next[swapIndex];
       next[swapIndex] = temp;
-
-      // Re-assign priorities 1..N
       return next.map((t, idx) => ({ ...t, priority: idx + 1 }));
     });
   };
@@ -313,7 +303,6 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
   };
 
   const saveCurrentConfig = () => {
-    // Re-generate bracket structures for tiers if player count or type changed
     const updatedTiers = tiers.map(tier => {
       const dummyPlayers = Array.from({ length: tier.playerCount }, (_, i) => ({
         id: `dummy_${i + 1}`,
@@ -342,12 +331,11 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
 
     let parsedAvg = 2;
     if (qualFormat === 'AVERAGE_OF_X') {
-      const parsed = parseInt(qualAverageCount, 10);
-      if (!qualAverageCount.trim() || isNaN(parsed) || parsed < 1) {
+      if (qualAverageCount === undefined || isNaN(qualAverageCount) || qualAverageCount < 1) {
         setAvgCountError('Please enter a valid attempt count (minimum 1)');
-        return null;
+        return;
       }
-      parsedAvg = parsed;
+      parsedAvg = qualAverageCount;
     }
 
     updateTournament(tournament.id, {
@@ -501,6 +489,87 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
         </div>
       )}
 
+      {/* Tournament Phase & Bracket Lock Banner */}
+      <div
+        style={{
+          background: tournament.isLocked
+            ? 'linear-gradient(90deg, rgba(16, 185, 129, 0.12) 0%, rgba(5, 150, 105, 0.18) 100%)'
+            : 'linear-gradient(90deg, rgba(245, 158, 11, 0.12) 0%, rgba(217, 119, 6, 0.18) 100%)',
+          border: tournament.isLocked ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid rgba(245, 158, 11, 0.35)',
+          borderRadius: 'var(--radius-lg)',
+          padding: '1rem 1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '1rem',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
+              background: tournament.isLocked ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: tournament.isLocked ? '#34d399' : 'var(--color-gold-bright)',
+            }}
+          >
+            {tournament.isLocked ? <ShieldCheck size={20} /> : <Lock size={20} />}
+          </div>
+          <div>
+            <div style={{ fontSize: '0.95rem', fontWeight: 700, color: tournament.isLocked ? '#34d399' : 'var(--color-gold-bright)' }}>
+              {tournament.isLocked ? 'MATCH PLAY MODE (LOCKED)' : 'QUALIFIERS MODE (DRAFT PREVIEW)'}
+            </div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
+              {tournament.isLocked
+                ? 'Bracket seeds are frozen and match play is live. Unlock Brackets to revert to qualifiers preview.'
+                : 'Bracket seeds update dynamically with qualifiers. Lock brackets to begin formal match play.'}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {settingsUnlockError && (
+            <span style={{ color: 'var(--color-red)', fontSize: '0.8rem', fontWeight: 600 }}>
+              {settingsUnlockError}
+            </span>
+          )}
+          {tournament.isLocked ? (
+            <button
+              type="button"
+              onClick={() => {
+                const res = unlockBrackets(tournament.id);
+                if (!res.success && res.error) {
+                  setSettingsUnlockError(res.error);
+                } else {
+                  setSettingsUnlockError(null);
+                }
+              }}
+              className="btn btn-secondary"
+              style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+              title="Revert tournament to Qualifiers Mode"
+            >
+              <Unlock size={15} />
+              Unlock Brackets
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsSettingsVerifyModalOpen(true)}
+              className="btn btn-primary"
+              style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+            >
+              <Lock size={15} />
+              Lock Brackets and Begin Match Play
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Section 1: Tournament Information */}
       <section
         style={{
@@ -611,29 +680,21 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
           {qualFormat === 'AVERAGE_OF_X' && (
             <div style={{ background: 'var(--color-bg-surface-elevated)', padding: '1rem', borderRadius: 'var(--radius-sm)', maxWidth: '360px' }}>
               <label style={labelStyle}>Target Attempt Count (X)</label>
-              <input
-                type="number"
+              <ClearableNumberInput
                 min={1}
                 max={10}
                 value={qualAverageCount}
-                onChange={e => {
-                  setQualAverageCount(e.target.value);
+                onChange={val => {
+                  setQualAverageCount(val);
                   if (avgCountError) setAvgCountError(null);
                 }}
-                style={{
-                  ...inputStyle,
-                  borderColor: avgCountError ? 'var(--color-red)' : inputStyle.borderColor,
-                }}
+                error={avgCountError}
+                onErrorChange={setAvgCountError}
+                style={inputStyle}
               />
-              {avgCountError ? (
-                <div style={{ color: 'var(--color-red)', fontSize: '0.75rem', marginTop: '0.35rem' }}>
-                  {avgCountError}
-                </div>
-              ) : (
-                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                  e.g. 2 for Average of 2, 3 for Average of 3
-                </span>
-              )}
+              <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.35rem', display: 'block' }}>
+                e.g. 2 for Average of 2, 3 for Average of 3
+              </span>
             </div>
           )}
 
@@ -658,19 +719,19 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
                   <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <div style={{ flex: 1 }}>
                       <label style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Min Score</label>
-                      <input
-                        type="number"
+                      <ClearableNumberInput
+                        min={0}
                         value={th.minScore}
-                        onChange={e => updateThreshold(idx, 'minScore', parseInt(e.target.value, 10) || 0)}
+                        onChange={val => updateThreshold(idx, 'minScore', val ?? 0)}
                         style={inputStyle}
                       />
                     </div>
-                    <div style={{ width: '120px' }}>
+                    <div style={{ width: '130px' }}>
                       <label style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Points Awarded</label>
-                      <input
-                        type="number"
+                      <ClearableNumberInput
+                        min={0}
                         value={th.points}
-                        onChange={e => updateThreshold(idx, 'points', parseInt(e.target.value, 10) || 0)}
+                        onChange={val => updateThreshold(idx, 'points', val ?? 0)}
                         style={inputStyle}
                       />
                     </div>
@@ -869,12 +930,11 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
                   {tier.bracketType === 'FLAT' && (
                     <div>
                       <label style={labelStyle}>Flat Width (Matches/Round)</label>
-                      <input
-                        type="number"
+                      <ClearableNumberInput
                         min={1}
                         max={16}
                         value={tier.flatWidth || 4}
-                        onChange={e => updateTier(idx, { flatWidth: parseInt(e.target.value, 10) || 4 })}
+                        onChange={val => updateTier(idx, { flatWidth: val ?? 4 })}
                         style={inputStyle}
                       />
                     </div>
@@ -882,18 +942,17 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
 
                   <div>
                     <label style={labelStyle}>Participant Count</label>
-                    <input
-                      type="number"
+                    <ClearableNumberInput
                       min={2}
                       max={64}
                       value={tier.playerCount}
-                      onChange={e => updateTier(idx, { playerCount: parseInt(e.target.value, 10) || 2 })}
+                      onChange={val => updateTier(idx, { playerCount: val ?? 2 })}
                       style={inputStyle}
                     />
                   </div>
 
                   <div>
-                    <label style={labelStyle}>Best-of Default (Up to Bo99)</label>
+                    <label style={labelStyle}>Best-of Default</label>
                     <BestOfSelect
                       value={tier.bestOf}
                       onChange={val => updateTier(idx, { bestOf: val })}
@@ -1394,8 +1453,36 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
                         <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                           {pIdx + 1}
                         </td>
-                        <td style={{ padding: '0.65rem 0.85rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                          {player.name}
+                        <td style={{ padding: '0.65rem 0.85rem' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedPlayerForDrawer(player);
+                              setIsPlayerDrawerOpen(true);
+                            }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              padding: 0,
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                              fontWeight: 600,
+                              color: 'var(--color-text-primary)',
+                              fontSize: 'inherit',
+                              transition: 'color 0.15s ease',
+                            }}
+                            onMouseEnter={e => {
+                              e.currentTarget.style.color = 'var(--color-gold-bright)';
+                              e.currentTarget.style.textDecoration = 'underline';
+                            }}
+                            onMouseLeave={e => {
+                              e.currentTarget.style.color = 'var(--color-text-primary)';
+                              e.currentTarget.style.textDecoration = 'none';
+                            }}
+                            title="View player tournament profile"
+                          >
+                            {player.name}
+                          </button>
                         </td>
                         <td style={{ padding: '0.65rem 0.85rem' }}>
                           {player.country ? (
@@ -2044,6 +2131,26 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
           </div>
         </div>
       )}
+      {/* Modals & Drawers */}
+      {selectedPlayerForDrawer && (
+        <PlayerDetailDrawer
+          isOpen={isPlayerDrawerOpen}
+          onClose={() => {
+            setIsPlayerDrawerOpen(false);
+            setSelectedPlayerForDrawer(null);
+          }}
+          player={selectedPlayerForDrawer}
+          tournament={tournament}
+        />
+      )}
+
+      {isSettingsVerifyModalOpen && (
+        <VerifyBracketModal
+          isOpen={isSettingsVerifyModalOpen}
+          onClose={() => setIsSettingsVerifyModalOpen(false)}
+          tournament={tournament}
+        />
+      )}
     </form>
   );
 };
@@ -2063,7 +2170,7 @@ const inputStyle: React.CSSProperties = {
   padding: '0.6rem 0.85rem',
   borderRadius: 'var(--radius-sm)',
   border: '1px solid var(--color-border)',
-  background: 'var(--color-bg-base)',
+  backgroundColor: 'var(--color-bg-base)',
   color: 'var(--color-text-primary)',
   fontSize: '0.875rem',
 };
