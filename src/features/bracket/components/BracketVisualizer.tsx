@@ -133,7 +133,8 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                 const p1Wins = record?.player1Wins || 0;
                 const p2Wins = record?.player2Wins || 0;
                 const matchBestOf = record?.bestOf || match.bestOf || tier.bestOf || 5;
-                const hasTiebreaker = Boolean(record?.hasTiebreaker || (record?.games && record.games.length > matchBestOf));
+                const hasTieGame = Boolean(record?.games?.some(g => g.winnerPlayerId === 'TIE' || (g.player1Points !== null && g.player1Points === g.player2Points && g.player1Points > 0)));
+                const hasTiebreaker = Boolean(record?.hasTiebreaker || hasTieGame || (record?.games && record.games.length > matchBestOf));
                 const p1ScoreDisplay = hasTiebreaker ? `${p1Wins} (t)` : `${p1Wins}`;
                 const p2ScoreDisplay = hasTiebreaker ? `${p2Wins} (t)` : `${p2Wins}`;
 

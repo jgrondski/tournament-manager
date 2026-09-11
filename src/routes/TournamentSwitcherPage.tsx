@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useTournament } from '../features/tournament/store';
 import { colorWithAlpha } from '../features/bracket/colorUtils';
 import { Calendar, MapPin, Users, Layers, Plus, Settings, Trophy, ShieldCheck, AlertTriangle, X, Trash2 } from 'lucide-react';
-import { QualFormat, Tournament, TournamentTier } from '../features/tournament/types';
+import { QualFormat, Tournament, TournamentTier, DEFAULT_POINTS_THRESHOLDS } from '../features/tournament/types';
 import { generateTraditionalBracket } from '../features/bracket/math';
 import { ClearableNumberInput } from '../components/ClearableNumberInput';
 
@@ -101,6 +101,7 @@ export const TournamentSwitcherPage: React.FC = () => {
       location: newTourneyLocation || 'TBD',
       qualFormat: newTourneyFormat,
       qualAverageCount: parsedAvgCount,
+      pointsConfig: newTourneyFormat === 'POINTS' ? DEFAULT_POINTS_THRESHOLDS : undefined,
       isLocked: false,
       tiers: initialTiers,
     });
@@ -489,7 +490,7 @@ export const TournamentSwitcherPage: React.FC = () => {
                   style={modalInputStyle}
                 >
                   <option value="AVERAGE_OF_X">Average of X Attempts</option>
-                  <option value="HIGH_SCORE">High Score (MAX of attempts)</option>
+                  <option value="HIGH_SCORE"># of Maxes</option>
                   <option value="POINTS">Points Threshold System</option>
                 </select>
               </div>

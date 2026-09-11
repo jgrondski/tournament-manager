@@ -7,6 +7,20 @@ export interface PointsThreshold {
   points: number;
 }
 
+export const DEFAULT_POINTS_THRESHOLDS: PointsThreshold[] = [
+  { minScore: 999999, points: 2 },
+  { minScore: 1099999, points: 3 },
+  { minScore: 1199999, points: 4 },
+  { minScore: 1299999, points: 5 },
+  { minScore: 1399999, points: 6 },
+  { minScore: 1499999, points: 7 },
+  { minScore: 1599999, points: 8 },
+  { minScore: 1699999, points: 9 },
+  { minScore: 1799999, points: 10 },
+  { minScore: 1899999, points: 11 },
+  { minScore: 1999999, points: 13 },
+];
+
 export interface GameScoreEntry {
   gameNumber: number; // 1, 2, 3, 4, 5...
   player1Points: number | null;

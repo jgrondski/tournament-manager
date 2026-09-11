@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Tournament, PlayerProfile } from '../../tournament/types';
 import { LeaderboardRankRow, MAXOUT_THRESHOLD } from '../scoring';
+import { calculateGlobalStandings } from '../../tournament/standings';
 import { colorWithAlpha } from '../../bracket/colorUtils';
 import {
   X,
@@ -28,12 +29,35 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
   tournament,
   rankRow,
 }) => {
-  if (!isOpen || !player) return null;
+  // Determine if tournament has finished all bracket play
+  const isTournamentDone = useMemo(() => {
+    if (!tournament.isLocked || tournament.tiers.length === 0) return false;
+    return tournament.tiers.every(tier => {
+      const rounds = tier.bracket.rounds;
+      if (rounds.length === 0) return false;
+      const finalsMatch = rounds[rounds.length - 1]?.matches[0];
+      if (!finalsMatch) return false;
+      const record = tournament.matchScores[finalsMatch.id];
+      return Boolean(record?.isComplete || finalsMatch.winnerId || record?.winnerPlayerId);
+    });
+  }, [tournament]);
 
-  // Chronological qualifier submissions
-  const playerSubmissions = (tournament.qualifierSubmissions || [])
-    .filter(s => s.playerId === player.id)
-    .sort((a, b) => a.submittedAt - b.submittedAt);
+  // Derive final standings position if tournament is completed
+  const globalStanding = useMemo(() => {
+    if (!player || !isTournamentDone) return null;
+    const standings = calculateGlobalStandings(tournament);
+    return standings.find(s => s.player.id === player.id) || null;
+  }, [isTournamentDone, tournament, player]);
+
+  // Chronological qualifier submissions (earliest at top, latest on bottom)
+  const playerSubmissions = useMemo(() => {
+    if (!player) return [];
+    return (tournament.qualifierSubmissions || [])
+      .filter(s => s.playerId === player.id)
+      .sort((a, b) => a.submittedAt - b.submittedAt);
+  }, [tournament.qualifierSubmissions, player]);
+
+  if (!isOpen || !player) return null;
 
   // Tournament match history
   const playerMatches: Array<{
@@ -48,7 +72,7 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
     isWinner: boolean;
     isComplete: boolean;
     isForfeit?: boolean;
-    games: Array<{ gameNumber: number; playerScore: number | null; opponentScore: number | null; won: boolean }>;
+    games: Array<{ gameNumber: number; playerScore: number | null; opponentScore: number | null; won: boolean; isTie: boolean }>;
   }> = [];
 
   let totalMatchesWon = 0;
@@ -88,6 +112,7 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
           const pScore = isP1 ? g.player1Points : g.player2Points;
           const oppScore = isP1 ? g.player2Points : g.player1Points;
           const won = g.winnerPlayerId === player.id;
+          const isTie = g.winnerPlayerId === 'TIE' || (typeof pScore === 'number' && pScore === oppScore && pScore > 0);
           if (typeof pScore === 'number') {
             totalGamePoints += pScore;
             gamesWithPointsCount++;
@@ -97,6 +122,7 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
             playerScore: pScore,
             opponentScore: oppScore,
             won,
+            isTie,
           };
         });
 
@@ -131,8 +157,56 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
         <div style={headerStyle}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
-              {/* Placement / Seed Badge */}
-              {rankRow?.assignedTier && rankRow.tierSeed !== undefined ? (
+              {/* Placement / Seed Badge Lifecycle */}
+              {isTournamentDone && globalStanding ? (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.3rem',
+                    padding: '0.2rem 0.6rem',
+                    borderRadius: 'var(--radius-full)',
+                    background: globalStanding.finalRank === 1 ? 'rgba(245, 158, 11, 0.25)' : 'rgba(255, 255, 255, 0.08)',
+                    color: globalStanding.finalRank === 1 ? 'var(--color-gold-bright)' : 'var(--color-text-primary)',
+                    border: globalStanding.finalRank === 1 ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid var(--color-border)',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                  }}
+                >
+                  <Trophy size={12} />
+                  Final Rank #{globalStanding.finalRank}
+                </span>
+              ) : tournament.isLocked ? (
+                /* Match play in progress: display Qual Seed */
+                rankRow?.assignedTier && rankRow.tierSeed !== undefined ? (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.3rem',
+                      padding: '0.2rem 0.6rem',
+                      borderRadius: 'var(--radius-full)',
+                      background: colorWithAlpha(tierColor, 0.2, 'rgba(245, 158, 11, 0.15)'),
+                      color: tierColor,
+                      border: `1px solid ${colorWithAlpha(tierColor, 0.4, 'transparent')}`,
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                    }}
+                  >
+                    <Flame size={12} />
+                    Qual Seed #{rankRow.tierSeed} ({rankRow.assignedTier.name})
+                  </span>
+                ) : rankRow?.isDNQ ? (
+                  <span className="badge badge-muted" style={{ background: 'rgba(100, 116, 139, 0.2)', color: '#94a3b8' }}>
+                    DNQ (Seed #{rankRow.globalRank || rankRow.rank})
+                  </span>
+                ) : (
+                  <span className="badge badge-muted">
+                    Qual Seed #{rankRow?.tierSeed || rankRow?.globalRank || rankRow?.rank || '—'}
+                  </span>
+                )
+              ) : rankRow?.assignedTier && rankRow.tierSeed !== undefined ? (
+                /* Qualifiers mode */
                 <span
                   style={{
                     display: 'inline-flex',
@@ -160,7 +234,7 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
                 </span>
               ) : (
                 <span className="badge badge-muted">
-                  Rank #{rankRow?.rank ?? '—'}
+                  Qual Rank #{rankRow?.rank ?? '—'}
                 </span>
               )}
 
@@ -248,9 +322,15 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
               </div>
 
               <div style={statBoxStyle}>
-                <span style={statLabelStyle}>Current Seed</span>
+                <span style={statLabelStyle}>
+                  {isTournamentDone ? 'Final Rank' : tournament.isLocked ? 'Qual Seed' : 'Qual Rank'}
+                </span>
                 <span style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                  {rankRow?.tierSeed ? `Tier Seed #${rankRow.tierSeed}` : `Global #${rankRow?.globalRank || '—'}`}
+                  {isTournamentDone && globalStanding
+                    ? `#${globalStanding.finalRank} (${globalStanding.rankLabel})`
+                    : tournament.isLocked
+                    ? rankRow?.tierSeed ? `Tier Seed #${rankRow.tierSeed}` : `Global #${rankRow?.globalRank || rankRow?.rank || '—'}`
+                    : `Rank #${rankRow?.rank || '—'}`}
                 </span>
               </div>
 
@@ -269,21 +349,21 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
             )}
           </div>
 
-          {/* Section 2: Qualifier Attempts Audit Log */}
+          {/* Section 2: Qual Submissions Audit Log */}
           <div style={cardSectionStyle}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Trophy size={16} color="var(--color-gold-bright)" />
-                <h3 style={sectionTitleStyle}>Qualifier Attempts Audit</h3>
+                <h3 style={sectionTitleStyle}>Qual Submissions</h3>
               </div>
               <span className="tabular-nums" style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                {playerSubmissions.length} {playerSubmissions.length === 1 ? 'attempt' : 'attempts'} logged
+                {playerSubmissions.length} {playerSubmissions.length === 1 ? 'submission' : 'submissions'} logged
               </span>
             </div>
 
             {playerSubmissions.length === 0 ? (
               <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
-                No qualifier attempts submitted yet.
+                No qual submissions logged yet.
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -545,13 +625,13 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
                                 color: 'var(--color-text-muted)',
                               }}
                             >
-                              <span>Game {g.gameNumber}:</span>
+                              <span>Game {g.gameNumber}:{g.isTie ? ' (TIE)' : ''}</span>
                               <span>
-                                <strong style={{ color: g.won ? '#34d399' : 'var(--color-text-secondary)' }}>
+                                <strong style={{ color: g.isTie ? '#38bdf8' : g.won ? '#34d399' : 'var(--color-text-secondary)' }}>
                                   {g.playerScore !== null ? g.playerScore.toLocaleString() : '—'}
                                 </strong>
                                 {' vs '}
-                                <span style={{ color: !g.won && g.playerScore !== null ? '#fb7185' : 'var(--color-text-muted)' }}>
+                                <span style={{ color: g.isTie ? '#38bdf8' : !g.won && g.playerScore !== null ? '#fb7185' : 'var(--color-text-muted)' }}>
                                   {g.opponentScore !== null ? g.opponentScore.toLocaleString() : '—'}
                                 </span>
                               </span>

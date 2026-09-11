@@ -195,3 +195,25 @@ export function generateFlatBracket(
     matchesById,
   };
 }
+
+/**
+ * Calculates the valid powers-of-two flat bracket widths for a given player count.
+ * Flat brackets accept powers of 2, up to roughly half the number of players:
+ * Powers of 2 starting from 2 up to max(2, floor(playerCount / 2)).
+ * e.g.:
+ * - 9 players -> maxAllowed = 4 -> [2, 4]
+ * - 16 players -> maxAllowed = 8 -> [2, 4, 8]
+ * - 4 players -> maxAllowed = 2 -> [2]
+ * - 32 players -> maxAllowed = 16 -> [2, 4, 8, 16]
+ */
+export function getValidFlatWidths(playerCount: number): number[] {
+  const maxAllowed = Math.max(2, Math.floor(playerCount / 2));
+  const widths: number[] = [];
+  let w = 2;
+  while (w <= maxAllowed) {
+    widths.push(w);
+    w *= 2;
+  }
+  return widths.length > 0 ? widths : [2];
+}
+

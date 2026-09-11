@@ -885,9 +885,19 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
                           {row.exitDetails ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                <span className="tabular-nums" style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                                  {row.exitDetails.scoreDisplay}
-                                </span>
+                                {isOverallChamp ? (
+                                  <span style={{ fontSize: '0.82rem', color: 'var(--color-gold-bright)', fontWeight: 700 }}>
+                                    👑 {row.exitDetails.scoreDisplay}
+                                  </span>
+                                ) : isTierChamp ? (
+                                  <span style={{ fontSize: '0.82rem', color: tierColor, fontWeight: 700 }}>
+                                    🏆 {row.exitDetails.scoreDisplay}
+                                  </span>
+                                ) : (
+                                  <span className="tabular-nums" style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                                    {row.exitDetails.scoreDisplay}
+                                  </span>
+                                )}
                                 <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
                                   vs {row.exitDetails.opponentName || 'Opponent'}
                                 </span>
@@ -907,7 +917,9 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
                                 )}
                               </div>
                               <div className="tabular-nums" style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
-                                Loss Avg: <strong style={{ color: 'var(--color-text-secondary)' }}>{row.exitDetails.avgLossScore.toLocaleString()}</strong>
+                                Loss Avg: <strong style={{ color: 'var(--color-text-secondary)' }}>
+                                  {row.exitDetails.avgLossScore > 0 ? row.exitDetails.avgLossScore.toLocaleString() : '—'}
+                                </strong>
                               </div>
                             </div>
                           ) : isOverallChamp ? (

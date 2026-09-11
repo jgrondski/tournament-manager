@@ -1,129 +1,137 @@
-# Walkthrough: Tournament Management, Visual Brackets, Match Scoring & Standings Enhancements
+# Walkthrough: Tournament Enhancements & Visual Bracket Polish
 
-All 10 requested enhancements and bug fixes are complete, validated across the entire codebase, and verified with 80 passing unit tests, TypeScript typechecking, ESLint, and a successful Vite production build.
+All 13 requested enhancements and fixes across player profiles, tournament standings, tiebreaker scoring & deletion, flat bracket width math, default points thresholds, format renaming to "# of Maxes", kicker simulation, round overrides editing UX, and qual sheet columns are complete and verified.
 
 ---
 
 ## 1. Summary of Changes
 
-### 1.1 Clearable Number Inputs with Blur Validation & Refocus
-* **[ClearableNumberInput.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/components/ClearableNumberInput.tsx):**
-  * Created reusable input component supporting `min`, `max`, `step`, and optional `required`.
-  * Allows backspacing and clearing down to an empty string `""` without forcing an immediate fallback value (e.g. `2`).
-  * On blur: validates whether the entered value is a valid integer between `min` and `max`.
-  * If invalid or empty when required: displays an inline error alert badge above the input and automatically refocuses the input field, while still allowing the input to remain empty.
-* **Integrations across the app:**
-  * **[TournamentSwitcherPage.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/routes/TournamentSwitcherPage.tsx):** Used for "Average of X Attempts" count.
-  * **[GenerateFakePlayersModal.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/players/components/GenerateFakePlayersModal.tsx):** Used for competitor generation count.
-  * **[TournamentAdminForm.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/tournament/components/TournamentAdminForm.tsx):** Used for qualifier attempts, minimum qualification score, ranking points, flat bracket width, and tier player count.
+### 1.1 Player Profile Match History: Blue Score Styling for Ties
+* **[PlayerDetailDrawer.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/qualifiers/components/PlayerDetailDrawer.tsx):**
+  * In the match history score pills, tied games are detected when `winnerPlayerId === 'TIE'` or `player1Points === player2Points && player1Points > 0`.
+  * Tied game scores are rendered in bright sky blue (`color: #38bdf8`, `background: rgba(56, 189, 248, 0.12)`, `border: 1px solid rgba(56, 189, 248, 0.4)`) with an inline `(TIE)` badge, distinguishing them from green (wins) and red (losses).
 
-### 1.2 Styled Native Dropdown Carats
-* **[index.css](file:///Users/jgrondski/src/repos/tournament-manager/src/index.css):**
-  * Added global styling for native `<select>` dropdowns:
-    * Custom SVG chevron icon with `background-position: right 0.75rem center !important` and `padding-right: 2.25rem !important`.
-    * `appearance: none; -webkit-appearance: none; cursor: pointer;`.
-  * Updated inline styles in forms from `background` shorthand to `backgroundColor` so native styles and custom carats are never unintentionally overridden.
+### 1.2 Player Profile Rank Lifecycle
+* **[PlayerDetailDrawer.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/qualifiers/components/PlayerDetailDrawer.tsx):**
+  * **Qualifiers Stage (`!tournament.isLocked`):** Displays **Qual Rank** with the player's current leaderboard rank.
+  * **Bracket Match Play Stage (`tournament.isLocked && !isTournamentDone`):** Displays **Qual Seed** with the seed assigned when entering bracket play.
+  * **Completed Tournament (`tournament.isLocked && isTournamentDone`):** Displays **Final Rank** reflecting the official final standing position (e.g. `1st`, `2nd`, `3rd`, etc.).
 
-### 1.3 Dropped `(UP TO BO99)` from Settings
-* **[TournamentAdminForm.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/tournament/components/TournamentAdminForm.tsx):**
-  * Removed `(Up to Bo99)` from the tier configuration form label, changing it to clean `Best-of Default`.
-
-### 1.4 Standings Country & Playstyle Chips Preservation
+### 1.3 Tournament Standings: Champion Loss Average
 * **[standings.ts](file:///Users/jgrondski/src/repos/tournament-manager/src/features/tournament/standings.ts):**
-  * Updated `calculateGlobalStandings` to index `tournament.playersPool`.
-  * Decorates all bracket participants (champion, runner-up, semifinalists, and eliminated round competitors) with their original `country` and `playstyle` chips.
-* **[standings.test.ts](file:///Users/jgrondski/src/repos/tournament-manager/src/features/tournament/__tests__/standings.test.ts):**
-  * Added unit test verifying country and playstyle metadata retention across champion, runner-up, eliminated bracket players, and non-bracket qualifiers.
-
-### 1.5 Player Profile Drawer from Standings & Tournament Roster
+  * Extended `calculateGlobalStandings` to compute `exitDetails` for the Tournament Champion using their games in the Grand Finals match, calculating their `avgLossScore` (average points scored in lost games, if any) or overall points average.
 * **[FinalStandingsTable.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/tournament/components/FinalStandingsTable.tsx):**
-  * Made competitor names in the global and tier standings tables clickable buttons that open `PlayerDetailDrawer`.
-* **[TournamentAdminForm.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/tournament/components/TournamentAdminForm.tsx):**
-  * Made competitor names in the registered Tournament Roster table clickable buttons that open `PlayerDetailDrawer`.
+  * In the "Exit Match / Loss Avg" column, the champion now displays their finals match score alongside `Loss Avg: <formatted>` or `Overall Avg: <formatted>` with a championship trophy badge, matching the loss average display format of other participants.
 
-### 1.6 Hover Separation & Player Profile Drawer in Bracket Views
-* Separated hover targets and clicks across all bracket views:
-  * **[BracketVisualizer.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/bracket/components/BracketVisualizer.tsx):**
-    * Competitor name slots have distinct hover styling (golden border and subtle highlight).
-    * Clicking a player's name triggers `e.stopPropagation()` and opens `PlayerDetailDrawer`.
-    * Champion card winner name is also clickable to open `PlayerDetailDrawer`.
-    * Clicking anywhere else on the match container opens `MatchScoreDrawer`.
-  * **[OrganizerSheetMatrix.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/bracket/components/OrganizerSheetMatrix.tsx):**
-    * Competitor cells have independent hover highlight and open `PlayerDetailDrawer` on click with `e.stopPropagation()`.
-    * Clicking anywhere else on the match row opens `MatchScoreDrawer`.
-  * **[MatchCardFeed.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/bracket/components/MatchCardFeed.tsx):**
-    * Player name badges have independent hover styling and click handler for `PlayerDetailDrawer`.
-    * Clicking anywhere else on the match card opens `MatchScoreDrawer`.
-
-### 1.7 Removed Trophies from Organizer Sheet & Floor Judge
-* **[OrganizerSheetMatrix.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/bracket/components/OrganizerSheetMatrix.tsx):**
-  * Removed `<Trophy>` icon next to winning players in matrix match cells.
-* **[MatchCardFeed.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/bracket/components/MatchCardFeed.tsx):**
-  * Removed `<Trophy>` icon next to winning players in floor judge match cards.
-
-### 1.8 Tiebreaker Games & `(t)` Notation
-* **[types.ts](file:///Users/jgrondski/src/repos/tournament-manager/src/features/tournament/types.ts):**
-  * Added `hasTiebreaker?: boolean;` to `MatchScoreRecord`.
+### 1.4 Tiebreaker Game Deletion & `(t)` Cleanup
 * **[MatchScoreDrawer.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/bracket/components/MatchScoreDrawer.tsx):**
-  * Added `+ Add Tiebreaker Game` button below the games list.
-  * Added visual badge `Tiebreaker` on games beyond `bestOf`.
-  * Displays tie detection notice when tied games exist.
-* Series score display across bracket views:
-  * In [BracketVisualizer.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/bracket/components/BracketVisualizer.tsx), [MatchCardFeed.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/bracket/components/MatchCardFeed.tsx), and [OrganizerSheetMatrix.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/bracket/components/OrganizerSheetMatrix.tsx):
-    * If `hasTiebreaker` is true or recorded games exceed `bestOf`, series scores render with `(t)` notation (e.g., `3 (t)` vs `1 (t)`).
-
-### 1.9 Game Score Clearing & 0-0 Handling
+  * Added a trash delete button for any tiebreaker game whose scores are `0 - 0` or empty.
+  * Clicking the delete button removes the game, recalculates series scores, and updates `hasTiebreaker`.
 * **[store.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/tournament/store.tsx):**
-  * Added `saveMatchScores` method to tournament store:
-    * Cleans scored games: empty entries or `0-0` scores with no declared winner are stored as nulls and excluded from win calculations.
-    * Automatically calculates series wins for Player 1 and Player 2.
-    * If neither player reaches the required win threshold $\lceil \text{best\_of} / 2 \rceil$, any previously declared winner is retracted using `retractMatchWinner`, clearing downstream bracket slots.
-    * Preserves `hasTiebreaker` flag on the match record.
-* **[MatchScoreDrawer.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/bracket/components/MatchScoreDrawer.tsx):**
-  * Clearing points or entering `0-0` automatically unselects any declared winner.
+  * Fixed `saveMatchScores` so `tiebreakerActive` is dynamically determined by actual tied games or remaining tiebreaker games. If a tiebreaker game is deleted and no ties exist, `hasTiebreaker` is removed.
+* **[BracketVisualizer.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/bracket/components/BracketVisualizer.tsx), [MatchCardFeed.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/bracket/components/MatchCardFeed.tsx), and [OrganizerSheetMatrix.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/bracket/components/OrganizerSheetMatrix.tsx):**
+  * Updated `hasTiebreaker` display logic to check if games actually contained tied scores. The `(t)` notation is stripped if no tie exists and no active tiebreaker games remain.
 
-### 1.10 Lock & Unlock Buttons in Tournament Settings
+### 1.5 Flat Bracket Width Math & Dropdown
+* **[flat.ts](file:///Users/jgrondski/src/repos/tournament-manager/src/features/bracket/math/flat.ts):**
+  * Implemented `getValidFlatWidths(playerCount)`: valid widths are powers of 2 ($2, 4, 8, \dots$) $\le \max(2, \lfloor \text{playerCount} / 2 \rfloor)$.
+  * E.g. for 9 players: $[2, 4]$; for 16 players: $[2, 4, 8]$; for 4 players: $[2]$.
 * **[TournamentAdminForm.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/tournament/components/TournamentAdminForm.tsx):**
-  * Added Phase & Bracket Lock Banner at the top of Tournament Settings:
-    * When unlocked: displays `Brackets Unlocked (Draft Mode)` with **Lock Brackets and Begin Match Play** button (opens `VerifyBracketModal`).
-    * When locked: displays `Brackets Locked (Match Play Active)` with **Unlock Brackets** button (calls `unlockBrackets` with error notification handling).
+  * Replaced manual number input with a `<select>` dropdown populated by `getValidFlatWidths(tier.playerCount)`.
+  * `updateTier` automatically clamps `flatWidth` to a valid option whenever `playerCount` changes.
+* **[flat.test.ts](file:///Users/jgrondski/src/repos/tournament-manager/src/features/bracket/math/__tests__/flat.test.ts):**
+  * Added unit test suite covering odd, even, and edge-case player counts.
+
+### 1.6 Default Points Thresholds
+* **[types.ts](file:///Users/jgrondski/src/repos/tournament-manager/src/features/tournament/types.ts):**
+  * Created `DEFAULT_POINTS_THRESHOLDS` constant:
+    * 999,999: 2 pts
+    * 1,099,999: 3 pts
+    * 1,199,999: 4 pts
+    * 1,299,999: 5 pts
+    * 1,399,999: 6 pts
+    * 1,499,999: 7 pts
+    * 1,599,999: 8 pts
+    * 1,699,999: 9 pts
+    * 1,799,999: 10 pts
+    * 1,899,999: 11 pts
+    * 1,999,999: 13 pts
+* **[TournamentSwitcherPage.tsx](file:///Users/jgrondski/src/routes/TournamentSwitcherPage.tsx) & [TournamentAdminForm.tsx](file:///Users/jgrondski/src/features/tournament/components/TournamentAdminForm.tsx):**
+  * Automatically populates `DEFAULT_POINTS_THRESHOLDS` when creating a tournament with `POINTS` format or switching the qualifier format to Points Threshold System.
+
+### 1.7 Format Renaming to "# of Maxes"
+* Renamed "High Score (MAX of attempts)" to **# of Maxes** across:
+  * **[TournamentSwitcherPage.tsx](file:///Users/jgrondski/src/routes/TournamentSwitcherPage.tsx)**
+  * **[TournamentAdminForm.tsx](file:///Users/jgrondski/src/features/tournament/components/TournamentAdminForm.tsx)**
+  * **[LeaderboardTable.tsx](file:///Users/jgrondski/src/features/qualifiers/components/LeaderboardTable.tsx)**
+
+### 1.8 Round Overrides Editor UX
+* **[TournamentAdminForm.tsx](file:///Users/jgrondski/src/features/tournament/components/TournamentAdminForm.tsx):**
+  * Created `RoundOverridesEditor` sub-component with local `draftRows` state.
+  * Adding or editing a round override marks the row as dirty without swapping or sorting rows.
+  * Each override row has a **Save** check button (`<Check />`) next to Delete that is enabled only when dirty.
+  * Rows only sort by `roundNumber` when **Save** is clicked, with CSS transitions (`transition: all 0.3s ease`).
+  * Clicking Delete immediately removes the row and syncs the tier overrides.
+
+### 1.9 Kicker in "# of Maxes" & 90% Simulation
+* **[LeaderboardTable.tsx](file:///Users/jgrondski/src/features/qualifiers/components/LeaderboardTable.tsx):**
+  * Replaced "High Score" column header with **Kicker** when the tournament format is `# of Maxes`.
+* **[simulation.ts](file:///Users/jgrondski/src/features/tournament/simulation.ts):**
+  * Updated qualifier simulation for `# of Maxes`: 90% of players are guaranteed to submit a kicker score ($< 999,999$) so realistic kicker scores are generated.
+
+### 1.10 Qual Submissions Renaming & Chronological Order
+* **[PlayerDetailDrawer.tsx](file:///Users/jgrondski/src/features/qualifiers/components/PlayerDetailDrawer.tsx):**
+  * Renamed the submissions section on the player profile drawer from "Qualifier Attempts" to **Qual Submissions**.
+  * Submissions are sorted chronologically by timestamp (`submittedAt - submittedAt`), with the earliest submission at the top and latest at the bottom.
+* **[LeaderboardTable.tsx](file:///Users/jgrondski/src/features/qualifiers/components/LeaderboardTable.tsx):**
+  * Removed the standalone "Attempts" column from the leaderboard table, reducing clutter.
+
+### 1.11 Points Qual Mode Table Polish
+* **[LeaderboardTable.tsx](file:///Users/jgrondski/src/features/qualifiers/components/LeaderboardTable.tsx):**
+  * Renamed "Attempt Points Breakdown" column header to **Points Breakdown**.
+  * Sorted attempt chips chronologically by timestamp.
+  * For competitors who did not reach any point threshold (0 total points), displays their best raw score (e.g. `Top Score: 450,000`) instead of an empty space.
 
 ---
 
-## 2. Automated Test Results
+## 2. Verification Results
 
-* **Vitest (`npm test`):** **11 test suites passed**, **80 tests passed** (0 failures).
-  * `standings.test.ts`:
-    * ✓ retains country and playstyle metadata for bracket players and non-bracket qualifiers in standings
-    * ✓ correctly derives 1st, 2nd, 3rd/4th placements from completed bracket matches
-    * ✓ accurately calculates rank delta between qualifier rank and final rank
-  * `advance.test.ts`:
-    * ✓ clears match winner/loser and downstream feeder slot on retraction
-    * ✓ cascades retraction if downstream match had also declared a winner
-* **TypeScript (`npm run typecheck`):** `tsc --noEmit` passed with 0 errors.
-* **ESLint (`npm run lint`):** `eslint .` passed with 0 warnings.
-* **Production Build (`npm run build`):** Vite bundle compiled successfully in 2.73s.
+### 2.1 Vitest Unit Tests
+All 85 tests across 11 test suites pass:
+```bash
+npm test
 
----
+ RUN  v3.2.7 /Users/jgrondski/src/repos/tournament-manager
 
-## 3. Manual Verification Steps
+ ✓ src/features/bracket/math/__tests__/traditional.test.ts (13 tests)
+ ✓ src/features/tournament/__tests__/store.test.ts (3 tests)
+ ✓ src/features/bracket/math/__tests__/flat.test.ts (13 tests)
+ ✓ src/features/bracket/math/__tests__/advance.test.ts (7 tests)
+ ✓ src/features/players/__tests__/players.test.ts (5 tests)
+ ✓ src/features/tournament/__tests__/standings.test.ts (8 tests)
+ ✓ src/features/bracket/math/__tests__/round-overrides.test.ts (8 tests)
+ ✓ src/features/tournament/__tests__/simulation.test.ts (7 tests)
+ ✓ src/features/qualifiers/__tests__/scoring.test.ts (13 tests)
+ ✓ src/features/tournament/__tests__/verification.test.ts (4 tests)
+ ✓ src/features/bracket/__tests__/colorUtils.test.ts (4 tests)
 
-1. **Clearable Number Inputs:**
-   - Go to **Create Tournament** -> select **Average of X Attempts**. Backspace the number until empty; verify it stays empty without jumping to 2. Click outside the input: verify validation error and refocus.
-   - Go to **Tournament Settings** -> edit any numeric input (Min Score, Points, Tier Player Count). Verify clearable backspacing and blur validation.
-2. **Dropdown Carats:**
-   - In **Tournament Settings**, inspect the **Bracket Type** dropdown or any other native `<select>`. Verify the chevron carat has comfortable right padding (`0.75rem`), identical to the Best-of dropdown.
-3. **Standings Country & Playstyle Chips:**
-   - In **Final Standings**, verify players who competed in brackets (including the champion, runner-up, and early eliminations) show their country flag and playstyle badge alongside qualifier-only players.
-4. **Player Profile Drawer Interactions:**
-   - In **Bracket** visualizer, hover over a player name box: verify gold border highlight on the player box only. Click the player name: verify `PlayerDetailDrawer` opens.
-   - Hover on the rest of the match card: verify the match card highlights. Click: verify `MatchScoreDrawer` opens.
-   - Test the same in **Organizer Sheet** and **Floor Judge** views.
-   - In **Final Standings** and **Settings -> Tournament Roster**, click a competitor name: verify `PlayerDetailDrawer` opens.
-5. **Tiebreaker Games & `(t)` Notation:**
-   - Open any match in **Bracket** view. Click **+ Add Tiebreaker Game**. Score the tiebreaker game and click **Save**.
-   - Verify the score displays with `(t)` on the bracket (e.g. `3 (t) - 1 (t)`).
-6. **Score Clearing & Winner Retraction:**
-   - Open a completed match, clear game scores or set to `0-0`. Save the match: verify the winner is retracted and downstream bracket slots are cleared.
-7. **Lock & Unlock in Settings:**
-   - In **Tournament Settings**, locate the Phase & Bracket Lock Banner at the top. Click **Lock Brackets and Begin Match Play** to verify brackets; click **Unlock Brackets** to return to draft mode.
+ Test Files  11 passed (11)
+      Tests  85 passed (85)
+```
+
+### 2.2 TypeScript & Lint Checks
+```bash
+npm run typecheck
+# 0 errors
+
+npm run lint
+# 0 problems (0 errors, 0 warnings)
+```
+
+### 2.3 Production Build
+```bash
+npm run build
+# vite v6.4.3 building for production...
+# ✓ 1900 modules transformed.
+# ✓ built in 2.63s
+```

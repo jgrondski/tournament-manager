@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BracketMatch } from '../types';
 import { MatchScoreRecord } from '../../tournament/types';
 import { useTournament } from '../../tournament/store';
-import { X, Trophy, Check, ShieldAlert, Plus } from 'lucide-react';
+import { X, Trophy, Check, ShieldAlert, Plus, Trash2 } from 'lucide-react';
 import { BestOfSelect } from './BestOfSelect';
 
 interface MatchScoreDrawerProps {
@@ -115,6 +115,18 @@ export const MatchScoreDrawer: React.FC<MatchScoreDrawerProps> = ({
     setHasTiebreaker(true);
   };
 
+  const handleDeleteTiebreakerGame = (idx: number) => {
+    setGames(prev => {
+      const updated = prev.filter((_, i) => i !== idx);
+      const hasRemainingTiebreaker = updated.length > bestOf;
+      const hasAnyTiedGame = updated.some(g => g.winner === 'TIE' || (g.p1 !== '' && g.p1 === g.p2 && parseInt(g.p1, 10) > 0));
+      if (!hasRemainingTiebreaker && !hasAnyTiedGame) {
+        setHasTiebreaker(false);
+      }
+      return updated;
+    });
+  };
+
   const handleSaveAndAdvance = () => {
     const formattedGames = games.map((g, idx) => ({
       gameNumber: idx + 1,
@@ -123,12 +135,18 @@ export const MatchScoreDrawer: React.FC<MatchScoreDrawerProps> = ({
       winnerPlayerId: g.winner,
     }));
 
+    const hasTiedGame = formattedGames.some(
+      g => g.winnerPlayerId === 'TIE' || (g.player1Points !== null && g.player1Points === g.player2Points && g.player1Points > 0)
+    );
+    const hasRemainingTiebreaker = games.length > bestOf;
+    const shouldRecordTiebreaker = Boolean((hasTiebreaker || hasRemainingTiebreaker || hasTiedGame) && (hasTiedGame || hasRemainingTiebreaker));
+
     saveMatchScores(
       tournamentId,
       tierId,
       match.id,
       formattedGames,
-      hasTiebreaker || games.length > bestOf
+      shouldRecordTiebreaker
     );
     onClose();
   };
@@ -267,11 +285,36 @@ export const MatchScoreDrawer: React.FC<MatchScoreDrawerProps> = ({
                         </span>
                       )}
                     </div>
-                    {margin && (
-                      <span style={{ fontSize: '0.7rem', color: 'var(--color-cyan)', fontFamily: 'var(--font-mono)' }}>
-                        Δ {margin} pts
-                      </span>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      {margin && (
+                        <span style={{ fontSize: '0.7rem', color: 'var(--color-cyan)', fontFamily: 'var(--font-mono)' }}>
+                          Δ {margin} pts
+                        </span>
+                      )}
+                      {isTiebreakerGame && ((!game.p1 || game.p1 === '0' || isNaN(num1) || num1 === 0) && (!game.p2 || game.p2 === '0' || isNaN(num2) || num2 === 0)) && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTiebreakerGame(idx)}
+                          title="Delete tiebreaker game"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                            padding: '0.15rem 0.4rem',
+                            borderRadius: 'var(--radius-sm)',
+                            background: 'rgba(239, 68, 68, 0.12)',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            color: '#fca5a5',
+                            fontSize: '0.68rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <Trash2 size={11} />
+                          <span>Delete</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '0.75rem', alignItems: 'center' }}>

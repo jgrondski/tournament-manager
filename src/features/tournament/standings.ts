@@ -406,6 +406,47 @@ export function calculateGlobalStandings(tournament: Tournament): GlobalStanding
           const finalRank = currentRank++;
           const champProfile = profileMap.get(champ.id);
 
+          // Calculate champion's average score across all lost games in tournament
+          const champLostScores: number[] = [];
+          for (const matchRecord of Object.values(tournament.matchScores || {})) {
+            if (!matchRecord?.games) continue;
+            for (const tierObj of tournament.tiers) {
+              const mNode = tierObj.bracket.matchesById[matchRecord.matchId];
+              if (!mNode) continue;
+              const isP1 = mNode.player1.player?.id === champ.id;
+              const isP2 = mNode.player2.player?.id === champ.id;
+              if (!isP1 && !isP2) continue;
+
+              for (const g of matchRecord.games) {
+                if (g.winnerPlayerId && g.winnerPlayerId !== champ.id && g.winnerPlayerId !== 'TIE') {
+                  const score = isP1 ? g.player1Points : g.player2Points;
+                  if (typeof score === 'number' && score !== null) {
+                    champLostScores.push(score);
+                  }
+                }
+              }
+            }
+          }
+
+          const champAvgLoss = champLostScores.length > 0
+            ? Math.round(champLostScores.reduce((a, b) => a + b, 0) / champLostScores.length)
+            : 0;
+
+          const isChampP1 = champ.id === p1?.id;
+          const champWins = isChampP1 ? (record?.player1Wins || 0) : (record?.player2Wins || 0);
+          const oppWins = isChampP1 ? (record?.player2Wins || 0) : (record?.player1Wins || 0);
+
+          const exitDetails: ExitMatchDetails = {
+            matchId: finalsMatch.id,
+            roundName: 'Finals',
+            scoreDisplay: `${champWins}–${oppWins}`,
+            playerWins: champWins,
+            opponentWins: oppWins,
+            opponentName: runnerUp?.name || 'Runner-up',
+            avgLossScore: champAvgLoss,
+            isForfeit: false,
+          };
+
           globalStandings.push({
             finalRank,
             rankLabel: finalRank === 1 ? '1st Place (Champion)' : `${getRankOrdinal(finalRank)} (Tier Champion)`,
@@ -419,6 +460,7 @@ export function calculateGlobalStandings(tournament: Tournament): GlobalStanding
             },
             tier,
             eliminationRound: 'Champion',
+            exitDetails,
             stats,
             qualScore: qualScoreMap.get(champ.id),
             qualRank,

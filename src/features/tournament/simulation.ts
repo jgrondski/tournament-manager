@@ -233,12 +233,22 @@ export function generateSimulatedQualifiers(
       let score: number;
 
       if (qualFormat === 'HIGH_SCORE') {
-        // High score: top seeds frequently max out (>= 999,999), lower seeds between 600k and 950k
-        const isMaxout = pIdx < Math.min(16, Math.floor(players.length * 0.4)) && Math.random() < 0.75;
+        // # of Maxes: top seeds frequently max out (>= 999,999)
+        // 90% of the time, submit a kicker (< 999,999) to establish tiebreaker scores
+        const playerCurrentAttempts = submissions.filter(s => s.playerId === player.id);
+        const hasKickerAlready = playerCurrentAttempts.some(s => s.score < 999999);
+        const isLastAttempt = attempt === targetAttempts;
+
+        let isMaxout = pIdx < Math.min(16, Math.floor(players.length * 0.4)) && Math.random() < 0.75;
+        // If player has only maxouts so far, 90% chance to submit a kicker on final attempt
+        if (isLastAttempt && !hasKickerAlready && Math.random() < 0.90) {
+          isMaxout = false;
+        }
+
         if (isMaxout) {
           score = Math.floor(1000000 + Math.random() * 300000);
         } else {
-          score = Math.floor((550000 + Math.random() * 420000) * skillMultiplier + (1 - skillMultiplier) * 300000);
+          score = Math.floor(750000 + Math.random() * 245000); // 750,000 to 995,000
         }
       } else if (qualFormat === 'POINTS') {
         score = Math.floor((600000 + Math.random() * 650000) * skillMultiplier);

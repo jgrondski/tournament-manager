@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateFlatBracket } from '../flat';
+import { generateFlatBracket, getValidFlatWidths } from '../flat';
 import { SeededPlayer } from '../../types';
 
 function createMockPlayers(count: number): SeededPlayer[] {
@@ -161,4 +161,27 @@ describe('generateFlatBracket', () => {
       }
     });
   });
+
+  describe('getValidFlatWidths', () => {
+    it('returns [2, 4] for 9 players', () => {
+      expect(getValidFlatWidths(9)).toEqual([2, 4]);
+    });
+
+    it('returns [2, 4, 8] for 16 players', () => {
+      expect(getValidFlatWidths(16)).toEqual([2, 4, 8]);
+    });
+
+    it('returns [2, 4] for 8 players', () => {
+      expect(getValidFlatWidths(8)).toEqual([2, 4]);
+    });
+
+    it('returns [2] for 4 players', () => {
+      expect(getValidFlatWidths(4)).toEqual([2]);
+    });
+
+    it('returns [2, 4, 8, 16] for 32 players', () => {
+      expect(getValidFlatWidths(32)).toEqual([2, 4, 8, 16]);
+    });
+  });
 });
+

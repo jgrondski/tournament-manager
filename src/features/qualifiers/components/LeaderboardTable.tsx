@@ -39,7 +39,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
 
   const format = tournament.qualFormat;
   const targetX = tournament.qualAverageCount || 2;
-  const tableColSpan = format === 'HIGH_SCORE' ? 6 : 5;
+  const tableColSpan = 5;
 
   return (
     <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -51,28 +51,39 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
             Qualifying Leaderboard
           </h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
-            Format: <strong style={{ color: 'var(--color-gold-bright)' }}>{tournament.qualFormat.replace(/_/g, ' ')}</strong>
+            Format: <strong style={{ color: 'var(--color-gold-bright)' }}>{tournament.qualFormat === 'HIGH_SCORE' ? '# of Maxes' : tournament.qualFormat === 'AVERAGE_OF_X' ? `Average of ${targetX} Attempts` : 'Points Threshold System'}</strong>
             {tournament.qualFormat === 'AVERAGE_OF_X' && ` (Ao${targetX})`}
             {' • '}
             {tournament.isLocked ? 'Qualifiers Closed (Match Play in Progress)' : 'Qualifiers Open (Live Running Standings)'}
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div style={{ position: 'relative' }}>
-            <Search size={16} color="var(--color-text-muted)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          {/* Competitor Search */}
+          <div style={{ position: 'relative', width: '220px' }}>
+            <Search
+              size={15}
+              style={{
+                position: 'absolute',
+                left: '0.65rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--color-text-muted)',
+              }}
+            />
             <input
               type="text"
               placeholder="Search competitor..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               style={{
-                padding: '0.45rem 0.75rem 0.45rem 2rem',
+                width: '100%',
+                padding: '0.45rem 0.65rem 0.45rem 2rem',
+                fontSize: '0.85rem',
                 borderRadius: 'var(--radius-sm)',
                 border: '1px solid var(--color-border)',
-                background: 'var(--color-bg-surface)',
+                background: 'var(--color-bg-base)',
                 color: 'var(--color-text-primary)',
-                fontSize: '0.85rem',
               }}
             />
           </div>
@@ -81,36 +92,28 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
             <button
               onClick={() => setIsEntryModalOpen(true)}
               className="btn btn-primary"
-              disabled={tournament.isLocked}
-              title={tournament.isLocked ? 'Qualifiers are locked during Match Play Mode' : undefined}
-              style={{
-                padding: '0.45rem 1rem',
-                fontSize: '0.85rem',
-                opacity: tournament.isLocked ? 0.5 : 1,
-                cursor: tournament.isLocked ? 'not-allowed' : 'pointer',
-              }}
+              style={{ padding: '0.45rem 0.95rem', fontSize: '0.85rem', gap: '0.4rem' }}
             >
               <Plus size={16} />
-              Submit Score
+              Record Qual Submission
             </button>
           )}
         </div>
       </div>
 
-      {/* Standings Table */}
-      <div style={{ overflowX: 'auto', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', background: 'var(--color-bg-surface)' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+      {/* Main Leaderboard Table */}
+      <div style={{ background: 'var(--color-bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
-            <tr style={{ background: 'var(--color-bg-surface-highlight)', borderBottom: '2px solid var(--color-border)' }}>
+            <tr style={{ background: 'var(--color-bg-surface-elevated)', borderBottom: '1px solid var(--color-border)' }}>
               <th style={{ ...thStyle, width: '60px', textAlign: 'center' }}>Rank</th>
               <th style={{ ...thStyle, minWidth: '220px' }}>Competitor</th>
 
               {/* Format-Dense Columns */}
               {format === 'HIGH_SCORE' && (
                 <>
-                  <th style={{ ...thStyle, width: '180px', textAlign: 'center' }}>Maxouts &amp; Kicker</th>
-                  <th style={{ ...thStyle, width: '140px', textAlign: 'right' }}>High Score</th>
-                  <th style={{ ...thStyle, width: '110px', textAlign: 'center' }}>Attempts</th>
+                  <th style={{ ...thStyle, width: '160px', textAlign: 'center' }}># of Maxes</th>
+                  <th style={{ ...thStyle, width: '150px', textAlign: 'right' }}>Kicker</th>
                 </>
               )}
 
@@ -123,7 +126,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
 
               {format === 'POINTS' && (
                 <>
-                  <th style={{ ...thStyle, minWidth: '220px', textAlign: 'center' }}>Attempt Points Breakdown</th>
+                  <th style={{ ...thStyle, minWidth: '220px', textAlign: 'center' }}>Points Breakdown</th>
                   <th style={{ ...thStyle, width: '140px', textAlign: 'right' }}>Total Points</th>
                 </>
               )}
@@ -238,38 +241,26 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                       {/* Format-Dense Column Layout */}
                       {format === 'HIGH_SCORE' && (
                         <>
-                          {/* Maxout & Kicker Column */}
+                          {/* # of Maxes Column */}
                           <td style={{ ...tdStyle, textAlign: 'center' }}>
                             {row.maxoutCount && row.maxoutCount > 0 ? (
-                              <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem' }}>
-                                <span
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '0.25rem',
-                                    padding: '0.15rem 0.5rem',
-                                    borderRadius: 'var(--radius-full)',
-                                    background: 'rgba(245, 158, 11, 0.22)',
-                                    color: 'var(--color-gold-bright)',
-                                    fontSize: '0.75rem',
-                                    fontWeight: 800,
-                                    border: '1px solid rgba(245, 158, 11, 0.4)',
-                                    boxShadow: '0 0 8px rgba(245, 158, 11, 0.15)',
-                                  }}
-                                >
-                                  <Sparkles size={11} /> {row.maxoutCount}x Max
-                                </span>
-
-                                {row.kickerScore && row.kickerScore > 0 ? (
-                                  <span className="tabular-nums" style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
-                                    Kicker: <strong style={{ color: 'var(--color-text-secondary)' }}>{row.kickerScore.toLocaleString()}</strong>
-                                  </span>
-                                ) : (
-                                  <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
-                                    No kicker
-                                  </span>
-                                )}
-                              </div>
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem',
+                                  padding: '0.15rem 0.5rem',
+                                  borderRadius: 'var(--radius-full)',
+                                  background: 'rgba(245, 158, 11, 0.22)',
+                                  color: 'var(--color-gold-bright)',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 800,
+                                  border: '1px solid rgba(245, 158, 11, 0.4)',
+                                  boxShadow: '0 0 8px rgba(245, 158, 11, 0.15)',
+                                }}
+                              >
+                                <Sparkles size={11} /> {row.maxoutCount}x Max
+                              </span>
                             ) : (
                               <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
                                 —
@@ -277,16 +268,25 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                             )}
                           </td>
 
-                          {/* High Score Column */}
-                          <td className="tabular-nums" style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, fontSize: '0.95rem', color: row.finalScore >= 999999 ? 'var(--color-gold-bright)' : '#ffffff' }}>
-                            {row.finalScore > 0 ? row.finalScore.toLocaleString() : '—'}
-                          </td>
-
-                          {/* Attempts Count Column */}
-                          <td style={{ ...tdStyle, textAlign: 'center' }}>
-                            <span className="tabular-nums" style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
-                              {row.attempts.length} {row.attempts.length === 1 ? 'att' : 'atts'}
-                            </span>
+                          {/* Kicker Column */}
+                          <td className="tabular-nums" style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, fontSize: '0.95rem' }}>
+                            {row.kickerScore && row.kickerScore > 0 ? (
+                              <span style={{ color: '#ffffff' }}>
+                                {row.kickerScore.toLocaleString()}
+                              </span>
+                            ) : row.maxoutCount && row.maxoutCount > 0 ? (
+                              <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                                No kicker
+                              </span>
+                            ) : row.finalScore > 0 ? (
+                              <span style={{ color: 'var(--color-text-secondary)' }}>
+                                {row.finalScore.toLocaleString()}
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
+                                —
+                              </span>
+                            )}
                           </td>
                         </>
                       )}
@@ -336,34 +336,49 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
 
                       {format === 'POINTS' && (
                         <>
-                          {/* Points Breakdown per Attempt */}
+                          {/* Points Breakdown Column */}
                           <td style={{ ...tdStyle, textAlign: 'center' }}>
-                            <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
-                              {(() => {
-                                const submissionsForPlayer = (tournament.qualifierSubmissions || []).filter(s => s.playerId === row.player.id);
-                                const ptsResult = calculatePoints(submissionsForPlayer, tournament.pointsConfig || []);
-                                if (ptsResult.pointsPerAttempt.length === 0) {
-                                  return <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>No attempts</span>;
-                                }
-                                return ptsResult.pointsPerAttempt.map((pts, pIdx) => (
-                                  <span
-                                    key={pIdx}
-                                    className="tabular-nums"
-                                    style={{
-                                      padding: '0.15rem 0.45rem',
-                                      borderRadius: 'var(--radius-sm)',
-                                      fontSize: '0.75rem',
-                                      fontWeight: 700,
-                                      background: pts > 0 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 255, 255, 0.04)',
-                                      color: pts > 0 ? 'var(--color-gold-bright)' : 'var(--color-text-muted)',
-                                      border: pts > 0 ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid var(--color-border-subtle)',
-                                    }}
-                                  >
-                                    +{pts}
+                            {(() => {
+                              const submissionsForPlayer = (tournament.qualifierSubmissions || [])
+                                .filter(s => s.playerId === row.player.id)
+                                .sort((a, b) => a.submittedAt - b.submittedAt);
+                              const ptsResult = calculatePoints(submissionsForPlayer, tournament.pointsConfig || []);
+
+                              if (submissionsForPlayer.length === 0) {
+                                return <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>No submissions</span>;
+                              }
+
+                              if (ptsResult.totalPoints === 0) {
+                                const topScore = Math.max(...submissionsForPlayer.map(s => s.score));
+                                return (
+                                  <span className="tabular-nums" style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
+                                    Top Score: <strong style={{ color: 'var(--color-text-primary)' }}>{topScore.toLocaleString()}</strong>
                                   </span>
-                                ));
-                              })()}
-                            </div>
+                                );
+                              }
+
+                              return (
+                                <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+                                  {ptsResult.pointsPerAttempt.map((pts, pIdx) => (
+                                    <span
+                                      key={pIdx}
+                                      className="tabular-nums"
+                                      style={{
+                                        padding: '0.15rem 0.45rem',
+                                        borderRadius: 'var(--radius-sm)',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 700,
+                                        background: pts > 0 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 255, 255, 0.04)',
+                                        color: pts > 0 ? 'var(--color-gold-bright)' : 'var(--color-text-muted)',
+                                        border: pts > 0 ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid var(--color-border-subtle)',
+                                      }}
+                                    >
+                                      +{pts}
+                                    </span>
+                                  ))}
+                                </div>
+                              );
+                            })()}
                           </td>
 
                           {/* Total Points Column */}

@@ -628,11 +628,13 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           isComplete = true;
         }
 
-        const tiebreakerActive = Boolean(
-          hasTiebreaker ||
-          currentRecord.hasTiebreaker ||
-          cleanedGames.some(g => g.gameNumber > matchBestOf && (g.player1Points !== null || g.player2Points !== null || g.winnerPlayerId !== null))
+        const hasTiedGame = cleanedGames.some(
+          g => g.winnerPlayerId === 'TIE' || (g.player1Points !== null && g.player1Points === g.player2Points && g.player1Points > 0)
         );
+        const hasTiebreakerGames = cleanedGames.some(
+          g => g.gameNumber > matchBestOf && (g.player1Points !== null || g.player2Points !== null || g.winnerPlayerId !== null)
+        );
+        const tiebreakerActive = Boolean((hasTiebreaker || hasTiebreakerGames || hasTiedGame) && (hasTiedGame || hasTiebreakerGames));
 
         const updatedRecord: MatchScoreRecord = {
           ...currentRecord,
