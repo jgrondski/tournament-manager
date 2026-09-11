@@ -28,7 +28,9 @@ export function generateTraditionalBracket(
     throw new Error(`Traditional bracket requires at least 2 players, received ${players.length}`);
   }
 
-  const { tierId, bestOf = 3 } = options;
+  const { tierId, bestOf = 3, roundBestOfOverrides = {} } = options;
+  const getBestOfForRound = (r: number) => roundBestOfOverrides[r] ?? bestOf;
+
   const totalPlayers = players.length;
   const bracketSize = getNextPowerOfTwo(totalPlayers);
   const totalRounds = Math.log2(bracketSize);
@@ -62,7 +64,7 @@ export function generateTraditionalBracket(
       player2: { player: playerBySeed.get(2) ?? null },
       winnerId: null,
       loserId: null,
-      bestOf,
+      bestOf: getBestOfForRound(1),
       isBye: false,
     };
     matchesById[matchId] = m;
@@ -105,7 +107,7 @@ export function generateTraditionalBracket(
         loserId: null,
         nextMatchId,
         nextMatchSlot,
-        bestOf,
+        bestOf: getBestOfForRound(r),
         isBye: false,
       };
       roundMatches.push(match);
@@ -162,7 +164,7 @@ export function generateTraditionalBracket(
         loserId: null,
         nextMatchId: r2Match.id,
         nextMatchSlot: 1,
-        bestOf,
+        bestOf: getBestOfForRound(1),
         isBye: false,
       };
       round1Matches.push(match);
@@ -195,7 +197,7 @@ export function generateTraditionalBracket(
         loserId: null,
         nextMatchId: r2Match.id,
         nextMatchSlot: 2,
-        bestOf,
+        bestOf: getBestOfForRound(1),
         isBye: false,
       };
       round1Matches.push(match);

@@ -161,27 +161,75 @@ export function generateAdditionalFakePlayers(
 
 /**
  * Generate simulated qualifier scores for a tournament based on its capacity and format.
- * Generates scores for (total bracket capacity + 4 DNQ) players.
+ * Uses total bracket capacity + 1d6 extra players who won't make bracket play.
+ * Pulls from the global player pool first, keeping any already added players,
+ * and falling back to generic players if the global pool is empty or exhausted.
  */
-export function generateSimulatedQualifiers(tournament: Tournament): {
+export function generateSimulatedQualifiers(
+  tournament: Tournament,
+  globalPlayersPool: PlayerProfile[] = []
+): {
   players: PlayerProfile[];
   submissions: QualifierSubmission[];
 } {
-  const totalCapacity = tournament.tiers.reduce((acc, t) => acc + t.playerCount, 0);
-  const targetCount = Math.max(8, totalCapacity + 4);
+  const totalCapacity = tournament.tiers.reduce((acc, t) => acc + (t.playerCount || 0), 0);
+  const extra1d6 = Math.floor(Math.random() * 6) + 1; // 1d6 roll (1 to 6)
+  const targetCount = Math.max(8, totalCapacity + extra1d6);
 
-  const players = generateRealisticPlayers(targetCount, tournament.playersPool);
-  const submissions: QualifierSubmission[] = [];
+  // Preserve any competitors already added to the tournament
+  const players: PlayerProfile[] = [...(tournament.playersPool || [])];
+  const existingIds = new Set(players.map(p => p.id));
+  const existingNames = new Set(players.map(p => p.name.toLowerCase()));
+
+  // If more players needed, pull from global player pool first
+  if (players.length < targetCount && globalPlayersPool.length > 0) {
+    const availableFromGlobal = globalPlayersPool.filter(
+      p => !existingIds.has(p.id) && !existingNames.has(p.name.toLowerCase())
+    );
+
+    // Shuffle available global players randomly
+    const shuffledGlobal = [...availableFromGlobal].sort(() => Math.random() - 0.5);
+
+    for (const gp of shuffledGlobal) {
+      if (players.length >= targetCount) break;
+      players.push({ ...gp });
+      existingIds.add(gp.id);
+      existingNames.add(gp.name.toLowerCase());
+    }
+  }
+
+  // If still below targetCount, generate generic realistic players
+  if (players.length < targetCount) {
+    const needed = targetCount - players.length;
+    const genericPlayers = generateAdditionalFakePlayers(needed, players);
+    players.push(...genericPlayers);
+  }
+
+  // Preserve existing submissions and add simulated submissions for any player needing them
+  const existingSubmissions = tournament.qualifierSubmissions || [];
+  const existingSubmissionsByPlayer = new Map<string, QualifierSubmission[]>();
+  for (const sub of existingSubmissions) {
+    const list = existingSubmissionsByPlayer.get(sub.playerId) || [];
+    list.push(sub);
+    existingSubmissionsByPlayer.set(sub.playerId, list);
+  }
+
+  const submissions: QualifierSubmission[] = [...existingSubmissions];
   const baseTime = Date.now() - 3600000 * 4; // 4 hours ago
 
   const qualFormat = tournament.qualFormat || 'AVERAGE_OF_X';
   const targetAttempts = qualFormat === 'AVERAGE_OF_X' ? (tournament.qualAverageCount || 2) : 3;
 
   players.forEach((player, pIdx) => {
+    const existing = existingSubmissionsByPlayer.get(player.id) || [];
+    if (existing.length >= targetAttempts) {
+      return;
+    }
+
     // Top-seeded players have higher skill bias
     const skillMultiplier = 1 - (pIdx / players.length) * 0.45; // 1.0 down to 0.55
 
-    for (let attempt = 1; attempt <= targetAttempts; attempt++) {
+    for (let attempt = existing.length + 1; attempt <= targetAttempts; attempt++) {
       let score: number;
 
       if (qualFormat === 'HIGH_SCORE') {
@@ -310,13 +358,16 @@ export function simulateTournamentMatches(
  * Execute a full tournament simulation: seeds qualifiers if needed, locks tournament,
  * and simulates matches across all tiers.
  */
-export function runFullSimulation(tournament: Tournament): Tournament {
+export function runFullSimulation(
+  tournament: Tournament,
+  globalPlayersPool: PlayerProfile[] = []
+): Tournament {
   let tourney = { ...tournament };
 
   // 1. Seed qualifiers if fewer than total bracket capacity
   const totalCapacity = tourney.tiers.reduce((acc, t) => acc + t.playerCount, 0);
   if ((tourney.qualifierSubmissions?.length || 0) < totalCapacity) {
-    const { players, submissions } = generateSimulatedQualifiers(tourney);
+    const { players, submissions } = generateSimulatedQualifiers(tourney, globalPlayersPool);
     tourney = {
       ...tourney,
       playersPool: players,

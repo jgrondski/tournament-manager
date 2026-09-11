@@ -116,7 +116,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
 
               {format === 'AVERAGE_OF_X' && (
                 <>
-                  <th style={{ ...thStyle, minWidth: '240px', textAlign: 'center' }}>Target Attempts (Ao{targetX})</th>
+                  <th style={{ ...thStyle, minWidth: '240px', textAlign: 'center' }}>Top Scores (Ao{targetX})</th>
                   <th style={{ ...thStyle, width: '160px', textAlign: 'right' }}>Average Score</th>
                 </>
               )}

@@ -309,7 +309,11 @@ export function generateDraftBracketsForTournament(tournament: Tournament): Tour
 
     // If we have at least 2 players, generate fresh mathematical bracket
     if (seededPlayers.length >= 2) {
-      const options = { tierId: tier.id, bestOf: tier.bestOf };
+      const options = {
+        tierId: tier.id,
+        bestOf: tier.bestOf,
+        roundBestOfOverrides: tier.roundBestOfOverrides,
+      };
       const newBracket =
         tier.bracketType === 'FLAT'
           ? generateFlatBracket(seededPlayers, tier.flatWidth || 4, options)

@@ -46,6 +46,7 @@ export interface BracketStructure {
 export interface GenerateBracketOptions {
   tierId?: string;
   bestOf?: number;
+  roundBestOfOverrides?: Record<number, number>;
 }
 
 export const isMatchPlayable = (match: BracketMatch): boolean => {

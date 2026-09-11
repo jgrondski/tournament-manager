@@ -3,6 +3,7 @@ import { BracketMatch } from '../types';
 import { MatchScoreRecord } from '../../tournament/types';
 import { useTournament } from '../../tournament/store';
 import { X, Trophy, Check, ShieldAlert } from 'lucide-react';
+import { BestOfSelect } from './BestOfSelect';
 
 interface MatchScoreDrawerProps {
   isOpen: boolean;
@@ -69,6 +70,7 @@ export const MatchScoreDrawer: React.FC<MatchScoreDrawerProps> = ({
     if (!isNaN(num1) && !isNaN(num2)) {
       if (num1 > num2 && p1) updated[gameIndex].winner = p1.id;
       else if (num2 > num1 && p2) updated[gameIndex].winner = p2.id;
+      else if (num1 === num2) updated[gameIndex].winner = 'TIE';
     }
 
     setGames(updated);
@@ -168,29 +170,14 @@ export const MatchScoreDrawer: React.FC<MatchScoreDrawerProps> = ({
             </div>
           </div>
 
-          <div style={{ padding: '0 1rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>VS</span>
-            <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.25rem' }}>
-              {[3, 5, 7].map(bo => (
-                <button
-                  key={bo}
-                  onClick={() => handleBestOfChange(bo)}
-                  style={{
-                    padding: '0.2rem 0.5rem',
-                    fontSize: '0.7rem',
-                    fontWeight: 600,
-                    borderRadius: 'var(--radius-sm)',
-                    border: bestOf === bo ? '1px solid var(--color-gold)' : '1px solid var(--color-border)',
-                    background: bestOf === bo ? 'var(--color-gold-bg)' : 'transparent',
-                    color: bestOf === bo ? 'var(--color-gold-bright)' : 'var(--color-text-muted)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Bo{bo}
-                </button>
-              ))}
-            </div>
-            <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', marginTop: '0.2rem' }}>
+          <div style={{ padding: '0 0.75rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', fontWeight: 600, marginBottom: '0.35rem' }}>VS</span>
+            <BestOfSelect
+              value={bestOf}
+              onChange={handleBestOfChange}
+              compact={true}
+            />
+            <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', marginTop: '0.35rem' }}>
               First to {winThreshold}
             </span>
           </div>
@@ -234,9 +221,16 @@ export const MatchScoreDrawer: React.FC<MatchScoreDrawerProps> = ({
               return (
                 <div key={idx} style={gameRowCardStyle}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                      Game {idx + 1}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                        Game {idx + 1}
+                      </span>
+                      {game.winner === 'TIE' && (
+                        <span style={{ fontSize: '0.65rem', padding: '0.1rem 0.45rem', borderRadius: 'var(--radius-sm)', background: 'var(--color-cyan-bg)', color: 'var(--color-cyan)', fontWeight: 700, border: '1px solid rgba(6, 182, 212, 0.3)' }}>
+                          TIE (NO WIN)
+                        </span>
+                      )}
+                    </div>
                     {margin && (
                       <span style={{ fontSize: '0.7rem', color: 'var(--color-cyan)', fontFamily: 'var(--font-mono)' }}>
                         Δ {margin} pts
@@ -282,7 +276,27 @@ export const MatchScoreDrawer: React.FC<MatchScoreDrawerProps> = ({
                       />
                     </div>
 
-                    <span style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem', paddingTop: '1.2rem' }}>—</span>
+                    {/* Interactive TIE Button */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: '1.1rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleManualWinnerToggle(idx, 'TIE')}
+                        title={game.winner === 'TIE' ? 'Clear tie' : 'Declare Game as Tie (no win awarded)'}
+                        style={{
+                          padding: '0.2rem 0.5rem',
+                          fontSize: '0.7rem',
+                          fontWeight: 700,
+                          borderRadius: 'var(--radius-sm)',
+                          border: game.winner === 'TIE' ? '1px solid var(--color-cyan)' : '1px solid var(--color-border)',
+                          background: game.winner === 'TIE' ? 'var(--color-cyan-bg)' : 'transparent',
+                          color: game.winner === 'TIE' ? 'var(--color-cyan)' : 'var(--color-text-muted)',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        TIE
+                      </button>
+                    </div>
 
                     {/* Player 2 Input */}
                     <div>

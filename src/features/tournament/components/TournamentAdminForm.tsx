@@ -22,8 +22,10 @@ import {
   Search,
 } from 'lucide-react';
 import { generateTraditionalBracket, generateFlatBracket } from '../../bracket/math';
+import { BestOfSelect } from '../../bracket/components/BestOfSelect';
 import { ImportFromGlobalModal } from '../../players/components/ImportFromGlobalModal';
 import { PlayerEditModal } from '../../players/components/PlayerEditModal';
+import { getAvailableRoundsForTier, pruneInvalidRoundOverrides } from '../roundOverrides';
 
 interface TournamentAdminFormProps {
   tournament: Tournament;
@@ -56,7 +58,8 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
   const [date, setDate] = useState(tournament.date);
   const [location, setLocation] = useState(tournament.location);
   const [qualFormat, setQualFormat] = useState<QualFormat>(tournament.qualFormat || 'AVERAGE_OF_X');
-  const [qualAverageCount, setQualAverageCount] = useState<number>(tournament.qualAverageCount || 2);
+  const [qualAverageCount, setQualAverageCount] = useState<string>(String(tournament.qualAverageCount || 2));
+  const [avgCountError, setAvgCountError] = useState<string | null>(null);
   const [pointsConfig, setPointsConfig] = useState<PointsThreshold[]>(
     tournament.pointsConfig || [
       { minScore: 1200000, points: 100 },
@@ -111,7 +114,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
     if (date !== (tournament.date || '')) return true;
     if (location !== (tournament.location || '')) return true;
     if (qualFormat !== (tournament.qualFormat || 'AVERAGE_OF_X')) return true;
-    if (qualAverageCount !== (tournament.qualAverageCount || 2)) return true;
+    if (qualAverageCount !== String(tournament.qualAverageCount || 2)) return true;
 
     // Points config
     const initialPoints = tournament.pointsConfig || [
@@ -146,7 +149,8 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
         a.bestOf !== b.bestOf ||
         a.primaryColor !== b.primaryColor ||
         a.secondaryColor !== b.secondaryColor ||
-        a.flatWidth !== b.flatWidth
+        a.flatWidth !== b.flatWidth ||
+        JSON.stringify(a.roundBestOfOverrides || {}) !== JSON.stringify(b.roundBestOfOverrides || {})
       ) {
         return true;
       }
@@ -180,7 +184,8 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
       setDate(tournament.date || '');
       setLocation(tournament.location || '');
       setQualFormat(tournament.qualFormat || 'AVERAGE_OF_X');
-      setQualAverageCount(tournament.qualAverageCount || 2);
+      setQualAverageCount(String(tournament.qualAverageCount || 2));
+      setAvgCountError(null);
       setPointsConfig(
         tournament.pointsConfig || [
           { minScore: 1200000, points: 100 },
@@ -198,7 +203,8 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
     setDate(tournament.date || '');
     setLocation(tournament.location || '');
     setQualFormat(tournament.qualFormat || 'AVERAGE_OF_X');
-    setQualAverageCount(tournament.qualAverageCount || 2);
+    setQualAverageCount(String(tournament.qualAverageCount || 2));
+    setAvgCountError(null);
     setPointsConfig(
       tournament.pointsConfig || [
         { minScore: 1200000, points: 100 },
@@ -265,10 +271,18 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
   const updateTier = (index: number, updates: Partial<TournamentTier>) => {
     setTiers(prev => {
       const next = [...prev];
-      const target = { ...next[index], ...updates };
+      let target = { ...next[index], ...updates };
       // If name changed, derive slug
       if (updates.name && !updates.slug) {
         target.slug = updates.name.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-');
+      }
+      // If participant count or bracket structure changed, prune out-of-range round overrides
+      if (
+        updates.playerCount !== undefined ||
+        updates.bracketType !== undefined ||
+        updates.flatWidth !== undefined
+      ) {
+        target = pruneInvalidRoundOverrides(target);
       }
       next[index] = target;
       return next;
@@ -309,8 +323,16 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
 
       const newBracket =
         tier.bracketType === 'FLAT'
-          ? generateFlatBracket(dummyPlayers, tier.flatWidth || 4, { tierId: tier.id, bestOf: tier.bestOf })
-          : generateTraditionalBracket(dummyPlayers, { tierId: tier.id, bestOf: tier.bestOf });
+          ? generateFlatBracket(dummyPlayers, tier.flatWidth || 4, {
+              tierId: tier.id,
+              bestOf: tier.bestOf,
+              roundBestOfOverrides: tier.roundBestOfOverrides,
+            })
+          : generateTraditionalBracket(dummyPlayers, {
+              tierId: tier.id,
+              bestOf: tier.bestOf,
+              roundBestOfOverrides: tier.roundBestOfOverrides,
+            });
 
       return {
         ...tier,
@@ -318,13 +340,23 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
       };
     });
 
+    let parsedAvg = 2;
+    if (qualFormat === 'AVERAGE_OF_X') {
+      const parsed = parseInt(qualAverageCount, 10);
+      if (!qualAverageCount.trim() || isNaN(parsed) || parsed < 1) {
+        setAvgCountError('Please enter a valid attempt count (minimum 1)');
+        return null;
+      }
+      parsedAvg = parsed;
+    }
+
     updateTournament(tournament.id, {
       name,
       slug,
       date,
       location,
       qualFormat,
-      qualAverageCount,
+      qualAverageCount: parsedAvg,
       pointsConfig,
     });
 
@@ -335,7 +367,8 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    saveCurrentConfig();
+    const result = saveCurrentConfig();
+    if (!result) return;
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
     if (onSaved) onSaved();
@@ -583,12 +616,24 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
                 min={1}
                 max={10}
                 value={qualAverageCount}
-                onChange={e => setQualAverageCount(parseInt(e.target.value, 10) || 2)}
-                style={inputStyle}
+                onChange={e => {
+                  setQualAverageCount(e.target.value);
+                  if (avgCountError) setAvgCountError(null);
+                }}
+                style={{
+                  ...inputStyle,
+                  borderColor: avgCountError ? 'var(--color-red)' : inputStyle.borderColor,
+                }}
               />
-              <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                e.g. 2 for Average of 2, 3 for Average of 3
-              </span>
+              {avgCountError ? (
+                <div style={{ color: 'var(--color-red)', fontSize: '0.75rem', marginTop: '0.35rem' }}>
+                  {avgCountError}
+                </div>
+              ) : (
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                  e.g. 2 for Average of 2, 3 for Average of 3
+                </span>
+              )}
             </div>
           )}
 
@@ -848,17 +893,11 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
                   </div>
 
                   <div>
-                    <label style={labelStyle}>Best-of Default</label>
-                    <select
+                    <label style={labelStyle}>Best-of Default (Up to Bo99)</label>
+                    <BestOfSelect
                       value={tier.bestOf}
-                      onChange={e => updateTier(idx, { bestOf: parseInt(e.target.value, 10) || 3 })}
-                      style={inputStyle}
-                    >
-                      <option value={1}>Best of 1</option>
-                      <option value={3}>Best of 3</option>
-                      <option value={5}>Best of 5</option>
-                      <option value={7}>Best of 7</option>
-                    </select>
+                      onChange={val => updateTier(idx, { bestOf: val })}
+                    />
                   </div>
 
                   {/* Colors */}
@@ -881,6 +920,244 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
                       />
                     </div>
                   </div>
+                </div>
+
+                {/* Round-Specific Best-of Overrides */}
+                <div
+                  style={{
+                    marginTop: '1.25rem',
+                    paddingTop: '1rem',
+                    borderTop: '1px solid var(--color-border-subtle)',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: '0.75rem',
+                      flexWrap: 'wrap',
+                      gap: '0.5rem',
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                          Round-Specific Best-of Overrides
+                        </span>
+                        <span
+                          style={{
+                            fontSize: '0.7rem',
+                            padding: '0.1rem 0.45rem',
+                            borderRadius: 'var(--radius-full)',
+                            background: Object.keys(tier.roundBestOfOverrides || {}).length > 0 ? 'var(--color-gold-bg)' : 'var(--color-bg-base)',
+                            color: Object.keys(tier.roundBestOfOverrides || {}).length > 0 ? 'var(--color-gold-bright)' : 'var(--color-text-muted)',
+                            border: '1px solid var(--color-border-subtle)',
+                            fontWeight: 600,
+                          }}
+                        >
+                          {Object.keys(tier.roundBestOfOverrides || {}).length} configured
+                        </span>
+                      </div>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.15rem' }}>
+                        Override series format for specific rounds (e.g., Finals Bo7). Unconfigured rounds inherit default <strong>Bo{tier.bestOf}</strong>.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const availableRounds = getAvailableRoundsForTier(tier);
+                        const currentKeys = new Set(
+                          Object.keys(tier.roundBestOfOverrides || {}).map(k => parseInt(k, 10))
+                        );
+                        // Pick first round not yet overridden
+                        const nextRound = availableRounds.find(r => !currentKeys.has(r.roundNumber));
+                        if (nextRound) {
+                          updateTier(idx, {
+                            roundBestOfOverrides: {
+                              ...(tier.roundBestOfOverrides || {}),
+                              [nextRound.roundNumber]: tier.bestOf,
+                            },
+                          });
+                        }
+                      }}
+                      disabled={
+                        getAvailableRoundsForTier(tier).every(r =>
+                          (tier.roundBestOfOverrides || {})[r.roundNumber] !== undefined
+                        )
+                      }
+                      title={
+                        getAvailableRoundsForTier(tier).every(r =>
+                          (tier.roundBestOfOverrides || {})[r.roundNumber] !== undefined
+                        )
+                          ? 'All rounds in this bracket already have overrides configured'
+                          : 'Add a round-specific Best-of format override'
+                      }
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        padding: '0.35rem 0.65rem',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        borderRadius: 'var(--radius-sm)',
+                        border: '1px solid var(--color-border)',
+                        background: 'var(--color-bg-surface-elevated)',
+                        color: getAvailableRoundsForTier(tier).every(r =>
+                          (tier.roundBestOfOverrides || {})[r.roundNumber] !== undefined
+                        )
+                          ? 'var(--color-text-muted)'
+                          : 'var(--color-gold-bright)',
+                        cursor: getAvailableRoundsForTier(tier).every(r =>
+                          (tier.roundBestOfOverrides || {})[r.roundNumber] !== undefined
+                        )
+                          ? 'not-allowed'
+                          : 'pointer',
+                        opacity: getAvailableRoundsForTier(tier).every(r =>
+                          (tier.roundBestOfOverrides || {})[r.roundNumber] !== undefined
+                        )
+                          ? 0.5
+                          : 1,
+                      }}
+                    >
+                      <Plus size={14} /> Add Round Override
+                    </button>
+                  </div>
+
+                  {/* Override Rows List */}
+                  {Object.keys(tier.roundBestOfOverrides || {}).length === 0 ? (
+                    <div
+                      style={{
+                        padding: '0.6rem 0.75rem',
+                        borderRadius: 'var(--radius-sm)',
+                        background: 'var(--color-bg-base)',
+                        border: '1px dashed var(--color-border-subtle)',
+                        fontSize: '0.75rem',
+                        color: 'var(--color-text-muted)',
+                      }}
+                    >
+                      All rounds in this bracket currently inherit tier default <strong>Bo{tier.bestOf}</strong>.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      {(() => {
+                        const availableRounds = getAvailableRoundsForTier(tier);
+                        const entries = Object.entries(tier.roundBestOfOverrides || {})
+                          .map(([rStr, boVal]) => ({
+                            roundNumber: parseInt(rStr, 10),
+                            bestOf: boVal,
+                          }))
+                          .sort((a, b) => a.roundNumber - b.roundNumber);
+
+                        return entries.map(entry => {
+                          // Other rounds selected in different rows
+                          const otherAssignedRounds = new Set(
+                            entries
+                              .filter(e => e.roundNumber !== entry.roundNumber)
+                              .map(e => e.roundNumber)
+                          );
+
+                          // Single-use dropdown: only this round + unassigned rounds
+                          const selectableRounds = availableRounds.filter(
+                            r => r.roundNumber === entry.roundNumber || !otherAssignedRounds.has(r.roundNumber)
+                          );
+
+                          return (
+                            <div
+                              key={entry.roundNumber}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.75rem',
+                                padding: '0.5rem 0.75rem',
+                                background: 'var(--color-bg-base)',
+                                borderRadius: 'var(--radius-sm)',
+                                border: '1px solid var(--color-border-subtle)',
+                              }}
+                            >
+                              {/* Round dropdown (single inclusion invariant) */}
+                              <div style={{ flex: 1, minWidth: '170px' }}>
+                                <label style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', display: 'block', marginBottom: '0.2rem' }}>
+                                  Target Round
+                                </label>
+                                <select
+                                  value={entry.roundNumber}
+                                  onChange={e => {
+                                    const newRoundNumber = parseInt(e.target.value, 10);
+                                    if (newRoundNumber === entry.roundNumber) return;
+                                    const nextOverrides = { ...(tier.roundBestOfOverrides || {}) };
+                                    delete nextOverrides[entry.roundNumber];
+                                    nextOverrides[newRoundNumber] = entry.bestOf;
+                                    updateTier(idx, { roundBestOfOverrides: nextOverrides });
+                                  }}
+                                  style={inputStyle}
+                                >
+                                  {selectableRounds.map(r => (
+                                    <option key={r.roundNumber} value={r.roundNumber}>
+                                      {r.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              {/* BestOf Combobox (supporting up to Bo99) */}
+                              <div style={{ flex: 1, minWidth: '170px' }}>
+                                <label style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', display: 'block', marginBottom: '0.2rem' }}>
+                                  Format (Up to Bo99)
+                                </label>
+                                <BestOfSelect
+                                  value={entry.bestOf}
+                                  onChange={newBo => {
+                                    updateTier(idx, {
+                                      roundBestOfOverrides: {
+                                        ...(tier.roundBestOfOverrides || {}),
+                                        [entry.roundNumber]: newBo,
+                                      },
+                                    });
+                                  }}
+                                />
+                              </div>
+
+                              {/* Delete button */}
+                              <div style={{ paddingTop: '1.1rem' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const nextOverrides = { ...(tier.roundBestOfOverrides || {}) };
+                                    delete nextOverrides[entry.roundNumber];
+                                    updateTier(idx, { roundBestOfOverrides: nextOverrides });
+                                  }}
+                                  title="Remove round override"
+                                  style={{
+                                    padding: '0.45rem',
+                                    background: 'transparent',
+                                    border: '1px solid var(--color-border-subtle)',
+                                    borderRadius: 'var(--radius-sm)',
+                                    color: 'var(--color-text-muted)',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                  }}
+                                  onMouseEnter={e => {
+                                    e.currentTarget.style.color = 'var(--color-red)';
+                                    e.currentTarget.style.borderColor = 'var(--color-red)';
+                                  }}
+                                  onMouseLeave={e => {
+                                    e.currentTarget.style.color = 'var(--color-text-muted)';
+                                    e.currentTarget.style.borderColor = 'var(--color-border-subtle)';
+                                  }}
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -1101,16 +1378,11 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
                     <th style={{ padding: '0.65rem 0.85rem' }}>Country</th>
                     <th style={{ padding: '0.65rem 0.85rem' }}>Playstyle</th>
                     <th style={{ padding: '0.65rem 0.85rem' }}>Personal Best</th>
-                    <th style={{ padding: '0.65rem 0.85rem' }}>Qual Attempts</th>
-                    <th style={{ padding: '0.65rem 0.85rem' }}>Status</th>
                     <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredRoster.map((player, pIdx) => {
-                    const qualAttempts = (tournament.qualifierSubmissions || []).filter(
-                      s => s.playerId === player.id
-                    ).length;
                     return (
                       <tr
                         key={player.id}
@@ -1139,18 +1411,6 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
                         </td>
                         <td style={{ padding: '0.65rem 0.85rem', fontFamily: 'monospace' }}>
                           {player.personalBest ? player.personalBest.toLocaleString() : '—'}
-                        </td>
-                        <td style={{ padding: '0.65rem 0.85rem' }}>
-                          <span style={{ fontWeight: 600, color: qualAttempts > 0 ? 'var(--color-gold-bright)' : 'var(--color-text-muted)' }}>
-                            {qualAttempts} attempt{qualAttempts === 1 ? '' : 's'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '0.65rem 0.85rem' }}>
-                          {player.isDisqualified ? (
-                            <span style={{ color: '#f87171', fontSize: '0.7rem', fontWeight: 700 }}>DQ</span>
-                          ) : (
-                            <span style={{ color: '#4ade80', fontSize: '0.7rem', fontWeight: 600 }}>Active</span>
-                          )}
                         </td>
                         <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>
                           <button

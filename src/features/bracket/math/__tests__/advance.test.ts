@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateTraditionalBracket } from '../traditional';
-import { advanceMatchWinner } from '../advance';
+import { advanceMatchWinner, retractMatchWinner } from '../advance';
 import { SeededPlayer } from '../../types';
 
 function createMockPlayers(count: number): SeededPlayer[] {
@@ -116,5 +116,47 @@ describe('advanceMatchWinner', () => {
     bracket = advanceMatchWinner(bracket, 'r3-m1', 'player-2');
     expect(bracket.matchesById['r3-m1'].winnerId).toBe('player-2');
     expect(bracket.matchesById['r3-m1'].loserId).toBe('player-1');
+  });
+});
+
+describe('retractMatchWinner', () => {
+  it('clears match winner/loser and downstream feeder slot', () => {
+    const players = createMockPlayers(8);
+    let bracket = generateTraditionalBracket(players);
+
+    // Advance player 1 in r1-m1
+    bracket = advanceMatchWinner(bracket, 'r1-m1', 'player-1');
+    expect(bracket.matchesById['r1-m1'].winnerId).toBe('player-1');
+    expect(bracket.matchesById['r2-m1'].player1.player?.id).toBe('player-1');
+
+    // Retract r1-m1 winner
+    bracket = retractMatchWinner(bracket, 'r1-m1');
+    expect(bracket.matchesById['r1-m1'].winnerId).toBeNull();
+    expect(bracket.matchesById['r1-m1'].loserId).toBeNull();
+    expect(bracket.matchesById['r2-m1'].player1.player).toBeNull();
+  });
+
+  it('cascades retraction if downstream match had also declared a winner', () => {
+    const players = createMockPlayers(8);
+    let bracket = generateTraditionalBracket(players);
+
+    // Advance r1-m1 (player 1) and r1-m2 (player 4)
+    bracket = advanceMatchWinner(bracket, 'r1-m1', 'player-1');
+    bracket = advanceMatchWinner(bracket, 'r1-m2', 'player-4');
+
+    // Advance r2-m1 (player 1) into Finals r3-m1
+    bracket = advanceMatchWinner(bracket, 'r2-m1', 'player-1');
+    expect(bracket.matchesById['r3-m1'].player1.player?.id).toBe('player-1');
+
+    // Retract r1-m1 (player 1 winner undone)
+    bracket = retractMatchWinner(bracket, 'r1-m1');
+
+    // r1-m1 has no winner
+    expect(bracket.matchesById['r1-m1'].winnerId).toBeNull();
+    // r2-m1 lost player 1 and had its winner retracted
+    expect(bracket.matchesById['r2-m1'].player1.player).toBeNull();
+    expect(bracket.matchesById['r2-m1'].winnerId).toBeNull();
+    // r3-m1 (Finals) also had player 1 retracted
+    expect(bracket.matchesById['r3-m1'].player1.player).toBeNull();
   });
 });

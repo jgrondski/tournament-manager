@@ -17,7 +17,8 @@ export const TournamentSwitcherPage: React.FC = () => {
   const [newTourneyDate, setNewTourneyDate] = useState('');
   const [newTourneyLocation, setNewTourneyLocation] = useState('');
   const [newTourneyFormat, setNewTourneyFormat] = useState<QualFormat>('AVERAGE_OF_X');
-  const [newTourneyAvgCount, setNewTourneyAvgCount] = useState(2);
+  const [newTourneyAvgCount, setNewTourneyAvgCount] = useState('2');
+  const [avgCountError, setAvgCountError] = useState<string | null>(null);
 
   const hasRecordedScoresOrQuals = (t: Tournament): boolean => {
     const hasQuals = (t.qualifierSubmissions && t.qualifierSubmissions.length > 0) ||
@@ -83,13 +84,23 @@ export const TournamentSwitcherPage: React.FC = () => {
       },
     ];
 
+    let parsedAvgCount = 2;
+    if (newTourneyFormat === 'AVERAGE_OF_X') {
+      const parsed = parseInt(newTourneyAvgCount, 10);
+      if (!newTourneyAvgCount.trim() || isNaN(parsed) || parsed < 1) {
+        setAvgCountError('Please enter a valid attempt count (minimum 1)');
+        return;
+      }
+      parsedAvgCount = parsed;
+    }
+
     const created = createTournament({
       name: newTourneyName,
       slug: newTourneySlug,
       date: newTourneyDate || 'Upcoming',
       location: newTourneyLocation || 'TBD',
       qualFormat: newTourneyFormat,
-      qualAverageCount: newTourneyAvgCount,
+      qualAverageCount: parsedAvgCount,
       isLocked: false,
       tiers: initialTiers,
     });
@@ -491,9 +502,20 @@ export const TournamentSwitcherPage: React.FC = () => {
                     min={1}
                     max={10}
                     value={newTourneyAvgCount}
-                    onChange={e => setNewTourneyAvgCount(parseInt(e.target.value, 10) || 2)}
-                    style={modalInputStyle}
+                    onChange={e => {
+                      setNewTourneyAvgCount(e.target.value);
+                      if (avgCountError) setAvgCountError(null);
+                    }}
+                    style={{
+                      ...modalInputStyle,
+                      borderColor: avgCountError ? 'var(--color-red)' : modalInputStyle.borderColor,
+                    }}
                   />
+                  {avgCountError && (
+                    <div style={{ color: 'var(--color-red)', fontSize: '0.75rem', marginTop: '0.35rem' }}>
+                      {avgCountError}
+                    </div>
+                  )}
                 </div>
               )}
 

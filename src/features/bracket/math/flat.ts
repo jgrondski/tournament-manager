@@ -27,7 +27,8 @@ export function generateFlatBracket(
     throw new Error(`flatWidth must be >= 1, received ${flatWidth}`);
   }
 
-  const { tierId, bestOf = 3 } = options;
+  const { tierId, bestOf = 3, roundBestOfOverrides = {} } = options;
+  const getBestOfForRound = (r: number) => roundBestOfOverrides[r] ?? bestOf;
   const totalPlayers = players.length;
 
   // Map players by seed
@@ -99,7 +100,7 @@ export function generateFlatBracket(
         player2: { player: null },
         winnerId: null,
         loserId: null,
-        bestOf,
+        bestOf: getBestOfForRound(r),
         isBye: false,
       };
       roundMatches.push(match);

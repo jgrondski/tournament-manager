@@ -41,6 +41,7 @@ export interface TournamentTier {
   secondaryColor?: string;
   bracket: BracketStructure;
   isLocked: boolean;
+  roundBestOfOverrides?: Record<number, number>; // Key: roundNumber (1, 2, ...), Value: bestOf (1..99)
 }
 
 export interface QualifierSubmission {

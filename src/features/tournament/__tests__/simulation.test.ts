@@ -5,7 +5,7 @@ import {
   runFullSimulation,
   REALISTIC_PLAYER_NAMES,
 } from '../simulation';
-import { Tournament, TournamentTier } from '../types';
+import { Tournament, TournamentTier, PlayerProfile } from '../types';
 import { generateTraditionalBracket, generateFlatBracket } from '../../bracket/math';
 
 describe('Simulation Engine', () => {
@@ -87,20 +87,55 @@ describe('Simulation Engine', () => {
       isLocked: false,
     };
 
-    it('generates capacity + 4 competitors with correct attempt count', () => {
+    it('generates capacity + 1d6 competitors with correct attempt count', () => {
       const { players, submissions } = generateSimulatedQualifiers(mockTournament);
 
-      // Capacity is 8, so target count is 8 + 4 = 12
-      expect(players).toHaveLength(12);
+      // Capacity is 8, 1d6 adds 1..6, so total should be between 9 and 14
+      expect(players.length).toBeGreaterThanOrEqual(9);
+      expect(players.length).toBeLessThanOrEqual(14);
 
-      // AVERAGE_OF_X with count 2 should generate 2 submissions per competitor = 24 submissions
-      expect(submissions).toHaveLength(24);
+      // AVERAGE_OF_X with count 2 should generate 2 submissions per competitor
+      expect(submissions).toHaveLength(players.length * 2);
 
       submissions.forEach(sub => {
         expect(sub.tournamentId).toBe('tourney-test');
         expect(sub.score).toBeGreaterThan(0);
         expect(sub.submittedAt).toBeGreaterThan(0);
       });
+    });
+
+    it('pulls from global player pool if populated and preserves existing tournament players', () => {
+      const existingPlayer: PlayerProfile = {
+        id: 'p_existing_1',
+        name: 'Existing Champion',
+        personalBest: 1250000,
+        playstyle: 'Rolling',
+      };
+
+      const globalPool: PlayerProfile[] = [
+        { id: 'p_glob_1', name: 'Global Star A', personalBest: 1100000, playstyle: 'DAS' },
+        { id: 'p_glob_2', name: 'Global Star B', personalBest: 1150000, playstyle: 'Rolling' },
+        { id: 'p_glob_3', name: 'Global Star C', personalBest: 950000, playstyle: 'Hypertap' },
+      ];
+
+      const tourneyWithPlayer: Tournament = {
+        ...mockTournament,
+        playersPool: [existingPlayer],
+      };
+
+      const { players } = generateSimulatedQualifiers(tourneyWithPlayer, globalPool);
+
+      // Existing player MUST still be present
+      expect(players.some(p => p.id === 'p_existing_1')).toBe(true);
+
+      // Global players should be pulled in
+      const globalIds = new Set(globalPool.map(g => g.id));
+      const pulledGlobal = players.filter(p => globalIds.has(p.id));
+      expect(pulledGlobal.length).toBe(3);
+
+      // Total count should still be capacity (8) + 1d6 (1..6)
+      expect(players.length).toBeGreaterThanOrEqual(9);
+      expect(players.length).toBeLessThanOrEqual(14);
     });
 
     it('handles HIGH_SCORE mode with 3 attempts per player', () => {
@@ -110,8 +145,9 @@ describe('Simulation Engine', () => {
       };
 
       const { players, submissions } = generateSimulatedQualifiers(highScoreTourney);
-      expect(players).toHaveLength(12);
-      expect(submissions).toHaveLength(36); // 12 * 3 attempts
+      expect(players.length).toBeGreaterThanOrEqual(9);
+      expect(players.length).toBeLessThanOrEqual(14);
+      expect(submissions).toHaveLength(players.length * 3); // 3 attempts per player
     });
   });
 
@@ -171,9 +207,9 @@ describe('Simulation Engine', () => {
 
       const simulated = runFullSimulation(cleanTourney);
 
-      // 1. Should have seeded players (16 capacity + 4 DNQ = 20 players)
-      expect(simulated.playersPool.length).toBeGreaterThanOrEqual(20);
-      expect(simulated.qualifierSubmissions.length).toBeGreaterThanOrEqual(40);
+      // 1. Should have seeded players (16 capacity + 1d6 >= 17 players)
+      expect(simulated.playersPool.length).toBeGreaterThanOrEqual(17);
+      expect(simulated.qualifierSubmissions.length).toBeGreaterThanOrEqual(34);
 
       // 2. Tournament and all tiers should be locked
       expect(simulated.isLocked).toBe(true);
