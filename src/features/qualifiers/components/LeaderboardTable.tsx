@@ -164,7 +164,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                       title="Click to view detailed competitor profile, audit log, and match stats"
                       style={{
                         background: rowBg,
-                        borderBottom: '1px solid var(--color-border-subtle)',
+                        borderBottom: '1px solid rgba(0, 0, 0, 0.65)',
                         transition: 'all 0.15s ease',
                         cursor: 'pointer',
                       }}
@@ -357,9 +357,11 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                                 );
                               }
 
+                              const earnedPoints = ptsResult.pointsPerAttempt.filter(pts => pts > 0);
+
                               return (
                                 <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
-                                  {ptsResult.pointsPerAttempt.map((pts, pIdx) => (
+                                  {earnedPoints.map((pts, pIdx) => (
                                     <span
                                       key={pIdx}
                                       className="tabular-nums"
@@ -368,9 +370,9 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                                         borderRadius: 'var(--radius-sm)',
                                         fontSize: '0.75rem',
                                         fontWeight: 700,
-                                        background: pts > 0 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 255, 255, 0.04)',
-                                        color: pts > 0 ? 'var(--color-gold-bright)' : 'var(--color-text-muted)',
-                                        border: pts > 0 ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid var(--color-border-subtle)',
+                                        background: 'rgba(245, 158, 11, 0.15)',
+                                        color: 'var(--color-gold-bright)',
+                                        border: '1px solid rgba(245, 158, 11, 0.3)',
                                       }}
                                     >
                                       +{pts}

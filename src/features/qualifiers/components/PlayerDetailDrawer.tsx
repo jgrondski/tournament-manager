@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Tournament, PlayerProfile } from '../../tournament/types';
-import { LeaderboardRankRow, MAXOUT_THRESHOLD } from '../scoring';
-import { calculateGlobalStandings } from '../../tournament/standings';
+import { LeaderboardRankRow, MAXOUT_THRESHOLD, deriveLeaderboard } from '../scoring';
+import { calculateGlobalStandings, getRankOrdinal } from '../../tournament/standings';
 import { colorWithAlpha } from '../../bracket/colorUtils';
 import {
   X,
@@ -9,7 +9,6 @@ import {
   Trophy,
   Swords,
   Sparkles,
-  ShieldAlert,
   Flame,
   Clock,
 } from 'lucide-react';
@@ -29,25 +28,71 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
   tournament,
   rankRow,
 }) => {
-  // Determine if tournament has finished all bracket play
-  const isTournamentDone = useMemo(() => {
-    if (!tournament.isLocked || tournament.tiers.length === 0) return false;
-    return tournament.tiers.every(tier => {
-      const rounds = tier.bracket.rounds;
-      if (rounds.length === 0) return false;
-      const finalsMatch = rounds[rounds.length - 1]?.matches[0];
-      if (!finalsMatch) return false;
-      const record = tournament.matchScores[finalsMatch.id];
-      return Boolean(record?.isComplete || finalsMatch.winnerId || record?.winnerPlayerId);
-    });
-  }, [tournament]);
 
-  // Derive final standings position if tournament is completed
-  const globalStanding = useMemo(() => {
-    if (!player || !isTournamentDone) return null;
-    const standings = calculateGlobalStandings(tournament);
-    return standings.find(s => s.player.id === player.id) || null;
-  }, [isTournamentDone, tournament, player]);
+  // Derive leaderboard row so we have rank data even if caller didn't pass rankRow
+  const leaderboard = useMemo(() => deriveLeaderboard(tournament), [tournament]);
+  const effectiveRankRow = useMemo(() => {
+    if (!player) return undefined;
+    return rankRow || leaderboard.find(r => r.player.id === player.id);
+  }, [rankRow, leaderboard, player]);
+
+  // Derive global standings for the player
+  const globalStandings = useMemo(() => calculateGlobalStandings(tournament), [tournament]);
+  const effectiveStanding = useMemo(() => {
+    if (!player) return null;
+    return globalStandings.find(s => s.player.id === player.id) || null;
+  }, [globalStandings, player]);
+
+  // Dedicated permanent metrics
+  const overallQualSeed = useMemo(() => {
+    if (!effectiveRankRow) return '—';
+    if (effectiveRankRow.isDisqualified) return 'DQ';
+    if (effectiveRankRow.attempts.length === 0 && effectiveRankRow.finalScore === 0) {
+      const hasSubs = (tournament.qualifierSubmissions || []).some(s => s.playerId === player?.id);
+      if (!hasSubs) return '—';
+    }
+    return typeof effectiveRankRow.rank === 'number' ? `#${effectiveRankRow.rank}` : String(effectiveRankRow.rank);
+  }, [effectiveRankRow, tournament.qualifierSubmissions, player?.id]);
+
+  const bracketSeed = useMemo(() => {
+    if (!tournament.isLocked || !effectiveRankRow) return '—';
+    if (effectiveRankRow.assignedTier && effectiveRankRow.tierSeed !== undefined) {
+      return `${effectiveRankRow.assignedTier.name} #${effectiveRankRow.tierSeed}`;
+    }
+    return '—';
+  }, [tournament.isLocked, effectiveRankRow]);
+
+  const finalPlace = useMemo(() => {
+    if (!tournament.isLocked) return '—';
+    if (effectiveRankRow?.isDisqualified) return 'DQ';
+
+    if (effectiveRankRow?.isDNQ) {
+      if (typeof effectiveRankRow.rank === 'number') {
+        return `${getRankOrdinal(effectiveRankRow.rank)} (DNQ)`;
+      }
+      return 'DNQ';
+    }
+
+    if (effectiveStanding) {
+      if (effectiveStanding.eliminationRound !== 'Bracket Participant') {
+        if (typeof effectiveStanding.finalRank === 'number') {
+          return getRankOrdinal(effectiveStanding.finalRank);
+        }
+        return String(effectiveStanding.finalRank);
+      }
+    }
+    return '—';
+  }, [tournament.isLocked, effectiveRankRow, effectiveStanding]);
+
+  const assignedTierDisplay = useMemo(() => {
+    if (effectiveRankRow?.assignedTier) {
+      return tournament.isLocked
+        ? effectiveRankRow.assignedTier.name
+        : `${effectiveRankRow.assignedTier.name} (Projected)`;
+    }
+    if (effectiveRankRow?.isDNQ) return 'DNQ';
+    return '—';
+  }, [effectiveRankRow, tournament.isLocked]);
 
   // Chronological qualifier submissions (earliest at top, latest on bottom)
   const playerSubmissions = useMemo(() => {
@@ -148,7 +193,7 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
     ? Math.round(totalGamePoints / gamesWithPointsCount)
     : 0;
 
-  const tierColor = rankRow?.assignedTier?.primaryColor || '#f59e0b';
+  const tierColor = effectiveRankRow?.assignedTier?.primaryColor || '#f59e0b';
 
   return (
     <div style={overlayStyle}>
@@ -157,8 +202,8 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
         <div style={headerStyle}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
-              {/* Placement / Seed Badge Lifecycle */}
-              {isTournamentDone && globalStanding ? (
+              {/* Final Place Badge (if determined) */}
+              {finalPlace !== '—' && (
                 <span
                   style={{
                     display: 'inline-flex',
@@ -166,47 +211,20 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
                     gap: '0.3rem',
                     padding: '0.2rem 0.6rem',
                     borderRadius: 'var(--radius-full)',
-                    background: globalStanding.finalRank === 1 ? 'rgba(245, 158, 11, 0.25)' : 'rgba(255, 255, 255, 0.08)',
-                    color: globalStanding.finalRank === 1 ? 'var(--color-gold-bright)' : 'var(--color-text-primary)',
-                    border: globalStanding.finalRank === 1 ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid var(--color-border)',
+                    background: effectiveStanding?.finalRank === 1 ? 'rgba(245, 158, 11, 0.25)' : 'rgba(255, 255, 255, 0.08)',
+                    color: effectiveStanding?.finalRank === 1 ? 'var(--color-gold-bright)' : 'var(--color-text-primary)',
+                    border: effectiveStanding?.finalRank === 1 ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid var(--color-border)',
                     fontSize: '0.78rem',
                     fontWeight: 700,
                   }}
                 >
                   <Trophy size={12} />
-                  Final Rank #{globalStanding.finalRank}
+                  Final: {finalPlace}
                 </span>
-              ) : tournament.isLocked ? (
-                /* Match play in progress: display Qual Seed */
-                rankRow?.assignedTier && rankRow.tierSeed !== undefined ? (
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.3rem',
-                      padding: '0.2rem 0.6rem',
-                      borderRadius: 'var(--radius-full)',
-                      background: colorWithAlpha(tierColor, 0.2, 'rgba(245, 158, 11, 0.15)'),
-                      color: tierColor,
-                      border: `1px solid ${colorWithAlpha(tierColor, 0.4, 'transparent')}`,
-                      fontSize: '0.78rem',
-                      fontWeight: 700,
-                    }}
-                  >
-                    <Flame size={12} />
-                    Qual Seed #{rankRow.tierSeed} ({rankRow.assignedTier.name})
-                  </span>
-                ) : rankRow?.isDNQ ? (
-                  <span className="badge badge-muted" style={{ background: 'rgba(100, 116, 139, 0.2)', color: '#94a3b8' }}>
-                    DNQ (Seed #{rankRow.globalRank || rankRow.rank})
-                  </span>
-                ) : (
-                  <span className="badge badge-muted">
-                    Qual Seed #{rankRow?.tierSeed || rankRow?.globalRank || rankRow?.rank || '—'}
-                  </span>
-                )
-              ) : rankRow?.assignedTier && rankRow.tierSeed !== undefined ? (
-                /* Qualifiers mode */
+              )}
+
+              {/* Bracket Seed Badge (if locked and assigned to a tier) */}
+              {bracketSeed !== '—' && (
                 <span
                   style={{
                     display: 'inline-flex',
@@ -222,19 +240,27 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
                   }}
                 >
                   <Flame size={12} />
-                  {rankRow.assignedTier.name} #{rankRow.tierSeed}
+                  Bracket: {bracketSeed}
                 </span>
-              ) : rankRow?.isDisqualified ? (
-                <span className="badge badge-muted" style={{ color: '#f87171', background: 'rgba(239, 68, 68, 0.18)' }}>
-                  <ShieldAlert size={12} /> Disqualified
-                </span>
-              ) : rankRow?.isDNQ ? (
-                <span className="badge badge-muted" style={{ background: 'rgba(100, 116, 139, 0.2)', color: '#94a3b8' }}>
-                  DNQ (Rank #{rankRow.rank})
-                </span>
-              ) : (
-                <span className="badge badge-muted">
-                  Qual Rank #{rankRow?.rank ?? '—'}
+              )}
+
+              {/* Overall Qual Seed Badge (if qualified/ranked) */}
+              {overallQualSeed !== '—' && (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.3rem',
+                    padding: '0.2rem 0.6rem',
+                    borderRadius: 'var(--radius-full)',
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    color: 'var(--color-text-secondary)',
+                    border: '1px solid var(--color-border)',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                  }}
+                >
+                  Qual: {overallQualSeed}
                 </span>
               )}
 
@@ -306,10 +332,10 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
               <h3 style={sectionTitleStyle}>Competitor Profile</h3>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
               <div style={statBoxStyle}>
                 <span style={statLabelStyle}>Personal Best</span>
-                <span className="tabular-nums" style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-gold-bright)' }}>
+                <span className="tabular-nums" style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--color-gold-bright)' }}>
                   {player.personalBest ? player.personalBest.toLocaleString() : '—'}
                 </span>
               </div>
@@ -322,22 +348,30 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
               </div>
 
               <div style={statBoxStyle}>
-                <span style={statLabelStyle}>
-                  {isTournamentDone ? 'Final Rank' : tournament.isLocked ? 'Qual Seed' : 'Qual Rank'}
-                </span>
-                <span style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                  {isTournamentDone && globalStanding
-                    ? `#${globalStanding.finalRank} (${globalStanding.rankLabel})`
-                    : tournament.isLocked
-                    ? rankRow?.tierSeed ? `Tier Seed #${rankRow.tierSeed}` : `Global #${rankRow?.globalRank || rankRow?.rank || '—'}`
-                    : `Rank #${rankRow?.rank || '—'}`}
+                <span style={statLabelStyle}>Assigned Tier</span>
+                <span style={{ fontSize: '0.95rem', fontWeight: 600, color: effectiveRankRow?.assignedTier ? tierColor : 'var(--color-text-muted)' }}>
+                  {assignedTierDisplay}
                 </span>
               </div>
 
               <div style={statBoxStyle}>
-                <span style={statLabelStyle}>Assigned Tier</span>
-                <span style={{ fontSize: '0.95rem', fontWeight: 600, color: rankRow?.assignedTier ? tierColor : 'var(--color-text-muted)' }}>
-                  {rankRow?.assignedTier?.name || (rankRow?.isDNQ ? 'DNQ' : 'Pending')}
+                <span style={statLabelStyle}>Overall Qual Seed</span>
+                <span className="tabular-nums" style={{ fontSize: '1.05rem', fontWeight: 700, color: overallQualSeed !== '—' ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
+                  {overallQualSeed}
+                </span>
+              </div>
+
+              <div style={statBoxStyle}>
+                <span style={statLabelStyle}>Bracket Seed</span>
+                <span style={{ fontSize: '0.95rem', fontWeight: 600, color: bracketSeed !== '—' ? tierColor : 'var(--color-text-muted)' }}>
+                  {bracketSeed}
+                </span>
+              </div>
+
+              <div style={statBoxStyle}>
+                <span style={statLabelStyle}>Final Place</span>
+                <span style={{ fontSize: '0.95rem', fontWeight: 700, color: finalPlace !== '—' ? (effectiveStanding?.finalRank === 1 ? 'var(--color-gold-bright)' : 'var(--color-text-primary)') : 'var(--color-text-muted)' }}>
+                  {finalPlace}
                 </span>
               </div>
             </div>
@@ -349,164 +383,7 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
             )}
           </div>
 
-          {/* Section 2: Qual Submissions Audit Log */}
-          <div style={cardSectionStyle}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Trophy size={16} color="var(--color-gold-bright)" />
-                <h3 style={sectionTitleStyle}>Qual Submissions</h3>
-              </div>
-              <span className="tabular-nums" style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                {playerSubmissions.length} {playerSubmissions.length === 1 ? 'submission' : 'submissions'} logged
-              </span>
-            </div>
-
-            {playerSubmissions.length === 0 ? (
-              <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
-                No qual submissions logged yet.
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {playerSubmissions.map((sub, idx) => {
-                  const isMaxout = sub.score >= MAXOUT_THRESHOLD;
-                  const isKicker = tournament.qualFormat === 'HIGH_SCORE' && sub.score === rankRow?.kickerScore && sub.score < MAXOUT_THRESHOLD;
-                  const isBest = tournament.qualFormat === 'HIGH_SCORE' && sub.score === rankRow?.finalScore;
-
-                  return (
-                    <div
-                      key={sub.id}
-                      style={{
-                        padding: '0.65rem 0.85rem',
-                        borderRadius: 'var(--radius-sm)',
-                        background: isMaxout
-                          ? 'rgba(245, 158, 11, 0.12)'
-                          : isKicker
-                          ? 'rgba(56, 189, 248, 0.08)'
-                          : 'var(--color-bg-surface)',
-                        border: isMaxout
-                          ? '1px solid rgba(245, 158, 11, 0.35)'
-                          : isKicker
-                          ? '1px solid rgba(56, 189, 248, 0.25)'
-                          : '1px solid var(--color-border-subtle)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                        <div
-                          className="tabular-nums"
-                          style={{
-                            width: '24px',
-                            height: '24px',
-                            borderRadius: '50%',
-                            background: 'var(--color-bg-surface-elevated)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            color: 'var(--color-text-muted)',
-                          }}
-                        >
-                          {idx + 1}
-                        </div>
-
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                            <span className="tabular-nums" style={{ fontWeight: 700, fontSize: '0.95rem', color: isMaxout ? 'var(--color-gold-bright)' : '#ffffff' }}>
-                              {sub.score.toLocaleString()}
-                            </span>
-
-                            {isMaxout && (
-                              <span
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '0.2rem',
-                                  padding: '0.1rem 0.4rem',
-                                  borderRadius: 'var(--radius-sm)',
-                                  background: 'rgba(245, 158, 11, 0.25)',
-                                  color: 'var(--color-gold-bright)',
-                                  fontSize: '0.68rem',
-                                  fontWeight: 800,
-                                }}
-                              >
-                                <Sparkles size={11} /> MAXOUT
-                              </span>
-                            )}
-
-                            {isKicker && (
-                              <span
-                                style={{
-                                  padding: '0.1rem 0.4rem',
-                                  borderRadius: 'var(--radius-sm)',
-                                  background: 'rgba(56, 189, 248, 0.2)',
-                                  color: '#38bdf8',
-                                  fontSize: '0.68rem',
-                                  fontWeight: 700,
-                                }}
-                              >
-                                KICKER
-                              </span>
-                            )}
-
-                            {isBest && !isMaxout && (
-                              <span
-                                style={{
-                                  padding: '0.1rem 0.4rem',
-                                  borderRadius: 'var(--radius-sm)',
-                                  background: 'rgba(255, 255, 255, 0.08)',
-                                  color: 'var(--color-text-secondary)',
-                                  fontSize: '0.68rem',
-                                  fontWeight: 600,
-                                }}
-                              >
-                                Best
-                              </span>
-                            )}
-                          </div>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '0.1rem' }}>
-                            <Clock size={11} />
-                            <span>
-                              {new Date(sub.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              {' • '}
-                              {new Date(sub.submittedAt).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Format Result Contribution */}
-                      <div style={{ textAlign: 'right' }}>
-                        {tournament.qualFormat === 'POINTS' ? (
-                          <span className="tabular-nums" style={{ fontWeight: 700, color: 'var(--color-gold-bright)', fontSize: '0.85rem' }}>
-                            {/* Points earned */}
-                            {(() => {
-                              const sorted = [...(tournament.pointsConfig || [])].sort((a, b) => b.minScore - a.minScore);
-                              const match = sorted.find(t => sub.score >= t.minScore);
-                              return match ? `+${match.points} pts` : '+0 pts';
-                            })()}
-                          </span>
-                        ) : tournament.qualFormat === 'HIGH_SCORE' ? (
-                          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                            {isMaxout ? 'Maxout' : isKicker ? 'Kicker' : 'Attempt'}
-                          </span>
-                        ) : (
-                          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                            Logged
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Section 3: Tournament Match Play History */}
+          {/* Section 2: Tournament Match Play History */}
           <div style={cardSectionStyle}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -642,6 +519,163 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+
+          {/* Section 3: Qual Submissions Audit Log */}
+          <div style={cardSectionStyle}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Trophy size={16} color="var(--color-gold-bright)" />
+                <h3 style={sectionTitleStyle}>Qual Submissions</h3>
+              </div>
+              <span className="tabular-nums" style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                {playerSubmissions.length} {playerSubmissions.length === 1 ? 'submission' : 'submissions'} logged
+              </span>
+            </div>
+
+            {playerSubmissions.length === 0 ? (
+              <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
+                No qual submissions logged yet.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {playerSubmissions.map((sub, idx) => {
+                  const isMaxout = sub.score >= MAXOUT_THRESHOLD;
+                  const isKicker = tournament.qualFormat === 'HIGH_SCORE' && sub.score === effectiveRankRow?.kickerScore && sub.score < MAXOUT_THRESHOLD;
+                  const isBest = tournament.qualFormat === 'HIGH_SCORE' && sub.score === effectiveRankRow?.finalScore;
+
+                  return (
+                    <div
+                      key={sub.id}
+                      style={{
+                        padding: '0.65rem 0.85rem',
+                        borderRadius: 'var(--radius-sm)',
+                        background: isMaxout
+                          ? 'rgba(245, 158, 11, 0.12)'
+                          : isKicker
+                          ? 'rgba(56, 189, 248, 0.08)'
+                          : 'var(--color-bg-surface)',
+                        border: isMaxout
+                          ? '1px solid rgba(245, 158, 11, 0.35)'
+                          : isKicker
+                          ? '1px solid rgba(56, 189, 248, 0.25)'
+                          : '1px solid var(--color-border-subtle)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                        <div
+                          className="tabular-nums"
+                          style={{
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '50%',
+                            background: 'var(--color-bg-surface-elevated)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            color: 'var(--color-text-muted)',
+                          }}
+                        >
+                          {idx + 1}
+                        </div>
+
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <span className="tabular-nums" style={{ fontWeight: 700, fontSize: '0.95rem', color: isMaxout ? 'var(--color-gold-bright)' : '#ffffff' }}>
+                              {sub.score.toLocaleString()}
+                            </span>
+
+                            {isMaxout && (
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.2rem',
+                                  padding: '0.1rem 0.4rem',
+                                  borderRadius: 'var(--radius-sm)',
+                                  background: 'rgba(245, 158, 11, 0.25)',
+                                  color: 'var(--color-gold-bright)',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 800,
+                                }}
+                              >
+                                <Sparkles size={11} /> MAXOUT
+                              </span>
+                            )}
+
+                            {isKicker && (
+                              <span
+                                style={{
+                                  padding: '0.1rem 0.4rem',
+                                  borderRadius: 'var(--radius-sm)',
+                                  background: 'rgba(56, 189, 248, 0.2)',
+                                  color: '#38bdf8',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 700,
+                                }}
+                              >
+                                KICKER
+                              </span>
+                            )}
+
+                            {isBest && !isMaxout && (
+                              <span
+                                style={{
+                                  padding: '0.1rem 0.4rem',
+                                  borderRadius: 'var(--radius-sm)',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: 'var(--color-text-secondary)',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 600,
+                                }}
+                              >
+                                Best
+                              </span>
+                            )}
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '0.1rem' }}>
+                            <Clock size={11} />
+                            <span>
+                              {new Date(sub.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              {' • '}
+                              {new Date(sub.submittedAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Format Result Contribution */}
+                      <div style={{ textAlign: 'right' }}>
+                        {tournament.qualFormat === 'POINTS' ? (
+                          <span className="tabular-nums" style={{ fontWeight: 700, color: 'var(--color-gold-bright)', fontSize: '0.85rem' }}>
+                            {/* Points earned */}
+                            {(() => {
+                              const sorted = [...(tournament.pointsConfig || [])].sort((a, b) => b.minScore - a.minScore);
+                              const match = sorted.find(t => sub.score >= t.minScore);
+                              return match ? `+${match.points} pts` : '+0 pts';
+                            })()}
+                          </span>
+                        ) : tournament.qualFormat === 'HIGH_SCORE' ? (
+                          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                            {isMaxout ? 'Maxout' : isKicker ? 'Kicker' : 'Attempt'}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                            Logged
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

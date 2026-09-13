@@ -229,7 +229,30 @@ export function generateSimulatedQualifiers(
     // Top-seeded players have higher skill bias
     const skillMultiplier = 1 - (pIdx / players.length) * 0.45; // 1.0 down to 0.55
 
-    for (let attempt = existing.length + 1; attempt <= targetAttempts; attempt++) {
+    let playerTargetAttempts = targetAttempts;
+    let isLegendaryPointsRun = false;
+
+    if (qualFormat === 'POINTS') {
+      // Points qualifiers allow multiple attempts.
+      // Top seeds typically play 4-6 attempts.
+      // Occasionally (~20% chance for #1 seed, or ~8% for seeds 2-3), a top player has a monster run reaching the 60s or 70s in total points.
+      if ((pIdx === 0 && Math.random() < 0.20) || (pIdx > 0 && pIdx < 3 && Math.random() < 0.08)) {
+        isLegendaryPointsRun = true;
+        playerTargetAttempts = Math.random() < 0.5 ? 6 : 7;
+      } else if (pIdx < 4) {
+        playerTargetAttempts = 5;
+      } else if (pIdx < Math.floor(players.length * 0.5)) {
+        playerTargetAttempts = 4;
+      } else {
+        playerTargetAttempts = 3;
+      }
+    }
+
+    if (existing.length >= playerTargetAttempts) {
+      return;
+    }
+
+    for (let attempt = existing.length + 1; attempt <= playerTargetAttempts; attempt++) {
       let score: number;
 
       if (qualFormat === 'HIGH_SCORE') {
@@ -251,7 +274,14 @@ export function generateSimulatedQualifiers(
           score = Math.floor(750000 + Math.random() * 245000); // 750,000 to 995,000
         }
       } else if (qualFormat === 'POINTS') {
-        score = Math.floor((600000 + Math.random() * 650000) * skillMultiplier);
+        if (isLegendaryPointsRun) {
+          // Scores between 1,600,000 and 2,150,000 (earning 9, 10, 11, or 13 points each, totaling 60-75 points)
+          score = Math.floor(1600000 + Math.random() * 550000);
+        } else {
+          // Standard points distribution: can hit higher thresholds for top seeds
+          const baseScore = 700000 + Math.random() * 1150000; // 700,000 to 1,850,000
+          score = Math.floor(baseScore * skillMultiplier);
+        }
       } else {
         // AVERAGE_OF_X
         score = Math.floor((650000 + Math.random() * 550000) * skillMultiplier);

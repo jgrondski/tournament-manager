@@ -568,8 +568,8 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
                         : section.isDNQ
                         ? 'rgba(100, 116, 139, 0.12)'
                         : colorWithAlpha(section.color, 0.1, 'rgba(245, 158, 11, 0.08)'),
-                      borderTop: '2px solid var(--color-border)',
-                      borderBottom: '1px solid var(--color-border)',
+                      borderTop: '2px solid rgba(0, 0, 0, 0.75)',
+                      borderBottom: '1px solid rgba(0, 0, 0, 0.65)',
                     }}
                   >
                     <td
@@ -629,20 +629,25 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
                     const isPositiveDelta = typeof delta === 'number' && delta > 0;
                     const isNegativeDelta = typeof delta === 'number' && delta < 0;
 
+                    let rowBg = idx % 2 === 0 ? 'var(--color-bg-surface)' : 'var(--color-bg-surface-elevated)';
+                    if (isOverallChamp) {
+                      rowBg = 'rgba(245, 158, 11, 0.16)';
+                    } else if (row.isDisqualified) {
+                      rowBg = 'rgba(239, 68, 68, 0.06)';
+                    } else if (row.isDNQ) {
+                      rowBg = idx % 2 === 0 ? 'var(--color-bg-surface)' : 'var(--color-bg-surface-elevated)';
+                    } else if (tierColor) {
+                      rowBg = isTierChamp || isRunnerUp
+                        ? colorWithAlpha(tierColor, 0.12, `${tierColor}18`)
+                        : `${tierColor}0d`; // Matching quals row tint
+                    }
+
                     return (
                       <tr
                         key={row.player.id}
                         style={{
-                          background: isOverallChamp
-                            ? 'rgba(245, 158, 11, 0.12)'
-                            : isRunnerUp
-                            ? 'rgba(56, 189, 248, 0.08)'
-                            : isTierChamp
-                            ? colorWithAlpha(tierColor, 0.08, 'rgba(245, 158, 11, 0.06)')
-                            : idx % 2 === 0
-                            ? 'var(--color-bg-surface)'
-                            : 'var(--color-bg-surface-elevated)',
-                          borderBottom: '1px solid var(--color-border-subtle)',
+                          background: rowBg,
+                          borderBottom: '1px solid rgba(0, 0, 0, 0.65)',
                           transition: 'background 0.15s ease',
                         }}
                       >
