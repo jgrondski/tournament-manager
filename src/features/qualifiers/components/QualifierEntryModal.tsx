@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Tournament, PlayerProfile } from '../../tournament/types';
 import { useTournament } from '../../tournament/store';
 import { CreatablePlayerSelect } from './CreatablePlayerSelect';
-import { Trophy, Plus, Trash2, X, AlertOctagon, CheckCircle2 } from 'lucide-react';
+import { Trophy, Plus, Trash2, X } from 'lucide-react';
 
 interface QualifierEntryModalProps {
   isOpen: boolean;
@@ -17,11 +17,8 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
 }) => {
   const {
     addPlayerToPool,
-    updatePlayerInPool,
     submitQualifierScore,
     deleteQualifierScore,
-    togglePlayerDisqualification,
-    togglePlayerQualsCompleted,
     globalPlayers,
     importPlayersToTournament,
   } = useTournament();
@@ -30,12 +27,6 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
     tournament.playersPool[0] || null
   );
   const [scoreInput, setScoreInput] = useState<string>('');
-  const [pbInput, setPbInput] = useState<string>(
-    selectedPlayer?.personalBest ? String(selectedPlayer.personalBest) : ''
-  );
-  const [playstyleInput, setPlaystyleInput] = useState<'DAS' | 'Rolling' | 'Hypertap'>(
-    selectedPlayer?.playstyle || 'Rolling'
-  );
 
   if (!isOpen) return null;
 
@@ -44,25 +35,16 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
     s => s.playerId === selectedPlayer?.id
   );
 
-  const isDQ = Boolean(selectedPlayer?.isDisqualified);
-  const isCompleted = Boolean(
-    selectedPlayer && tournament.tournamentPlayers[selectedPlayer.id]?.qualsCompleted
-  );
-
   const numericScore = parseInt(scoreInput, 10);
   const isScoreValid = Boolean(selectedPlayer) && !isNaN(numericScore) && numericScore > 0;
 
   const handlePlayerSelected = (player: PlayerProfile) => {
     setSelectedPlayer(player);
-    setPbInput(player.personalBest ? String(player.personalBest) : '');
-    setPlaystyleInput(player.playstyle || 'Rolling');
   };
 
   const handleSelectGlobalPlayer = (player: PlayerProfile) => {
     importPlayersToTournament(tournament.id, [player]);
     setSelectedPlayer(player);
-    setPbInput(player.personalBest ? String(player.personalBest) : '');
-    setPlaystyleInput(player.playstyle || 'Rolling');
   };
 
   const handleCreatePlayer = (name: string): PlayerProfile => {
@@ -85,15 +67,6 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
 
     submitQualifierScore(tournament.id, selectedPlayer.id, numericScore);
     setScoreInput('');
-  };
-
-  const handleUpdatePlayerMeta = () => {
-    if (!selectedPlayer) return;
-    const pbNum = parseInt(pbInput.replace(/\D/g, ''), 10) || selectedPlayer.personalBest;
-    updatePlayerInPool(tournament.id, selectedPlayer.id, {
-      personalBest: pbNum,
-      playstyle: playstyleInput,
-    });
   };
 
   return (
@@ -175,7 +148,7 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
         <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', maxHeight: '75vh', overflowY: 'auto' }}>
           {/* 1. Player Selection */}
           <div>
-            <label style={labelStyle}>Competitor (Creatable Combobox)</label>
+            <label style={labelStyle}>Competitor</label>
             <CreatablePlayerSelect
               playersPool={tournament.playersPool}
               globalPlayers={globalPlayers}
@@ -193,99 +166,7 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
 
           {selectedPlayer && (
             <>
-              {/* 2. Player Status Toggles (DQ & Quals Complete) */}
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '0.75rem',
-                  padding: '0.85rem',
-                  background: 'var(--color-bg-surface-elevated)',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--color-border)',
-                  flexWrap: 'wrap',
-                }}
-              >
-                {/* DQ Toggle */}
-                <button
-                  type="button"
-                  onClick={() =>
-                    togglePlayerDisqualification(tournament.id, selectedPlayer.id, !isDQ)
-                  }
-                  style={{
-                    padding: '0.4rem 0.75rem',
-                    borderRadius: 'var(--radius-sm)',
-                    border: isDQ ? '1px solid var(--color-red)' : '1px solid var(--color-border)',
-                    background: isDQ ? 'var(--color-red-bg)' : 'transparent',
-                    color: isDQ ? '#f87171' : 'var(--color-text-secondary)',
-                    fontSize: '0.8rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                  }}
-                >
-                  <AlertOctagon size={14} />
-                  {isDQ ? 'Disqualified (DQ)' : 'Active / Eligible'}
-                </button>
-
-                {/* Quals Completed Toggle */}
-                <button
-                  type="button"
-                  onClick={() =>
-                    togglePlayerQualsCompleted(tournament.id, selectedPlayer.id, !isCompleted)
-                  }
-                  style={{
-                    padding: '0.4rem 0.75rem',
-                    borderRadius: 'var(--radius-sm)',
-                    border: isCompleted ? '1px solid var(--color-green)' : '1px solid var(--color-border)',
-                    background: isCompleted ? 'var(--color-green-bg)' : 'transparent',
-                    color: isCompleted ? '#34d399' : 'var(--color-text-secondary)',
-                    fontSize: '0.8rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                  }}
-                >
-                  <CheckCircle2 size={14} />
-                  {isCompleted ? 'Quals Marked Complete' : 'Quals In Progress'}
-                </button>
-              </div>
-
-              {/* 3. Manual PB & Playstyle */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={labelStyle}>Personal Best (PB - Manual)</label>
-                  <input
-                    type="text"
-                    value={pbInput ? parseInt(pbInput, 10).toLocaleString() : ''}
-                    onChange={e => setPbInput(e.target.value.replace(/\D/g, ''))}
-                    onBlur={handleUpdatePlayerMeta}
-                    placeholder="e.g. 1,250,000"
-                    style={inputStyle}
-                  />
-                </div>
-                <div>
-                  <label style={labelStyle}>Playstyle</label>
-                  <select
-                    value={playstyleInput}
-                    onChange={e => {
-                      const ps = e.target.value as 'DAS' | 'Rolling' | 'Hypertap';
-                      setPlaystyleInput(ps);
-                      updatePlayerInPool(tournament.id, selectedPlayer.id, { playstyle: ps });
-                    }}
-                    style={inputStyle}
-                  >
-                    <option value="Rolling">Rolling</option>
-                    <option value="DAS">DAS</option>
-                    <option value="Hypertap">Hypertap</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* 4. Score Submission Form */}
+              {/* 2. Score Submission Form */}
               <form onSubmit={handleSubmitScore} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <label style={labelStyle}>New Attempt Score</label>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -319,7 +200,7 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
                 </div>
               </form>
 
-              {/* 5. Existing Attempts History */}
+              {/* 3. Existing Attempts History */}
               <div>
                 <label style={labelStyle}>
                   Submitted Attempts ({playerSubmissions.length})

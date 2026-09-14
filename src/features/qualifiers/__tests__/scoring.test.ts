@@ -168,51 +168,49 @@ describe('Qualifiers Scoring Engine', () => {
       tournamentPlayers: {},
     };
 
-    it('ranks eligible players by score and drops disqualified players to bottom as DQ', () => {
+    it('ranks all players strictly by qualifier score regardless of player disqualification status', () => {
       const rows = deriveLeaderboard(tournament);
 
       // Total 6 players
       expect(rows).toHaveLength(6);
 
-      // Rank 1 should be Alice (1,000,000)
-      expect(rows[0].player.name).toBe('Alice');
+      // Rank 1 should be Dave (1,200,000 maxout)
+      expect(rows[0].player.name).toBe('Dave (DQ)');
       expect(rows[0].rank).toBe(1);
       expect(rows[0].assignedTier?.id).toBe('gold');
       expect(rows[0].tierSeed).toBe(1); // Gold Seed 1
 
-      // Rank 2 should be Bob (900,000)
-      expect(rows[1].player.name).toBe('Bob');
+      // Rank 2 should be Alice (1,000,000 maxout)
+      expect(rows[1].player.name).toBe('Alice');
       expect(rows[1].rank).toBe(2);
       expect(rows[1].assignedTier?.id).toBe('gold');
       expect(rows[1].tierSeed).toBe(2); // Gold Seed 2
 
-      // Rank 3 should be Charlie (850,000) -> Silver tier (cutoff ranks 3-4)
-      expect(rows[2].player.name).toBe('Charlie');
+      // Rank 3 should be Bob (900,000) -> Silver tier (cutoff ranks 3-4)
+      expect(rows[2].player.name).toBe('Bob');
       expect(rows[2].rank).toBe(3);
       expect(rows[2].assignedTier?.id).toBe('silver');
-      // Tier-relative seed invariant: rank 3 - tierStartRank 3 + 1 = Seed 1
       expect(rows[2].tierSeed).toBe(1);
 
-      // Rank 4 should be Eve (800,000) -> Silver tier
-      expect(rows[3].player.name).toBe('Eve');
+      // Rank 4 should be Charlie (850,000) -> Silver tier
+      expect(rows[3].player.name).toBe('Charlie');
       expect(rows[3].rank).toBe(4);
       expect(rows[3].assignedTier?.id).toBe('silver');
-      expect(rows[3].tierSeed).toBe(2); // Seed 2
+      expect(rows[3].tierSeed).toBe(2);
 
-      // Rank 5 should be Frank (700,000) -> DNQ (past Gold 2p + Silver 2p = 4 cutoffs)
-      expect(rows[4].player.name).toBe('Frank');
+      // Rank 5 should be Eve (800,000) -> DNQ (past Gold 2p + Silver 2p = 4 cutoffs)
+      expect(rows[4].player.name).toBe('Eve');
       expect(rows[4].rank).toBe(5);
       expect(rows[4].assignedTier).toBeUndefined();
       expect(rows[4].tierSeed).toBeUndefined();
       expect(rows[4].isDNQ).toBe(true);
 
-      // Last should be Dave (DQ) despite 1,200,000 score
-      const dqRow = rows[5];
-      expect(dqRow.player.name).toBe('Dave (DQ)');
-      expect(dqRow.rank).toBe('DQ');
-      expect(dqRow.isDisqualified).toBe(true);
-      expect(dqRow.assignedTier).toBeUndefined();
-      expect(dqRow.tierSeed).toBeUndefined();
+      // Rank 6 should be Frank (700,000) -> DNQ
+      expect(rows[5].player.name).toBe('Frank');
+      expect(rows[5].rank).toBe(6);
+      expect(rows[5].assignedTier).toBeUndefined();
+      expect(rows[5].tierSeed).toBeUndefined();
+      expect(rows[5].isDNQ).toBe(true);
     });
 
     it('breaks ties deterministically by earlier submission timestamp', () => {
@@ -328,18 +326,18 @@ describe('Qualifiers Scoring Engine', () => {
     it('dynamically generates draft brackets with tier-relative seeding', () => {
       const draftTiers = generateDraftBracketsForTournament(tournament);
 
-      // Gold tier bracket should feature Alice (Seed 1) vs Bob (Seed 2)
+      // Gold tier bracket should feature Dave (Seed 1) vs Alice (Seed 2)
       const goldBracket = draftTiers.find(t => t.id === 'gold')!.bracket;
-      expect(goldBracket.rounds[0].matches[0].player1.player?.name).toBe('Alice');
+      expect(goldBracket.rounds[0].matches[0].player1.player?.name).toBe('Dave (DQ)');
       expect(goldBracket.rounds[0].matches[0].player1.player?.seed).toBe(1);
-      expect(goldBracket.rounds[0].matches[0].player2.player?.name).toBe('Bob');
+      expect(goldBracket.rounds[0].matches[0].player2.player?.name).toBe('Alice');
       expect(goldBracket.rounds[0].matches[0].player2.player?.seed).toBe(2);
 
-      // Silver tier bracket should feature Charlie (Seed 1) vs Eve (Seed 2)
+      // Silver tier bracket should feature Bob (Seed 1) vs Charlie (Seed 2)
       const silverBracket = draftTiers.find(t => t.id === 'silver')!.bracket;
-      expect(silverBracket.rounds[0].matches[0].player1.player?.name).toBe('Charlie');
+      expect(silverBracket.rounds[0].matches[0].player1.player?.name).toBe('Bob');
       expect(silverBracket.rounds[0].matches[0].player1.player?.seed).toBe(1);
-      expect(silverBracket.rounds[0].matches[0].player2.player?.name).toBe('Eve');
+      expect(silverBracket.rounds[0].matches[0].player2.player?.name).toBe('Charlie');
       expect(silverBracket.rounds[0].matches[0].player2.player?.seed).toBe(2);
     });
 
@@ -352,21 +350,18 @@ describe('Qualifiers Scoring Engine', () => {
       const rows = deriveLeaderboard(tierlessTournament);
       expect(rows).toHaveLength(6);
 
-      // Ranked 1 through 5, and DQ for Dave
+      // Ranked 1 through 6
       expect(rows[0].rank).toBe(1);
-      expect(rows[0].player.name).toBe('Alice');
+      expect(rows[0].player.name).toBe('Dave (DQ)');
       expect(rows[0].isDNQ).toBe(false);
       expect(rows[0].assignedTier).toBeUndefined();
       expect(rows[0].tierSeed).toBeUndefined();
 
-      expect(rows[4].rank).toBe(5);
-      expect(rows[4].player.name).toBe('Frank');
-      expect(rows[4].isDNQ).toBe(false);
-      expect(rows[4].assignedTier).toBeUndefined();
-      expect(rows[4].tierSeed).toBeUndefined();
+      expect(rows[1].rank).toBe(2);
+      expect(rows[1].player.name).toBe('Alice');
 
-      expect(rows[5].rank).toBe('DQ');
-      expect(rows[5].isDisqualified).toBe(true);
+      expect(rows[5].rank).toBe(6);
+      expect(rows[5].player.name).toBe('Frank');
       expect(rows[5].isDNQ).toBe(false);
     });
   });

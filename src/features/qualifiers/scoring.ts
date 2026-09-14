@@ -17,8 +17,8 @@ export interface MaxoutKickerResult {
 }
 
 export interface LeaderboardRankRow {
-  rank: number | 'DQ';
-  globalRank: number; // numerical sort position (DQ players at the bottom)
+  rank: number;
+  globalRank: number;
   player: PlayerProfile;
   attempts: number[];
   formattedDetail: string; // e.g. "Ao2 (3 attempts)", "Max of 4", "180 pts"
@@ -186,19 +186,14 @@ export function deriveLeaderboard(tournament: Tournament): LeaderboardRankRow[] 
   });
 
   // Sort rows deterministically:
-  // 1. Non-disqualified come before disqualified
-  // 2. If HIGH_SCORE:
+  // 1. If HIGH_SCORE:
   //    a. maxout_count descending
   //    b. If maxout_count > 0: kicker_score descending
   //    c. If maxout_count == 0: highest score descending
   //    If other formats: finalScore descending
-  // 3. Earlier timestamp first (for ties)
-  // 4. Player ID ascending fallback
+  // 2. Earlier timestamp first (for ties)
+  // 3. Player ID ascending fallback
   rawRows.sort((a, b) => {
-    if (a.isDisqualified !== b.isDisqualified) {
-      return a.isDisqualified ? 1 : -1;
-    }
-
     if (tournament.qualFormat === 'HIGH_SCORE') {
       const aMax = a.maxoutCount || 0;
       const bMax = b.maxoutCount || 0;
@@ -245,17 +240,6 @@ export function deriveLeaderboard(tournament: Tournament): LeaderboardRankRow[] 
   // Assign ranks, tier cutoffs, and tier seeds
   let activeRankCounter = 1;
   const result: LeaderboardRankRow[] = rawRows.map((item, idx) => {
-    if (item.isDisqualified) {
-      return {
-        ...item,
-        rank: 'DQ',
-        globalRank: idx + 1,
-        isDNQ: false,
-        assignedTier: undefined,
-        tierSeed: undefined,
-      };
-    }
-
     const rank = activeRankCounter++;
     // Find matching tier range
     const matchingRange = tierRanges.find(

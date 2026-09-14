@@ -21,13 +21,32 @@ export const FinalStandingsPage: React.FC = () => {
     );
   }
 
+  const isStandingsGated = tournament.tiers.length === 0 || !tournament.isLocked;
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <TournamentNavbar
         tournament={tournament}
         activeView="standings"
       />
-      <main style={{ flex: 1, padding: '2rem 1.5rem', maxWidth: '1200px', width: '100%', margin: '0 auto' }}>
+      <main
+        style={
+          isStandingsGated
+            ? {
+                flex: 1,
+                padding: '3rem 1.5rem',
+                textAlign: 'center',
+                maxWidth: '600px',
+                margin: '0 auto',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '1rem',
+              }
+            : { flex: 1, padding: '2rem 1.5rem', maxWidth: '1200px', width: '100%', margin: '0 auto' }
+        }
+      >
         <FinalStandingsTable tournament={tournament} />
       </main>
     </div>

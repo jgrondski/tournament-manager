@@ -7,6 +7,7 @@ import { PublicLeaderboardPage } from './routes/PublicLeaderboardPage';
 import { ManageSheetPage } from './routes/ManageSheetPage';
 import { ManageJudgePage } from './routes/ManageJudgePage';
 import { ManageTournamentSettingsPage } from './routes/ManageTournamentSettingsPage';
+import { ManageTournamentPlayersPage } from './routes/ManageTournamentPlayersPage';
 import { FinalStandingsPage } from './routes/FinalStandingsPage';
 import { SlugRedirectPage } from './routes/SlugRedirectPage';
 import { PlayerDirectoryPage } from './routes/PlayerDirectoryPage';
@@ -32,6 +33,7 @@ export const App: React.FC = () => {
           <Route path="/:slug/manage/judge" element={<ManageJudgePage />} />
           <Route path="/:slug/manage/bracket" element={<ManageJudgePage />} />
           <Route path="/:slug/manage/qualifiers" element={<PublicLeaderboardPage />} />
+          <Route path="/:slug/manage/players" element={<ManageTournamentPlayersPage />} />
           <Route path="/:slug/manage/settings" element={<ManageTournamentSettingsPage />} />
 
           {/* Public Dynamic Tier Bracket (e.g. /kc-2026-open/gold, /kc-2026-open/silver, etc.) */}

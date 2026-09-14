@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Tournament, TournamentTier, QualFormat, PointsThreshold, PlayerProfile, DEFAULT_POINTS_THRESHOLDS } from '../types';
+import { Link } from 'react-router-dom';
+import { Tournament, TournamentTier, QualFormat, PointsThreshold, DEFAULT_POINTS_THRESHOLDS } from '../types';
 import { useTournament } from '../store';
 import {
   Plus,
@@ -13,26 +14,21 @@ import {
   X,
   Sparkles,
   Play,
-  UserPlus,
-  Search,
   Users,
   Unlock,
   ShieldCheck,
   AlertTriangle,
-  Download,
-  UserX,
   Lock,
   Check,
+  Sliders,
 } from 'lucide-react';
 import { generateTraditionalBracket, generateFlatBracket, getValidFlatWidths } from '../../bracket/math';
 import { generateDraftBracketsForTournament } from '../../qualifiers/scoring';
 import { BestOfSelect } from '../../bracket/components/BestOfSelect';
-import { ImportFromGlobalModal } from '../../players/components/ImportFromGlobalModal';
-import { PlayerEditModal } from '../../players/components/PlayerEditModal';
 import { getAvailableRoundsForTier, pruneInvalidRoundOverrides } from '../roundOverrides';
 import { ClearableNumberInput } from '../../../components/ClearableNumberInput';
-import { PlayerDetailDrawer } from '../../qualifiers/components/PlayerDetailDrawer';
 import { VerifyBracketModal } from './VerifyBracketModal';
+import { PointsThresholdsDrawer } from './PointsThresholdsDrawer';
 
 interface DraftOverrideRow {
   id: string;
@@ -422,10 +418,6 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
     clearAllTournamentData,
     seedQualifiers,
     simulateFullTournament,
-    globalPlayers,
-    importPlayersToTournament,
-    addPlayerToPool,
-    removePlayerFromTournament,
     unlockBrackets,
   } = useTournament();
 
@@ -442,8 +434,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
       ? tournament.pointsConfig
       : DEFAULT_POINTS_THRESHOLDS
   );
-  const [selectedPlayerForDrawer, setSelectedPlayerForDrawer] = useState<PlayerProfile | null>(null);
-  const [isPlayerDrawerOpen, setIsPlayerDrawerOpen] = useState(false);
+  const [isPointsDrawerOpen, setIsPointsDrawerOpen] = useState(false);
   const [isSettingsVerifyModalOpen, setIsSettingsVerifyModalOpen] = useState(false);
   const [settingsUnlockError, setSettingsUnlockError] = useState<string | null>(null);
 
@@ -453,26 +444,6 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
   const [tierToDelete, setTierToDelete] = useState<{ index: number; tier: TournamentTier } | null>(null);
   const [dataActionToConfirm, setDataActionToConfirm] = useState<'MATCHES' | 'QUALS' | 'ALL' | null>(null);
   const [simFeedback, setSimFeedback] = useState<string | null>(null);
-
-  // Roster Management State
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
-  const [playerToRemove, setPlayerToRemove] = useState<PlayerProfile | null>(null);
-  const [rosterSearch, setRosterSearch] = useState('');
-  const [rosterFeedback, setRosterFeedback] = useState<string | null>(null);
-  const [rosterError, setRosterError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!rosterFeedback) return;
-    const timer = setTimeout(() => setRosterFeedback(null), 4000);
-    return () => clearTimeout(timer);
-  }, [rosterFeedback]);
-
-  useEffect(() => {
-    if (!rosterError) return;
-    const timer = setTimeout(() => setRosterError(null), 5000);
-    return () => clearTimeout(timer);
-  }, [rosterError]);
 
   useEffect(() => {
     if (!simFeedback) return;
@@ -605,25 +576,73 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
 
   // Tier Management
   const addTier = () => {
-    const nextPriority = tiers.length + 1;
-    const tierName = `Tier ${nextPriority}`;
-    const tierSlug = `tier-${nextPriority}`;
-    const newTier: TournamentTier = {
-      id: `tier_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-      slug: tierSlug,
-      name: tierName,
-      priority: nextPriority,
-      bracketType: 'TRADITIONAL',
-      playerCount: 8,
-      bestOf: 3,
-      primaryColor: '#3b82f6',
-      secondaryColor: '#60a5fa',
-      isLocked: false,
-      bracket: generateTraditionalBracket(
-        Array.from({ length: 8 }, (_, i) => ({ id: `p${i + 1}`, name: `Player ${i + 1}`, seed: i + 1 })),
-        { bestOf: 3 }
-      ),
-    };
+    let newTier: TournamentTier;
+    const tierId = `tier_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+
+    if (tiers.length === 0) {
+      // 1st Tier: Gold Championship, 16 players, Traditional, Bo5, #f59e0b / #fbbf24
+      newTier = {
+        id: tierId,
+        slug: 'gold',
+        name: 'Gold Championship',
+        priority: 1,
+        bracketType: 'TRADITIONAL',
+        playerCount: 16,
+        bestOf: 5,
+        primaryColor: '#f59e0b',
+        secondaryColor: '#fbbf24',
+        isLocked: false,
+        bracket: generateTraditionalBracket(
+          Array.from({ length: 16 }, (_, i) => ({ id: `p${i + 1}`, name: `Player ${i + 1}`, seed: i + 1 })),
+          { tierId, bestOf: 5 }
+        ),
+      };
+    } else if (tiers.length === 1) {
+      // 2nd Tier: Silver Bracket, 9 players, Flat bracket, 2 wide, Bo3 with semis & finals Bo5 overrides, #94a3b8 / #cbd5e1
+      const roundBestOfOverrides = { 4: 5, 5: 5 };
+      newTier = {
+        id: tierId,
+        slug: 'silver',
+        name: 'Silver Bracket',
+        priority: 2,
+        bracketType: 'FLAT',
+        playerCount: 9,
+        flatWidth: 2,
+        bestOf: 3,
+        roundBestOfOverrides,
+        primaryColor: '#94a3b8',
+        secondaryColor: '#cbd5e1',
+        isLocked: false,
+        bracket: generateFlatBracket(
+          Array.from({ length: 9 }, (_, i) => ({ id: `p${i + 1}`, name: `Player ${i + 1}`, seed: i + 1 })),
+          2,
+          { tierId, bestOf: 3, roundBestOfOverrides }
+        ),
+      };
+    } else {
+      const nextPriority = tiers.length + 1;
+      const tierName = nextPriority === 3 ? 'Bronze Bracket' : `Tier ${nextPriority}`;
+      const tierSlug = nextPriority === 3 ? 'bronze' : `tier-${nextPriority}`;
+      const primaryColor = nextPriority === 3 ? '#b45309' : '#3b82f6';
+      const secondaryColor = nextPriority === 3 ? '#d97706' : '#60a5fa';
+      newTier = {
+        id: tierId,
+        slug: tierSlug,
+        name: tierName,
+        priority: nextPriority,
+        bracketType: 'TRADITIONAL',
+        playerCount: 8,
+        bestOf: 3,
+        primaryColor,
+        secondaryColor,
+        isLocked: false,
+        bracket: generateTraditionalBracket(
+          Array.from({ length: 8 }, (_, i) => ({ id: `p${i + 1}`, name: `Player ${i + 1}`, seed: i + 1 })),
+          { tierId, bestOf: 3 }
+        ),
+      };
+    }
+
     const nextTiers = [...tiers, newTier];
     const draftTiers = generateDraftBracketsForTournament({ ...tournament, tiers: nextTiers });
     setTiers(draftTiers);
@@ -775,73 +794,6 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
   const totalCapacity = useMemo(() => {
     return tiers.reduce((acc, t) => acc + (t.playerCount || 0), 0);
   }, [tiers]);
-
-  const availableGlobalCount = useMemo(() => {
-    const existingIds = new Set((tournament.playersPool || []).map(p => p.id));
-    const existingNames = new Set((tournament.playersPool || []).map(p => p.name.toLowerCase()));
-    return globalPlayers.filter(
-      p => !existingIds.has(p.id) && !existingNames.has(p.name.toLowerCase())
-    ).length;
-  }, [globalPlayers, tournament.playersPool]);
-
-  const filteredRoster = useMemo(() => {
-    if (!rosterSearch.trim()) return tournament.playersPool || [];
-    const q = rosterSearch.toLowerCase().trim();
-    return (tournament.playersPool || []).filter(
-      p =>
-        p.name.toLowerCase().includes(q) ||
-        p.country?.toLowerCase().includes(q) ||
-        p.playstyle?.toLowerCase().includes(q)
-    );
-  }, [tournament.playersPool, rosterSearch]);
-
-  const existingRosterNames = useMemo(
-    () => (tournament.playersPool || []).map(p => p.name),
-    [tournament.playersPool]
-  );
-
-  const playerToRemoveHasMatches = useMemo(() => {
-    if (!playerToRemove) return false;
-    return Object.values(tournament.matchScores || {}).some(
-      m =>
-        m.winnerPlayerId === playerToRemove.id ||
-        m.loserPlayerId === playerToRemove.id ||
-        (m.isComplete && (m.games || []).length > 0)
-    );
-  }, [playerToRemove, tournament.matchScores]);
-
-  const handleImportGlobalPlayers = (playersToImport: PlayerProfile[]) => {
-    importPlayersToTournament(tournament.id, playersToImport);
-    setRosterFeedback(`Imported ${playersToImport.length} competitor(s) into tournament roster.`);
-  };
-
-  const handleImportAllGlobal = () => {
-    const existingIds = new Set((tournament.playersPool || []).map(p => p.id));
-    const existingNames = new Set((tournament.playersPool || []).map(p => p.name.toLowerCase()));
-    const toImport = globalPlayers.filter(
-      p => !existingIds.has(p.id) && !existingNames.has(p.name.toLowerCase())
-    );
-    if (toImport.length > 0) {
-      importPlayersToTournament(tournament.id, toImport);
-      setRosterFeedback(`Imported all ${toImport.length} available global competitor(s).`);
-    }
-  };
-
-  const handleRegisterNewCompetitor = (playerData: Omit<PlayerProfile, 'id'>) => {
-    addPlayerToPool(tournament.id, playerData);
-    setRosterFeedback(`Registered ${playerData.name} into tournament roster.`);
-  };
-
-  const handleRemoveCompetitorConfirm = () => {
-    if (!playerToRemove) return;
-    const res = removePlayerFromTournament(tournament.id, playerToRemove.id);
-    if (!res.success) {
-      setRosterError(res.error || 'Failed to remove competitor.');
-    } else {
-      setRosterFeedback(`Removed ${playerToRemove.name} from tournament roster.`);
-      setPlayerToRemove(null);
-    }
-  };
 
   return (
     <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -1081,52 +1033,56 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
           )}
 
           {qualFormat === 'POINTS' && (
-            <div style={{ background: 'var(--color-bg-surface-elevated)', padding: '1rem', borderRadius: 'var(--radius-sm)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--color-text-primary)' }}>
-                  Points Thresholds (Highest met threshold awards points)
-                </span>
-                <button
-                  type="button"
-                  onClick={addThreshold}
-                  className="btn btn-secondary"
-                  style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }}
-                >
-                  <Plus size={14} /> Add Threshold
-                </button>
+            <div
+              style={{
+                background: 'var(--color-bg-surface-elevated)',
+                padding: '1rem 1.25rem',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--color-border-subtle)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '1rem',
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--color-text-primary)' }}>
+                    Points Threshold System
+                  </span>
+                  <span
+                    style={{
+                      padding: '0.15rem 0.5rem',
+                      borderRadius: 'var(--radius-full)',
+                      background: 'rgba(245, 158, 11, 0.15)',
+                      color: 'var(--color-gold-bright)',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                    }}
+                  >
+                    {pointsConfig.length} {pointsConfig.length === 1 ? 'cutoff' : 'cutoffs'} configured
+                  </span>
+                </div>
+                <p style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', marginTop: '0.25rem', margin: '0.25rem 0 0 0' }}>
+                  Attempts award points non-cumulatively based on highest cutoff reached.
+                  {pointsConfig.length > 0 && (
+                    <span style={{ marginLeft: '0.35rem', color: 'var(--color-text-secondary)' }}>
+                      ({[...pointsConfig].sort((a, b) => b.minScore - a.minScore).slice(0, 4).map(p => `${(p.minScore / 1000).toFixed(0)}k → +${p.points}`).join(', ')}{pointsConfig.length > 4 ? ', ...' : ''})
+                    </span>
+                  )}
+                </p>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {pointsConfig.map((th, idx) => (
-                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Min Score</label>
-                      <ClearableNumberInput
-                        min={0}
-                        value={th.minScore}
-                        onChange={val => updateThreshold(idx, 'minScore', val ?? 0)}
-                        style={inputStyle}
-                      />
-                    </div>
-                    <div style={{ width: '130px' }}>
-                      <label style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Points Awarded</label>
-                      <ClearableNumberInput
-                        min={0}
-                        value={th.points}
-                        onChange={val => updateThreshold(idx, 'points', val ?? 0)}
-                        style={inputStyle}
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeThreshold(idx)}
-                      style={{ background: 'transparent', border: 'none', color: 'var(--color-red)', cursor: 'pointer', padding: '0.5rem', marginTop: '1.25rem' }}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
-              </div>
+              <button
+                type="button"
+                onClick={() => setIsPointsDrawerOpen(true)}
+                className="btn btn-secondary"
+                style={{ padding: '0.45rem 0.9rem', fontSize: '0.82rem', gap: '0.4rem', whiteSpace: 'nowrap' }}
+              >
+                <Sliders size={14} color="var(--color-gold-bright)" />
+                Configure Points Cutoffs
+              </button>
             </div>
           )}
         </div>
@@ -1391,288 +1347,39 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
           gap: '1.25rem',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Users size={20} color="var(--color-gold-bright)" />
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
-                Tournament Roster
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <Users size={22} color="var(--color-gold-bright)" />
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
+                Tournament Competitor Roster
               </h2>
-            </div>
-            <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem', margin: 0 }}>
-              Registered competitors for this tournament. Import from the global catalog or register new players directly.
-            </p>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              onClick={() => setIsImportModalOpen(true)}
-              className="btn btn-secondary"
-              style={{ padding: '0.45rem 0.85rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
-            >
-              <Download size={14} color="var(--color-gold-bright)" />
-              Import from Global Pool
-            </button>
-
-            {availableGlobalCount > 0 && (
-              <button
-                type="button"
-                onClick={handleImportAllGlobal}
-                className="btn btn-secondary"
-                style={{ padding: '0.45rem 0.85rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
-              >
-                Import All Available ({availableGlobalCount})
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setIsRegisterModalOpen(true)}
-              className="btn btn-primary"
-              style={{ padding: '0.45rem 0.95rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
-            >
-              <UserPlus size={14} />
-              Register Competitor
-            </button>
-          </div>
-        </div>
-
-        {/* Feedback / Error Alerts */}
-        {rosterFeedback && (
-          <div
-            style={{
-              padding: '0.75rem 1rem',
-              background: 'rgba(34, 197, 94, 0.12)',
-              border: '1px solid rgba(34, 197, 94, 0.4)',
-              borderRadius: 'var(--radius-sm)',
-              color: '#4ade80',
-              fontSize: '0.85rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-            }}
-          >
-            <CheckCircle2 size={16} />
-            <span>{rosterFeedback}</span>
-          </div>
-        )}
-
-        {rosterError && (
-          <div
-            style={{
-              padding: '0.75rem 1rem',
-              background: 'rgba(239, 68, 68, 0.15)',
-              border: '1px solid rgba(239, 68, 68, 0.4)',
-              borderRadius: 'var(--radius-sm)',
-              color: '#f87171',
-              fontSize: '0.85rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-            }}
-          >
-            <AlertTriangle size={16} />
-            <span>{rosterError}</span>
-          </div>
-        )}
-
-        {/* Capacity Summary Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-          <div style={{ padding: '0.85rem 1rem', background: 'var(--color-bg-surface-elevated)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)' }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
-              Registered Competitors
-            </div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: (tournament.playersPool || []).length > 0 ? 'var(--color-gold-bright)' : 'var(--color-text-secondary)' }}>
-              {(tournament.playersPool || []).length}
-            </div>
-          </div>
-
-          <div style={{ padding: '0.85rem 1rem', background: 'var(--color-bg-surface-elevated)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)' }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
-              Total Bracket Capacity
-            </div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-              {totalCapacity}
-            </div>
-          </div>
-
-          <div style={{ padding: '0.85rem 1rem', background: 'var(--color-bg-surface-elevated)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)' }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
-              Roster Status
-            </div>
-            <div style={{ fontSize: '0.95rem', fontWeight: 700, marginTop: '0.25rem' }}>
-              {(tournament.playersPool || []).length < totalCapacity ? (
-                <span style={{ color: 'var(--color-gold-bright)' }}>
-                  Underfilled ({(tournament.playersPool || []).length}/{totalCapacity})
-                </span>
-              ) : (tournament.playersPool || []).length === totalCapacity ? (
-                <span style={{ color: '#4ade80' }}>
-                  Full Capacity ({totalCapacity}/{totalCapacity})
-                </span>
-              ) : (
-                <span style={{ color: '#60a5fa' }}>
-                  Ready ({totalCapacity} in tiers + {(tournament.playersPool || []).length - totalCapacity} DNQ)
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Competitor Search & List */}
-        {(tournament.playersPool || []).length === 0 ? (
-          <div
-            style={{
-              padding: '2.5rem 1rem',
-              background: 'var(--color-bg-base)',
-              borderRadius: 'var(--radius-md)',
-              border: '1px dashed var(--color-border)',
-              textAlign: 'center',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '0.75rem',
-            }}
-          >
-            <p style={{ fontSize: '0.95rem', color: 'var(--color-text-secondary)', margin: 0 }}>
-              No competitors registered in this tournament roster yet.
-            </p>
-            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.25rem' }}>
-              <button
-                type="button"
-                onClick={() => setIsImportModalOpen(true)}
-                className="btn btn-secondary"
-                style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
-              >
-                <Download size={14} color="var(--color-gold-bright)" />
-                Import from Global Pool
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsRegisterModalOpen(true)}
-                className="btn btn-primary"
-                style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
-              >
-                <UserPlus size={14} />
-                Register Competitor
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <div style={{ position: 'relative', maxWidth: '320px' }}>
-              <input
-                type="text"
-                placeholder="Search registered competitors..."
-                value={rosterSearch}
-                onChange={e => setRosterSearch(e.target.value)}
+              <span
                 style={{
-                  width: '100%',
-                  padding: '0.45rem 0.75rem 0.45rem 2.1rem',
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1px solid var(--color-border)',
-                  background: 'var(--color-bg-base)',
-                  color: 'var(--color-text-primary)',
-                  fontSize: '0.8rem',
+                  padding: '0.25rem 0.65rem',
+                  borderRadius: 'var(--radius-full)',
+                  background: 'rgba(245, 158, 11, 0.15)',
+                  color: 'var(--color-gold-bright)',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
                 }}
-              />
-              <Search
-                size={14}
-                color="var(--color-text-muted)"
-                style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)' }}
-              />
+              >
+                {(tournament.playersPool || []).length} / {totalCapacity} Capacity Registered
+              </span>
             </div>
-
-            <div style={{ overflowX: 'auto', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textAlign: 'left' }}>
-                <thead>
-                  <tr style={{ background: 'var(--color-bg-surface-elevated)', borderBottom: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}>
-                    <th style={{ padding: '0.65rem 0.85rem', width: '40px', textAlign: 'center' }}>#</th>
-                    <th style={{ padding: '0.65rem 0.85rem' }}>Competitor</th>
-                    <th style={{ padding: '0.65rem 0.85rem' }}>Country</th>
-                    <th style={{ padding: '0.65rem 0.85rem' }}>Playstyle</th>
-                    <th style={{ padding: '0.65rem 0.85rem' }}>Personal Best</th>
-                    <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredRoster.map((player, pIdx) => {
-                    return (
-                      <tr
-                        key={player.id}
-                        style={{
-                          borderBottom: '1px solid var(--color-border-subtle)',
-                          background: player.isDisqualified ? 'rgba(239, 68, 68, 0.05)' : 'transparent',
-                        }}
-                      >
-                        <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                          {pIdx + 1}
-                        </td>
-                        <td style={{ padding: '0.65rem 0.85rem' }}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedPlayerForDrawer(player);
-                              setIsPlayerDrawerOpen(true);
-                            }}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              padding: 0,
-                              cursor: 'pointer',
-                              textAlign: 'left',
-                              fontWeight: 600,
-                              color: 'var(--color-text-primary)',
-                              fontSize: 'inherit',
-                              transition: 'color 0.15s ease',
-                            }}
-                            onMouseEnter={e => {
-                              e.currentTarget.style.color = 'var(--color-gold-bright)';
-                              e.currentTarget.style.textDecoration = 'underline';
-                            }}
-                            onMouseLeave={e => {
-                              e.currentTarget.style.color = 'var(--color-text-primary)';
-                              e.currentTarget.style.textDecoration = 'none';
-                            }}
-                            title="View player tournament profile"
-                          >
-                            {player.name}
-                          </button>
-                        </td>
-                        <td style={{ padding: '0.65rem 0.85rem' }}>
-                          {player.country ? (
-                            <span style={{ padding: '0.1rem 0.35rem', borderRadius: 'var(--radius-sm)', background: 'var(--color-bg-surface-highlight)', fontSize: '0.7rem', fontWeight: 700 }}>
-                              {player.country}
-                            </span>
-                          ) : '—'}
-                        </td>
-                        <td style={{ padding: '0.65rem 0.85rem' }}>
-                          <span className="badge badge-muted" style={{ fontSize: '0.65rem' }}>
-                            {player.playstyle}
-                          </span>
-                        </td>
-                        <td style={{ padding: '0.65rem 0.85rem', fontFamily: 'monospace' }}>
-                          {player.personalBest ? player.personalBest.toLocaleString() : '—'}
-                        </td>
-                        <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>
-                          <button
-                            type="button"
-                            onClick={() => setPlayerToRemove(player)}
-                            className="btn btn-secondary"
-                            style={{ padding: '0.25rem 0.55rem', fontSize: '0.7rem', color: 'var(--color-red)' }}
-                            title="Remove competitor from tournament"
-                          >
-                            <UserX size={13} /> Remove
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginTop: '0.35rem', margin: '0.35rem 0 0 0' }}>
+              Competitor registration, global pool imports, and roster management are now in the dedicated <strong style={{ color: 'var(--color-text-primary)' }}>Register Players</strong> page.
+            </p>
           </div>
-        )}
+
+          <Link
+            to={`/${tournament.slug}/manage/players`}
+            className="btn btn-primary"
+            style={{ padding: '0.55rem 1.15rem', fontSize: '0.875rem', gap: '0.5rem', textDecoration: 'none' }}
+          >
+            <Users size={16} /> Go to Register Players
+          </Link>
+        </div>
       </section>
 
       {/* Section 4: Data Management & Simulation */}
@@ -2165,137 +1872,15 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
         </div>
       )}
 
-      {/* Import from Global Pool Modal */}
-      <ImportFromGlobalModal
-        isOpen={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
-        globalPlayers={globalPlayers}
-        currentTournamentPlayers={tournament.playersPool || []}
-        onImport={handleImportGlobalPlayers}
+      {/* Points Thresholds Drawer */}
+      <PointsThresholdsDrawer
+        isOpen={isPointsDrawerOpen}
+        onClose={() => setIsPointsDrawerOpen(false)}
+        pointsConfig={pointsConfig}
+        onAddThreshold={addThreshold}
+        onUpdateThreshold={updateThreshold}
+        onRemoveThreshold={removeThreshold}
       />
-
-      {/* Register New Competitor Modal */}
-      <PlayerEditModal
-        isOpen={isRegisterModalOpen}
-        onClose={() => setIsRegisterModalOpen(false)}
-        onSave={handleRegisterNewCompetitor}
-        existingNames={existingRosterNames}
-      />
-
-      {/* Remove Competitor Speedbump Modal */}
-      {playerToRemove && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.75)',
-            backdropFilter: 'blur(6px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: '1rem',
-          }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              background: 'var(--color-bg-surface)',
-              borderRadius: 'var(--radius-lg)',
-              border: playerToRemoveHasMatches ? '1px solid var(--color-border)' : '1px solid var(--color-red)',
-              maxWidth: '460px',
-              width: '100%',
-              boxShadow: 'var(--shadow-xl)',
-              overflow: 'hidden',
-              animation: 'fadeIn 0.2s ease-out',
-            }}
-          >
-            <div
-              style={{
-                padding: '1.25rem 1.5rem',
-                background: 'var(--color-bg-surface-elevated)',
-                borderBottom: '1px solid var(--color-border)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: playerToRemoveHasMatches ? 'var(--color-gold-bright)' : 'var(--color-red)' }}>
-                {playerToRemoveHasMatches ? <AlertTriangle size={20} /> : <UserX size={20} />}
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
-                  {playerToRemoveHasMatches ? 'Cannot Remove Competitor' : 'Remove from Roster?'}
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setPlayerToRemove(null)}
-                style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '0.25rem' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {playerToRemoveHasMatches ? (
-                <p style={{ fontSize: '0.9rem', color: 'var(--color-text-primary)', lineHeight: 1.5, margin: 0 }}>
-                  <strong>{playerToRemove.name}</strong> cannot be removed from this tournament because they have recorded bracket matches. To remove this competitor, first clear match scores in the Data Maintenance section.
-                </p>
-              ) : (
-                <>
-                  <p style={{ fontSize: '0.9rem', color: 'var(--color-text-primary)', lineHeight: 1.5, margin: 0 }}>
-                    Are you sure you want to remove <strong>{playerToRemove.name}</strong> from this tournament roster?
-                  </p>
-                  <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', lineHeight: 1.4, margin: 0 }}>
-                    Any qualifier scores submitted by this competitor for this tournament will also be removed. The competitor remains in the global catalog.
-                  </p>
-                </>
-              )}
-            </div>
-
-            <div
-              style={{
-                padding: '1rem 1.5rem',
-                background: 'var(--color-bg-surface-elevated)',
-                borderTop: '1px solid var(--color-border)',
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '0.75rem',
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => setPlayerToRemove(null)}
-                className="btn btn-secondary"
-                style={{ padding: '0.5rem 1rem' }}
-              >
-                {playerToRemoveHasMatches ? 'Close' : 'Cancel'}
-              </button>
-              {!playerToRemoveHasMatches && (
-                <button
-                  type="button"
-                  onClick={handleRemoveCompetitorConfirm}
-                  className="btn btn-danger"
-                  style={{ padding: '0.5rem 1.25rem' }}
-                >
-                  Remove Competitor
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Modals & Drawers */}
-      {selectedPlayerForDrawer && (
-        <PlayerDetailDrawer
-          isOpen={isPlayerDrawerOpen}
-          onClose={() => {
-            setIsPlayerDrawerOpen(false);
-            setSelectedPlayerForDrawer(null);
-          }}
-          player={selectedPlayerForDrawer}
-          tournament={tournament}
-        />
-      )}
 
       {isSettingsVerifyModalOpen && (
         <VerifyBracketModal

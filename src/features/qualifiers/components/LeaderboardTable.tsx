@@ -3,7 +3,7 @@ import { Tournament, PlayerProfile } from '../../tournament/types';
 import { deriveLeaderboard, LeaderboardRankRow, calculatePoints } from '../scoring';
 import { QualifierEntryModal } from './QualifierEntryModal';
 import { PlayerDetailDrawer } from './PlayerDetailDrawer';
-import { Search, Trophy, Plus, AlertOctagon, User, Sparkles, ChevronRight } from 'lucide-react';
+import { Search, Trophy, Plus, User, Sparkles, ChevronRight } from 'lucide-react';
 
 interface LeaderboardTableProps {
   tournament: Tournament;
@@ -148,15 +148,12 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
               </tr>
             ) : (
               filteredRows.map((row: LeaderboardRankRow, idx) => {
-                const isRankNumeric = typeof row.rank === 'number';
-                const cutoffInfo = isRankNumeric ? cutoffRanks.get(row.rank as number) : undefined;
+                const cutoffInfo = cutoffRanks.get(row.rank);
 
                 // Subtle tier color row tinting when brackets exist
                 let rowBg = idx % 2 === 0 ? 'var(--color-bg-surface)' : 'var(--color-bg-surface-elevated)';
                 if (hasBrackets && row.assignedTier?.primaryColor) {
                   rowBg = `${row.assignedTier.primaryColor}0d`; // ~5% opacity tint
-                } else if (row.isDisqualified) {
-                  rowBg = 'rgba(239, 68, 68, 0.05)';
                 }
 
                 return (
@@ -176,46 +173,28 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                     >
                       {/* Rank */}
                       <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>
-                        {row.isDisqualified ? (
-                          <span
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              padding: '0.2rem 0.5rem',
-                              borderRadius: 'var(--radius-sm)',
-                              background: 'var(--color-red-bg)',
-                              color: '#f87171',
-                              fontSize: '0.75rem',
-                              fontWeight: 800,
-                            }}
-                          >
-                            DQ
-                          </span>
-                        ) : (
-                          <span
-                            className="tabular-nums"
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: '26px',
-                              height: '26px',
-                              borderRadius: '50%',
-                              background:
-                                typeof row.rank === 'number' && row.rank <= 3
-                                  ? 'var(--color-gold-bg)'
-                                  : 'rgba(255,255,255,0.05)',
-                              color:
-                                typeof row.rank === 'number' && row.rank <= 3
-                                  ? 'var(--color-gold-bright)'
-                                  : 'var(--color-text-secondary)',
-                              fontSize: '0.8rem',
-                            }}
-                          >
-                            {row.rank}
-                          </span>
-                        )}
+                        <span
+                          className="tabular-nums"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '26px',
+                            height: '26px',
+                            borderRadius: '50%',
+                            background:
+                              row.rank <= 3
+                                ? 'var(--color-gold-bg)'
+                                : 'rgba(255,255,255,0.05)',
+                            color:
+                              row.rank <= 3
+                                ? 'var(--color-gold-bright)'
+                                : 'var(--color-text-secondary)',
+                            fontSize: '0.8rem',
+                          }}
+                        >
+                          {row.rank}
+                        </span>
                       </td>
 
                       {/* Player Info */}
@@ -233,11 +212,6 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                           {row.player.country && (
                             <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', background: 'rgba(255,255,255,0.05)', padding: '0.1rem 0.35rem', borderRadius: 'var(--radius-sm)' }}>
                               {row.player.country}
-                            </span>
-                          )}
-                          {row.isDisqualified && (
-                            <span style={{ color: 'var(--color-red)', display: 'inline-flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.7rem' }}>
-                              <AlertOctagon size={12} /> DQ
                             </span>
                           )}
                         </div>
@@ -413,10 +387,6 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                                 }}
                               >
                                 {row.assignedTier.name} #{row.tierSeed}
-                              </span>
-                            ) : row.isDisqualified ? (
-                              <span className="badge badge-muted" style={{ color: '#f87171' }}>
-                                Disqualified
                               </span>
                             ) : row.isDNQ ? (
                               <span className="badge badge-muted" title="Did Not Qualify for active brackets">

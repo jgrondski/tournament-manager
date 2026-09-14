@@ -8,7 +8,7 @@ import { Layers, ExternalLink, ChevronDown, Video, ShieldCheck, AlertTriangle, U
 interface TournamentNavbarProps {
   tournament: Tournament;
   activeTier?: TournamentTier;
-  activeView: 'bracket' | 'sheet' | 'judge' | 'leaderboard' | 'standings' | 'settings';
+  activeView: 'bracket' | 'sheet' | 'judge' | 'leaderboard' | 'standings' | 'settings' | 'players';
   onNavigate?: (url: string) => boolean | void;
 }
 
@@ -263,6 +263,19 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
             }}
           >
             🏆 Qualifiers
+          </Link>
+
+          <Link
+            to={`/${tournament.slug}/manage/players`}
+            onClick={e => handleLinkClick(e, `/${tournament.slug}/manage/players`)}
+            style={{
+              ...viewTabStyle,
+              background: activeView === 'players' ? 'var(--color-bg-surface)' : 'transparent',
+              color: activeView === 'players' ? 'var(--color-gold-bright)' : 'var(--color-text-muted)',
+              fontWeight: activeView === 'players' ? 700 : 500,
+            }}
+          >
+            👥 Register Players
           </Link>
 
           <Link

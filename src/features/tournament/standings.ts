@@ -649,7 +649,12 @@ export function calculateGlobalStandings(tournament: Tournament): GlobalStanding
 
   // 4. Handle any bracket players who were not eliminated or placed yet (e.g. tournament in-progress)
   for (const tier of sortedTiers) {
-    const tierRows = leaderboard.filter(r => r.assignedTier?.id === tier.id && !placedPlayerIds.has(r.player.id));
+    const tierRows = leaderboard.filter(
+      r => r.assignedTier?.id === tier.id &&
+      !r.isDisqualified &&
+      !profileMap.get(r.player.id)?.isDisqualified &&
+      !placedPlayerIds.has(r.player.id)
+    );
     for (const row of tierRows) {
       if (placedPlayerIds.has(row.player.id)) continue;
       const stats = calculatePlayerStats(tournament, row.player.id);
@@ -682,7 +687,12 @@ export function calculateGlobalStandings(tournament: Tournament): GlobalStanding
 
   // 4. DNQ (Did Not Qualify) Competitors
   // Ranked sequentially after bracket participants based on qualifier leaderboard scores
-  const dnqRows = leaderboard.filter(r => r.isDNQ && !r.isDisqualified && !placedPlayerIds.has(r.player.id));
+  const dnqRows = leaderboard.filter(
+    r => r.isDNQ &&
+    !r.isDisqualified &&
+    !profileMap.get(r.player.id)?.isDisqualified &&
+    !placedPlayerIds.has(r.player.id)
+  );
   for (const dnq of dnqRows) {
     const finalRank = currentRank++;
     const qualRank = qualRankMap.get(dnq.player.id);
@@ -720,8 +730,14 @@ export function calculateGlobalStandings(tournament: Tournament): GlobalStanding
 
   // 5. Disqualified (DQ) Competitors
   // Placed at the absolute bottom
-  const dqRows = leaderboard.filter(r => r.isDisqualified);
+  const dqRows = leaderboard.filter(r => r.isDisqualified || profileMap.get(r.player.id)?.isDisqualified);
   for (const dq of dqRows) {
+    if (placedPlayerIds.has(dq.player.id)) {
+      const existingIdx = globalStandings.findIndex(s => s.player.id === dq.player.id);
+      if (existingIdx !== -1) {
+        globalStandings.splice(existingIdx, 1);
+      }
+    }
     globalStandings.push({
       finalRank: 'DQ',
       rankLabel: 'DQ (Disqualified)',

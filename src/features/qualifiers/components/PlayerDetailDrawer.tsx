@@ -1,5 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Tournament, PlayerProfile } from '../../tournament/types';
+import { useTournament } from '../../tournament/store';
 import { LeaderboardRankRow, MAXOUT_THRESHOLD, deriveLeaderboard } from '../scoring';
 import { calculateGlobalStandings, getRankOrdinal } from '../../tournament/standings';
 import { colorWithAlpha } from '../../bracket/colorUtils';
@@ -11,6 +12,8 @@ import {
   Sparkles,
   Flame,
   Clock,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 
 interface PlayerDetailDrawerProps {
@@ -28,6 +31,8 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
   tournament,
   rankRow,
 }) => {
+  const { submitQualifierScore, deleteQualifierScore } = useTournament();
+  const [scoreInput, setScoreInput] = useState('');
 
   // Derive leaderboard row so we have rank data even if caller didn't pass rankRow
   const leaderboard = useMemo(() => deriveLeaderboard(tournament), [tournament]);
@@ -537,6 +542,54 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
               </span>
             </div>
 
+            {/* Inline Score Entry when quals are in session */}
+            {!tournament.isLocked && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const num = parseInt(scoreInput.replace(/\D/g, ''), 10);
+                  if (num > 0) {
+                    submitQualifierScore(tournament.id, player.id, num);
+                    setScoreInput('');
+                  }
+                }}
+                style={{
+                  display: 'flex',
+                  gap: '0.5rem',
+                  marginBottom: '0.75rem',
+                  padding: '0.5rem',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'var(--color-bg-surface)',
+                  border: '1px solid var(--color-border-subtle)',
+                }}
+              >
+                <input
+                  type="text"
+                  value={scoreInput ? parseInt(scoreInput.replace(/\D/g, ''), 10).toLocaleString() : ''}
+                  onChange={(e) => setScoreInput(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Enter score (e.g. 1,050,000)..."
+                  style={{
+                    flex: 1,
+                    padding: '0.45rem 0.65rem',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--color-border)',
+                    background: 'var(--color-bg-base)',
+                    color: 'var(--color-text-primary)',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={!scoreInput || parseInt(scoreInput.replace(/\D/g, ''), 10) <= 0}
+                  className="btn btn-primary"
+                  style={{ padding: '0.45rem 0.85rem', fontSize: '0.8rem', gap: '0.3rem', whiteSpace: 'nowrap' }}
+                >
+                  <Plus size={14} /> Log Score
+                </button>
+              </form>
+            )}
+
             {playerSubmissions.length === 0 ? (
               <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
                 No qual submissions logged yet.
@@ -654,8 +707,8 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
                         </div>
                       </div>
 
-                      {/* Format Result Contribution */}
-                      <div style={{ textAlign: 'right' }}>
+                      {/* Format Result Contribution & Delete */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                         {tournament.qualFormat === 'POINTS' ? (
                           <span className="tabular-nums" style={{ fontWeight: 700, color: 'var(--color-gold-bright)', fontSize: '0.85rem' }}>
                             {/* Points earned */}
@@ -673,6 +726,26 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
                           <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
                             Logged
                           </span>
+                        )}
+
+                        {!tournament.isLocked && (
+                          <button
+                            type="button"
+                            onClick={() => deleteQualifierScore(tournament.id, sub.id)}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--color-red)',
+                              cursor: 'pointer',
+                              padding: '0.25rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              opacity: 0.7,
+                            }}
+                            title="Delete attempt"
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         )}
                       </div>
                     </div>
