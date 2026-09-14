@@ -1,9 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Tournament, PlayerProfile } from '../../tournament/types';
 import { useTournament } from '../../tournament/store';
-import { LeaderboardRankRow, MAXOUT_THRESHOLD, deriveLeaderboard } from '../scoring';
-import { calculateGlobalStandings, getRankOrdinal } from '../../tournament/standings';
-import { colorWithAlpha } from '../../bracket/colorUtils';
 import {
   X,
   User,
@@ -14,7 +11,11 @@ import {
   Clock,
   Plus,
   Trash2,
+  Check,
 } from 'lucide-react';
+import { LeaderboardRankRow, MAXOUT_THRESHOLD, deriveLeaderboard, getPlayerQualifierStatus } from '../scoring';
+import { calculateGlobalStandings, getRankOrdinal } from '../../tournament/standings';
+import { colorWithAlpha } from '../../bracket/colorUtils';
 
 interface PlayerDetailDrawerProps {
   isOpen: boolean;
@@ -31,7 +32,7 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
   tournament,
   rankRow,
 }) => {
-  const { submitQualifierScore, deleteQualifierScore } = useTournament();
+  const { submitQualifierScore, deleteQualifierScore, togglePlayerQualifierVerified } = useTournament();
   const [scoreInput, setScoreInput] = useState('');
 
   // Derive leaderboard row so we have rank data even if caller didn't pass rankRow
@@ -106,6 +107,13 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
       .filter(s => s.playerId === player.id)
       .sort((a, b) => a.submittedAt - b.submittedAt);
   }, [tournament.qualifierSubmissions, player]);
+
+  const qualStatus = useMemo(() => {
+    if (!player) return 'not started';
+    return getPlayerQualifierStatus(tournament, player.id);
+  }, [tournament, player]);
+
+  const isVerified = qualStatus === 'verified';
 
   if (!isOpen || !player) return null;
 
@@ -330,6 +338,139 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
 
         {/* Scrollable Body Content */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Section 0: Quick Qual Submission & Judge Verification (Top of Drawer when quals open) */}
+          {!tournament.isLocked && (
+            <div
+              style={{
+                ...cardSectionStyle,
+                border: '1px solid rgba(245, 158, 11, 0.4)',
+                background: 'linear-gradient(180deg, rgba(245, 158, 11, 0.1) 0%, var(--color-bg-surface-elevated) 100%)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Trophy size={16} color="var(--color-gold-bright)" />
+                  <h3 style={sectionTitleStyle}>Submit Qualifier Score</h3>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {/* Status Badge */}
+                  {qualStatus === 'verified' && (
+                    <span
+                      style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        padding: '0.15rem 0.5rem',
+                        borderRadius: 'var(--radius-sm)',
+                        background: 'rgba(34, 197, 94, 0.2)',
+                        color: '#4ade80',
+                        border: '1px solid rgba(34, 197, 94, 0.4)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                      }}
+                    >
+                      <Check size={12} /> Verified
+                    </span>
+                  )}
+                  {qualStatus === 'in progress' && (
+                    <span
+                      style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        padding: '0.15rem 0.5rem',
+                        borderRadius: 'var(--radius-sm)',
+                        background: 'rgba(245, 158, 11, 0.2)',
+                        color: 'var(--color-gold-bright)',
+                        border: '1px solid rgba(245, 158, 11, 0.4)',
+                      }}
+                    >
+                      In Progress
+                    </span>
+                  )}
+                  {qualStatus === 'not started' && (
+                    <span
+                      style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 500,
+                        padding: '0.15rem 0.5rem',
+                        borderRadius: 'var(--radius-sm)',
+                        background: 'rgba(255, 255, 255, 0.08)',
+                        color: 'var(--color-text-muted)',
+                        border: '1px solid var(--color-border)',
+                      }}
+                    >
+                      Not Started
+                    </span>
+                  )}
+
+                  {/* Judge Verification Trigger */}
+                  <button
+                    type="button"
+                    onClick={() => togglePlayerQualifierVerified(tournament.id, player.id)}
+                    className={`btn ${isVerified ? 'btn-secondary' : 'btn-primary'}`}
+                    style={{
+                      padding: '0.25rem 0.65rem',
+                      fontSize: '0.75rem',
+                      gap: '0.3rem',
+                      borderColor: isVerified ? 'rgba(34, 197, 94, 0.5)' : undefined,
+                      color: isVerified ? '#4ade80' : undefined,
+                    }}
+                    title={isVerified ? 'Click to unverify qualifier' : 'Click to verify qualifier as judge'}
+                  >
+                    <Check size={12} />
+                    {isVerified ? 'Verified' : 'Verify'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Inline Score Entry Form */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const num = parseInt(scoreInput.replace(/\D/g, ''), 10);
+                  if (num > 0) {
+                    submitQualifierScore(tournament.id, player.id, num);
+                    setScoreInput('');
+                  }
+                }}
+                style={{
+                  display: 'flex',
+                  gap: '0.5rem',
+                  padding: '0.5rem',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'var(--color-bg-surface)',
+                  border: '1px solid var(--color-border-subtle)',
+                }}
+              >
+                <input
+                  type="text"
+                  value={scoreInput ? parseInt(scoreInput.replace(/\D/g, ''), 10).toLocaleString() : ''}
+                  onChange={(e) => setScoreInput(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Enter score (e.g. 1,050,000)..."
+                  style={{
+                    flex: 1,
+                    padding: '0.45rem 0.65rem',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--color-border)',
+                    background: 'var(--color-bg-base)',
+                    color: 'var(--color-text-primary)',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={!scoreInput || parseInt(scoreInput.replace(/\D/g, ''), 10) <= 0}
+                  className="btn btn-primary"
+                  style={{ padding: '0.45rem 0.85rem', fontSize: '0.8rem', gap: '0.3rem', whiteSpace: 'nowrap' }}
+                >
+                  <Plus size={14} /> Log Score
+                </button>
+              </form>
+            </div>
+          )}
+
           {/* Section 1: Player Profile Details */}
           <div style={cardSectionStyle}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
@@ -537,58 +678,31 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
                 <Trophy size={16} color="var(--color-gold-bright)" />
                 <h3 style={sectionTitleStyle}>Qual Submissions</h3>
               </div>
-              <span className="tabular-nums" style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                {playerSubmissions.length} {playerSubmissions.length === 1 ? 'submission' : 'submissions'} logged
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span className="tabular-nums" style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                  {playerSubmissions.length} {playerSubmissions.length === 1 ? 'submission' : 'submissions'} logged
+                </span>
+                {/* Status indicator in bottom card */}
+                {qualStatus === 'verified' && (
+                  <span
+                    style={{
+                      fontSize: '0.7rem',
+                      fontWeight: 700,
+                      padding: '0.1rem 0.45rem',
+                      borderRadius: 'var(--radius-sm)',
+                      background: 'rgba(34, 197, 94, 0.2)',
+                      color: '#4ade80',
+                      border: '1px solid rgba(34, 197, 94, 0.4)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.2rem',
+                    }}
+                  >
+                    <Check size={11} /> Verified
+                  </span>
+                )}
+              </div>
             </div>
-
-            {/* Inline Score Entry when quals are in session */}
-            {!tournament.isLocked && (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const num = parseInt(scoreInput.replace(/\D/g, ''), 10);
-                  if (num > 0) {
-                    submitQualifierScore(tournament.id, player.id, num);
-                    setScoreInput('');
-                  }
-                }}
-                style={{
-                  display: 'flex',
-                  gap: '0.5rem',
-                  marginBottom: '0.75rem',
-                  padding: '0.5rem',
-                  borderRadius: 'var(--radius-sm)',
-                  background: 'var(--color-bg-surface)',
-                  border: '1px solid var(--color-border-subtle)',
-                }}
-              >
-                <input
-                  type="text"
-                  value={scoreInput ? parseInt(scoreInput.replace(/\D/g, ''), 10).toLocaleString() : ''}
-                  onChange={(e) => setScoreInput(e.target.value.replace(/\D/g, ''))}
-                  placeholder="Enter score (e.g. 1,050,000)..."
-                  style={{
-                    flex: 1,
-                    padding: '0.45rem 0.65rem',
-                    borderRadius: 'var(--radius-sm)',
-                    border: '1px solid var(--color-border)',
-                    background: 'var(--color-bg-base)',
-                    color: 'var(--color-text-primary)',
-                    fontSize: '0.85rem',
-                    fontWeight: 600,
-                  }}
-                />
-                <button
-                  type="submit"
-                  disabled={!scoreInput || parseInt(scoreInput.replace(/\D/g, ''), 10) <= 0}
-                  className="btn btn-primary"
-                  style={{ padding: '0.45rem 0.85rem', fontSize: '0.8rem', gap: '0.3rem', whiteSpace: 'nowrap' }}
-                >
-                  <Plus size={14} /> Log Score
-                </button>
-              </form>
-            )}
 
             {playerSubmissions.length === 0 ? (
               <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>

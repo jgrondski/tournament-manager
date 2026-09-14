@@ -124,6 +124,27 @@ npm run lint
 ```bash
 npm run build
 # vite v6.4.3 building for production...
-# ✓ 1900 modules transformed.
-# ✓ built in 3.07s
+# ✓ 1902 modules transformed.
+# ✓ built in 2.94s
 ```
+
+---
+
+## 3. Qualifier State Management, Modal Enhancements, & Navigation Realignment
+
+1. **Top Qualifier Score Form in Player Profile Drawer**:
+   - [PlayerDetailDrawer.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/qualifiers/components/PlayerDetailDrawer.tsx): When qualifiers are open, the score entry form and judge verification toggle are at the very top of the drawer body.
+2. **Blank Player Selection & Auto-Filter in Qualifier Entry Modal**:
+   - [QualifierEntryModal.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/qualifiers/components/QualifierEntryModal.tsx), [CreatablePlayerSelect.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/qualifiers/components/CreatablePlayerSelect.tsx): Starts blank, auto-filters matching competitors as typed, includes clear button (`X`), and displays status with judge verify button upon player selection.
+3. **3-State Qualifier Status Engine & Judge Verification**:
+   - [scoring.ts](file:///Users/jgrondski/src/repos/tournament-manager/src/features/qualifiers/scoring.ts): Logic-based states: `'not started'` (0 attempts), `'in progress'` (1+ attempts), and `'verified'` (judge verified).
+   - [LeaderboardTable.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/qualifiers/components/LeaderboardTable.tsx): Status badges rendered for each row on the Qual Board.
+4. **Auto-Flip to "Verified" on Bracket Lock**:
+   - [store.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/tournament/store.tsx): When brackets are finalized and locked, all players are auto-flipped to `isVerified: true`.
+5. **Restored "Import All Available" from Global Pool**:
+   - [ManageTournamentPlayersPage.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/routes/ManageTournamentPlayersPage.tsx): Added `Import All Available ({count})` button in both header toolbar and empty roster card.
+6. **Navigation Bar Realignment**:
+   - [TournamentNavbar.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/components/TournamentNavbar.tsx):
+     - Left aligned: Organizer Sheet, Floor Judge, Visual Bracket.
+     - Right aligned: Qualifiers, Standings, Register Players, Settings.
+     - Tier tabs rendered on dedicated sub-bar for bracket views.

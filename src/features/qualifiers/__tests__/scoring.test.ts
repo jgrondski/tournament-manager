@@ -7,6 +7,7 @@ import {
   calculatePoints,
   deriveLeaderboard,
   generateDraftBracketsForTournament,
+  getPlayerQualifierStatus,
 } from '../scoring';
 import { Tournament, QualifierSubmission, PlayerProfile, TournamentTier } from '../../tournament/types';
 import { generateTraditionalBracket } from '../../bracket/math';
@@ -363,6 +364,72 @@ describe('Qualifiers Scoring Engine', () => {
       expect(rows[5].rank).toBe(6);
       expect(rows[5].player.name).toBe('Frank');
       expect(rows[5].isDNQ).toBe(false);
+    });
+
+    it('populates qualifier status on LeaderboardRankRow (not started, in progress, verified)', () => {
+      const tourneyWithStatus: Tournament = {
+        ...tournament,
+        tournamentPlayers: {
+          p1: { playerId: 'p1', tournamentId: 't1', isVerified: true },
+        },
+      };
+
+      const rows = deriveLeaderboard(tourneyWithStatus);
+      // Dave (p4) has submissions and is not verified -> 'in progress'
+      const dave = rows.find(r => r.player.id === 'p4');
+      expect(dave?.status).toBe('in progress');
+
+      // Alice (p1) is marked isVerified: true -> 'verified'
+      const alice = rows.find(r => r.player.id === 'p1');
+      expect(alice?.status).toBe('verified');
+    });
+  });
+
+  describe('getPlayerQualifierStatus', () => {
+    const baseTourney: Tournament = {
+      id: 't-test',
+      slug: 't-test',
+      name: 'Test Tournament',
+      date: '2026-09-14',
+      location: 'Local',
+      qualFormat: 'HIGH_SCORE',
+      isLocked: false,
+      tiers: [],
+      matchScores: {},
+      playersPool: [
+        { id: 'p1', name: 'Player 1', personalBest: 1000000, playstyle: 'DAS' },
+        { id: 'p2', name: 'Player 2', personalBest: 1000000, playstyle: 'Rolling' },
+        { id: 'p3', name: 'Player 3', personalBest: 1000000, playstyle: 'Rolling' },
+      ],
+      qualifierSubmissions: [
+        { id: 's1', tournamentId: 't-test', playerId: 'p2', score: 950000, submittedAt: 1000 },
+      ],
+      tournamentPlayers: {
+        p3: { playerId: 'p3', tournamentId: 't-test', isVerified: true },
+      },
+    };
+
+    it('returns "not started" when competitor has 0 submissions and is not verified', () => {
+      expect(getPlayerQualifierStatus(baseTourney, 'p1')).toBe('not started');
+    });
+
+    it('returns "in progress" when competitor has at least 1 submission and is not verified', () => {
+      expect(getPlayerQualifierStatus(baseTourney, 'p2')).toBe('in progress');
+    });
+
+    it('returns "verified" when competitor is marked isVerified in tournamentPlayers', () => {
+      expect(getPlayerQualifierStatus(baseTourney, 'p3')).toBe('verified');
+    });
+
+    it('returns "verified" for all players when tournament brackets are locked/finalized', () => {
+      const lockedTourney: Tournament = {
+        ...baseTourney,
+        isLocked: true,
+      };
+
+      expect(getPlayerQualifierStatus(lockedTourney, 'p1')).toBe('verified');
+      expect(getPlayerQualifierStatus(lockedTourney, 'p2')).toBe('verified');
+      expect(getPlayerQualifierStatus(lockedTourney, 'p3')).toBe('verified');
     });
   });
 });

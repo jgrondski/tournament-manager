@@ -10,6 +10,7 @@ import {
   Users,
   UserPlus,
   Download,
+  DownloadCloud,
   Search,
   UserX,
   AlertTriangle,
@@ -53,6 +54,15 @@ export const ManageTournamentPlayersPage: React.FC = () => {
     [playersPool]
   );
 
+  const availableGlobalPlayers = useMemo(() => {
+    if (!playersPool) return globalPlayers;
+    const existingIds = new Set(playersPool.map(p => p.id));
+    const existingNames = new Set(playersPool.map(p => p.name.toLowerCase()));
+    return globalPlayers.filter(
+      p => !existingIds.has(p.id) && !existingNames.has(p.name.toLowerCase())
+    );
+  }, [playersPool, globalPlayers]);
+
   const playerToRemoveHasMatches = useMemo(() => {
     if (!playerToRemove || !matchScores) return false;
     return Object.values(matchScores).some(
@@ -83,6 +93,12 @@ export const ManageTournamentPlayersPage: React.FC = () => {
 
   const handleImportGlobalPlayers = (playersToImport: PlayerProfile[]) => {
     importPlayersToTournament(tournament.id, playersToImport);
+  };
+
+  const handleImportAllGlobal = () => {
+    if (availableGlobalPlayers.length > 0) {
+      importPlayersToTournament(tournament.id, availableGlobalPlayers);
+    }
   };
 
   const handleConfirmRemove = () => {
@@ -121,6 +137,18 @@ export const ManageTournamentPlayersPage: React.FC = () => {
               <Download size={15} color="var(--color-gold-bright)" />
               Import from Global Pool
             </button>
+            {availableGlobalPlayers.length > 0 && (
+              <button
+                type="button"
+                onClick={handleImportAllGlobal}
+                className="btn btn-secondary"
+                style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', gap: '0.45rem' }}
+                title={`Import all ${availableGlobalPlayers.length} available players from global catalog`}
+              >
+                <DownloadCloud size={15} color="#38bdf8" />
+                Import All Available ({availableGlobalPlayers.length})
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setIsRegisterModalOpen(true)}
@@ -231,7 +259,7 @@ export const ManageTournamentPlayersPage: React.FC = () => {
               <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', margin: 0, maxWidth: '420px' }}>
                 Register competitors directly or import them from the global player pool to begin recording qualifier scores.
               </p>
-              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
                 <button
                   type="button"
                   onClick={() => setIsImportModalOpen(true)}
@@ -241,6 +269,17 @@ export const ManageTournamentPlayersPage: React.FC = () => {
                   <Download size={14} color="var(--color-gold-bright)" />
                   Import from Global Pool
                 </button>
+                {availableGlobalPlayers.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleImportAllGlobal}
+                    className="btn btn-secondary"
+                    style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                  >
+                    <DownloadCloud size={14} color="#38bdf8" />
+                    Import All Available ({availableGlobalPlayers.length})
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setIsRegisterModalOpen(true)}

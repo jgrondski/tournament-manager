@@ -4,6 +4,7 @@ import {
   PlayerProfile,
   QualifierSubmission,
   PointsThreshold,
+  QualifierStatus,
 } from '../tournament/types';
 import { SeededPlayer } from '../bracket/types';
 import { generateTraditionalBracket, generateFlatBracket } from '../bracket/math';
@@ -26,10 +27,42 @@ export interface LeaderboardRankRow {
   maxoutCount?: number;
   kickerScore?: number;
   isDisqualified: boolean;
+  status: QualifierStatus;
   assignedTier?: TournamentTier;
   tierSeed?: number;
   isDNQ: boolean;
   earliestTimestamp: number;
+}
+
+/**
+ * Derives the current qualifier status for a player in a tournament.
+ * - If brackets are locked, all players are auto-flipped to 'verified'.
+ * - If marked isVerified in tournamentPlayers, returns 'verified'.
+ * - If 0 qualifier submissions, returns 'not started'.
+ * - Otherwise returns 'in progress'.
+ */
+export function getPlayerQualifierStatus(
+  tournament: Tournament,
+  playerId: string
+): QualifierStatus {
+  if (tournament.isLocked) {
+    return 'verified';
+  }
+
+  const tPlayer = tournament.tournamentPlayers?.[playerId];
+  if (tPlayer?.isVerified) {
+    return 'verified';
+  }
+
+  const playerSubs = (tournament.qualifierSubmissions || []).filter(
+    s => s.playerId === playerId
+  );
+
+  if (playerSubs.length === 0) {
+    return 'not started';
+  }
+
+  return 'in progress';
 }
 
 /**
@@ -181,6 +214,7 @@ export function deriveLeaderboard(tournament: Tournament): LeaderboardRankRow[] 
       maxoutCount,
       kickerScore,
       isDisqualified,
+      status: getPlayerQualifierStatus(tournament, player.id),
       earliestTimestamp,
     };
   });

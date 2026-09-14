@@ -139,79 +139,9 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
         </div>
       </div>
 
-      {/* Sub-Bar: Tier Selector Tabs & View Personas */}
+      {/* Navigation Bar: Left (Organizer Sheet, Floor Judge, Visual Bracket) | Right (Qualifiers, Standings, Register Players, Settings) */}
       <div style={subRowStyle}>
-        {/* Dynamic Tier Tabs (Gold, Silver, Bronze, etc.) or Add Tier Hint */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', overflowX: 'auto' }}>
-          {tournament.tiers.length === 0 ? (
-            <Link
-              to={`/${tournament.slug}/manage/settings`}
-              onClick={e => handleLinkClick(e, `/${tournament.slug}/manage/settings`)}
-              style={{
-                padding: '0.3rem 0.75rem',
-                borderRadius: 'var(--radius-sm)',
-                fontSize: '0.78rem',
-                color: 'var(--color-text-muted)',
-                textDecoration: 'none',
-                border: '1px dashed var(--color-border)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.35rem',
-              }}
-              title="No bracket tiers configured. Click to configure in Settings."
-            >
-              <span>+ Add Bracket Tier in Settings</span>
-            </Link>
-          ) : (
-            tournament.tiers.map(tier => {
-              const isTierActive = isBracketSpecificView && activeTier?.id === tier.id;
-              const tierPrimary = tier.primaryColor || '#f59e0b';
-              // Target route based on activeView
-              let targetPath = `/${tournament.slug}/${tier.slug}`;
-              if (activeView === 'sheet') targetPath = `/${tournament.slug}/manage/sheet?tier=${tier.slug}`;
-              else if (activeView === 'judge') targetPath = `/${tournament.slug}/manage/judge?tier=${tier.slug}`;
-
-              return (
-                <Link
-                  key={tier.id}
-                  to={targetPath}
-                  onClick={e => handleLinkClick(e, targetPath)}
-                  style={{
-                    padding: '0.4rem 0.85rem',
-                    borderRadius: 'var(--radius-sm)',
-                    fontSize: '0.85rem',
-                    fontWeight: 600,
-                    textDecoration: 'none',
-                    whiteSpace: 'nowrap',
-                    background: isTierActive ? colorWithAlpha(tierPrimary, 0.2, 'var(--color-gold-bg)') : colorWithAlpha(tierPrimary, 0.05, 'transparent'),
-                    color: isTierActive ? tierPrimary : 'var(--color-text-secondary)',
-                    border: isTierActive ? `1px solid ${colorWithAlpha(tierPrimary, 0.7, 'var(--color-gold)')}` : `1px solid ${colorWithAlpha(tierPrimary, 0.25, 'var(--color-border)')}`,
-                    boxShadow: isTierActive ? `0 0 10px ${colorWithAlpha(tierPrimary, 0.25, 'rgba(245, 158, 11, 0.2)')}` : 'none',
-                    transition: 'all 0.15s ease',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.45rem',
-                  }}
-                >
-                  <span
-                    style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      background: tierPrimary,
-                      boxShadow: isTierActive ? `0 0 6px ${tierPrimary}` : 'none',
-                      opacity: isTierActive ? 1 : 0.7,
-                      flexShrink: 0,
-                    }}
-                  />
-                  <span>{tier.name}</span>
-                </Link>
-              );
-            })
-          )}
-        </div>
-
-        {/* View Switcher: Organizer Sheet | Bracket View | Floor Judge | Qualifiers */}
+        {/* Left Side: Bracket & Tournament Operations */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'var(--color-bg-surface-highlight)', padding: '0.2rem', borderRadius: 'var(--radius-sm)' }}>
           <Link
             to={currentTierSlug ? `/${tournament.slug}/manage/sheet?tier=${currentTierSlug}` : `/${tournament.slug}/manage/sheet`}
@@ -224,19 +154,6 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
             }}
           >
             📊 Organizer Sheet
-          </Link>
-
-          <Link
-            to={currentTierSlug ? `/${tournament.slug}/${currentTierSlug}` : `/${tournament.slug}/bracket`}
-            onClick={e => handleLinkClick(e, currentTierSlug ? `/${tournament.slug}/${currentTierSlug}` : `/${tournament.slug}/bracket`)}
-            style={{
-              ...viewTabStyle,
-              background: activeView === 'bracket' ? 'var(--color-bg-surface)' : 'transparent',
-              color: activeView === 'bracket' ? 'var(--color-gold-bright)' : 'var(--color-text-muted)',
-              fontWeight: activeView === 'bracket' ? 700 : 500,
-            }}
-          >
-            🌲 Visual Bracket
           </Link>
 
           <Link
@@ -253,6 +170,22 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
           </Link>
 
           <Link
+            to={currentTierSlug ? `/${tournament.slug}/${currentTierSlug}` : `/${tournament.slug}/bracket`}
+            onClick={e => handleLinkClick(e, currentTierSlug ? `/${tournament.slug}/${currentTierSlug}` : `/${tournament.slug}/bracket`)}
+            style={{
+              ...viewTabStyle,
+              background: activeView === 'bracket' ? 'var(--color-bg-surface)' : 'transparent',
+              color: activeView === 'bracket' ? 'var(--color-gold-bright)' : 'var(--color-text-muted)',
+              fontWeight: activeView === 'bracket' ? 700 : 500,
+            }}
+          >
+            🌲 Visual Bracket
+          </Link>
+        </div>
+
+        {/* Right Side: Qualifiers, Standings, Register Players, Settings */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'var(--color-bg-surface-highlight)', padding: '0.2rem', borderRadius: 'var(--radius-sm)' }}>
+          <Link
             to={`/${tournament.slug}/leaderboard`}
             onClick={e => handleLinkClick(e, `/${tournament.slug}/leaderboard`)}
             style={{
@@ -263,19 +196,6 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
             }}
           >
             🏆 Qualifiers
-          </Link>
-
-          <Link
-            to={`/${tournament.slug}/manage/players`}
-            onClick={e => handleLinkClick(e, `/${tournament.slug}/manage/players`)}
-            style={{
-              ...viewTabStyle,
-              background: activeView === 'players' ? 'var(--color-bg-surface)' : 'transparent',
-              color: activeView === 'players' ? 'var(--color-gold-bright)' : 'var(--color-text-muted)',
-              fontWeight: activeView === 'players' ? 700 : 500,
-            }}
-          >
-            👥 Register Players
           </Link>
 
           <Link
@@ -292,6 +212,19 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
           </Link>
 
           <Link
+            to={`/${tournament.slug}/manage/players`}
+            onClick={e => handleLinkClick(e, `/${tournament.slug}/manage/players`)}
+            style={{
+              ...viewTabStyle,
+              background: activeView === 'players' ? 'var(--color-bg-surface)' : 'transparent',
+              color: activeView === 'players' ? 'var(--color-gold-bright)' : 'var(--color-text-muted)',
+              fontWeight: activeView === 'players' ? 700 : 500,
+            }}
+          >
+            👥 Register Players
+          </Link>
+
+          <Link
             to={`/${tournament.slug}/manage/settings`}
             onClick={e => handleLinkClick(e, `/${tournament.slug}/manage/settings`)}
             style={{
@@ -305,6 +238,82 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
           </Link>
         </div>
       </div>
+
+      {/* Tier Selector Bar (active on bracket-specific views: Sheet, Judge, Bracket) */}
+      {isBracketSpecificView && (
+        <div style={tierRowStyle}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', overflowX: 'auto', width: '100%' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginRight: '0.25rem', whiteSpace: 'nowrap' }}>
+              Bracket Tier:
+            </span>
+            {tournament.tiers.length === 0 ? (
+              <Link
+                to={`/${tournament.slug}/manage/settings`}
+                onClick={e => handleLinkClick(e, `/${tournament.slug}/manage/settings`)}
+                style={{
+                  padding: '0.25rem 0.65rem',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '0.78rem',
+                  color: 'var(--color-text-muted)',
+                  textDecoration: 'none',
+                  border: '1px dashed var(--color-border)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                }}
+                title="No bracket tiers configured. Click to configure in Settings."
+              >
+                <span>+ Add Bracket Tier in Settings</span>
+              </Link>
+            ) : (
+              tournament.tiers.map(tier => {
+                const isTierActive = isBracketSpecificView && activeTier?.id === tier.id;
+                const tierPrimary = tier.primaryColor || '#f59e0b';
+                let targetPath = `/${tournament.slug}/${tier.slug}`;
+                if (activeView === 'sheet') targetPath = `/${tournament.slug}/manage/sheet?tier=${tier.slug}`;
+                else if (activeView === 'judge') targetPath = `/${tournament.slug}/manage/judge?tier=${tier.slug}`;
+
+                return (
+                  <Link
+                    key={tier.id}
+                    to={targetPath}
+                    onClick={e => handleLinkClick(e, targetPath)}
+                    style={{
+                      padding: '0.35rem 0.8rem',
+                      borderRadius: 'var(--radius-sm)',
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
+                      textDecoration: 'none',
+                      whiteSpace: 'nowrap',
+                      background: isTierActive ? colorWithAlpha(tierPrimary, 0.2, 'var(--color-gold-bg)') : colorWithAlpha(tierPrimary, 0.05, 'transparent'),
+                      color: isTierActive ? tierPrimary : 'var(--color-text-secondary)',
+                      border: isTierActive ? `1px solid ${colorWithAlpha(tierPrimary, 0.7, 'var(--color-gold)')}` : `1px solid ${colorWithAlpha(tierPrimary, 0.25, 'var(--color-border)')}`,
+                      boxShadow: isTierActive ? `0 0 10px ${colorWithAlpha(tierPrimary, 0.25, 'rgba(245, 158, 11, 0.2)')}` : 'none',
+                      transition: 'all 0.15s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.45rem',
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        background: tierPrimary,
+                        boxShadow: isTierActive ? `0 0 6px ${tierPrimary}` : 'none',
+                        opacity: isTierActive ? 1 : 0.7,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span>{tier.name}</span>
+                  </Link>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
     </header>
   );
 };
@@ -392,4 +401,14 @@ const viewTabStyle: React.CSSProperties = {
   textDecoration: 'none',
   transition: 'all 0.1s ease',
   whiteSpace: 'nowrap',
+};
+
+const tierRowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  padding: '0.35rem 1.5rem',
+  background: 'var(--color-bg-surface)',
+  borderTop: '1px solid var(--color-border-subtle)',
+  overflowX: 'auto',
+  gap: '0.5rem',
 };

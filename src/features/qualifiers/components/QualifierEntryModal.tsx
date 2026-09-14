@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Tournament, PlayerProfile } from '../../tournament/types';
 import { useTournament } from '../../tournament/store';
 import { CreatablePlayerSelect } from './CreatablePlayerSelect';
-import { Trophy, Plus, Trash2, X } from 'lucide-react';
+import { Trophy, Plus, Trash2, X, Check } from 'lucide-react';
+import { getPlayerQualifierStatus } from '../scoring';
 
 interface QualifierEntryModalProps {
   isOpen: boolean;
@@ -19,14 +20,27 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
     addPlayerToPool,
     submitQualifierScore,
     deleteQualifierScore,
+    togglePlayerQualifierVerified,
     globalPlayers,
     importPlayersToTournament,
   } = useTournament();
 
-  const [selectedPlayer, setSelectedPlayer] = useState<PlayerProfile | null>(
-    tournament.playersPool[0] || null
-  );
+  const [selectedPlayer, setSelectedPlayer] = useState<PlayerProfile | null>(null);
   const [scoreInput, setScoreInput] = useState<string>('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedPlayer(null);
+      setScoreInput('');
+    }
+  }, [isOpen]);
+
+  const qualStatus = useMemo(() => {
+    if (!selectedPlayer) return 'not started';
+    return getPlayerQualifierStatus(tournament, selectedPlayer.id);
+  }, [tournament, selectedPlayer]);
+
+  const isVerified = qualStatus === 'verified';
 
   if (!isOpen) return null;
 
@@ -38,7 +52,7 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
   const numericScore = parseInt(scoreInput, 10);
   const isScoreValid = Boolean(selectedPlayer) && !isNaN(numericScore) && numericScore > 0;
 
-  const handlePlayerSelected = (player: PlayerProfile) => {
+  const handlePlayerSelected = (player: PlayerProfile | null) => {
     setSelectedPlayer(player);
   };
 
@@ -166,6 +180,55 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
 
           {selectedPlayer && (
             <>
+              {/* Qualifier Verification Status Bar */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '0.65rem 0.85rem',
+                  background: 'var(--color-bg-surface-elevated)',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--color-border)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Status:</span>
+                  {qualStatus === 'verified' && (
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#4ade80', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <Check size={12} /> Verified
+                    </span>
+                  )}
+                  {qualStatus === 'in progress' && (
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-gold-bright)' }}>
+                      In Progress
+                    </span>
+                  )}
+                  {qualStatus === 'not started' && (
+                    <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--color-text-muted)' }}>
+                      Not Started
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => togglePlayerQualifierVerified(tournament.id, selectedPlayer.id)}
+                  className={`btn ${isVerified ? 'btn-secondary' : 'btn-primary'}`}
+                  style={{
+                    padding: '0.25rem 0.65rem',
+                    fontSize: '0.75rem',
+                    gap: '0.3rem',
+                    borderColor: isVerified ? 'rgba(34, 197, 94, 0.5)' : undefined,
+                    color: isVerified ? '#4ade80' : undefined,
+                  }}
+                  title={isVerified ? 'Click to unverify qualifier' : 'Click to verify qualifier as judge'}
+                >
+                  <Check size={12} />
+                  {isVerified ? 'Verified' : 'Verify'}
+                </button>
+              </div>
+
               {/* 2. Score Submission Form */}
               <form onSubmit={handleSubmitScore} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <label style={labelStyle}>New Attempt Score</label>

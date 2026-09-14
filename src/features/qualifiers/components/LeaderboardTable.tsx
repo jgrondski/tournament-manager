@@ -3,7 +3,7 @@ import { Tournament, PlayerProfile } from '../../tournament/types';
 import { deriveLeaderboard, LeaderboardRankRow, calculatePoints } from '../scoring';
 import { QualifierEntryModal } from './QualifierEntryModal';
 import { PlayerDetailDrawer } from './PlayerDetailDrawer';
-import { Search, Trophy, Plus, User, Sparkles, ChevronRight } from 'lucide-react';
+import { Search, Trophy, Plus, User, Sparkles, ChevronRight, Check } from 'lucide-react';
 
 interface LeaderboardTableProps {
   tournament: Tournament;
@@ -199,7 +199,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
 
                       {/* Player Info */}
                       <td style={tdStyle}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                           <User size={14} color="var(--color-text-muted)" />
                           <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
                             {row.player.name}
@@ -212,6 +212,59 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                           {row.player.country && (
                             <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', background: 'rgba(255,255,255,0.05)', padding: '0.1rem 0.35rem', borderRadius: 'var(--radius-sm)' }}>
                               {row.player.country}
+                            </span>
+                          )}
+
+                          {/* Qualifier State Badge */}
+                          {row.status === 'verified' && (
+                            <span
+                              style={{
+                                fontSize: '0.68rem',
+                                fontWeight: 700,
+                                padding: '0.12rem 0.45rem',
+                                borderRadius: 'var(--radius-sm)',
+                                background: 'rgba(34, 197, 94, 0.15)',
+                                color: '#4ade80',
+                                border: '1px solid rgba(34, 197, 94, 0.3)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.2rem',
+                              }}
+                              title="Qualifier verified"
+                            >
+                              <Check size={10} /> Verified
+                            </span>
+                          )}
+                          {row.status === 'in progress' && (
+                            <span
+                              style={{
+                                fontSize: '0.68rem',
+                                fontWeight: 600,
+                                padding: '0.12rem 0.45rem',
+                                borderRadius: 'var(--radius-sm)',
+                                background: 'rgba(245, 158, 11, 0.15)',
+                                color: 'var(--color-gold-bright)',
+                                border: '1px solid rgba(245, 158, 11, 0.3)',
+                              }}
+                              title="Qualifier in progress"
+                            >
+                              In Progress
+                            </span>
+                          )}
+                          {row.status === 'not started' && (
+                            <span
+                              style={{
+                                fontSize: '0.68rem',
+                                fontWeight: 500,
+                                padding: '0.12rem 0.45rem',
+                                borderRadius: 'var(--radius-sm)',
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                color: 'var(--color-text-muted)',
+                                border: '1px solid var(--color-border-subtle)',
+                              }}
+                              title="Not started"
+                            >
+                              Not Started
                             </span>
                           )}
                         </div>

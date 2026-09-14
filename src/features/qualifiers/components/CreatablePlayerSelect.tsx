@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { PlayerProfile } from '../../tournament/types';
-import { User, Plus, Search, Check } from 'lucide-react';
+import { User, Plus, Search, Check, X } from 'lucide-react';
 
 interface CreatablePlayerSelectProps {
   playersPool: PlayerProfile[];
   globalPlayers?: PlayerProfile[];
   selectedPlayer: PlayerProfile | null;
-  onSelectPlayer: (player: PlayerProfile) => void;
+  onSelectPlayer: (player: PlayerProfile | null) => void;
   onCreatePlayer: (name: string) => PlayerProfile;
   onSelectGlobalPlayer?: (player: PlayerProfile) => void;
 }
@@ -26,6 +26,8 @@ export const CreatablePlayerSelect: React.FC<CreatablePlayerSelectProps> = ({
   useEffect(() => {
     if (selectedPlayer) {
       setQuery(selectedPlayer.name);
+    } else {
+      setQuery('');
     }
   }, [selectedPlayer]);
 
@@ -88,6 +90,13 @@ export const CreatablePlayerSelect: React.FC<CreatablePlayerSelectProps> = ({
     setIsOpen(false);
   };
 
+  const handleClear = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setQuery('');
+    onSelectPlayer(null);
+    setIsOpen(false);
+  };
+
   return (
     <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
       <div style={{ position: 'relative' }}>
@@ -102,7 +111,7 @@ export const CreatablePlayerSelect: React.FC<CreatablePlayerSelectProps> = ({
           placeholder="Search or enter competitor name..."
           style={{
             width: '100%',
-            padding: '0.65rem 0.85rem 0.65rem 2.25rem',
+            padding: '0.65rem 2.25rem 0.65rem 2.25rem',
             borderRadius: 'var(--radius-sm)',
             border: '1px solid var(--color-border)',
             background: 'var(--color-bg-base)',
@@ -115,6 +124,28 @@ export const CreatablePlayerSelect: React.FC<CreatablePlayerSelectProps> = ({
           color="var(--color-text-muted)"
           style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }}
         />
+        {query && (
+          <button
+            type="button"
+            onClick={handleClear}
+            style={{
+              position: 'absolute',
+              right: '10px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--color-text-muted)',
+              cursor: 'pointer',
+              padding: '2px',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+            title="Clear player selection"
+          >
+            <X size={15} />
+          </button>
+        )}
       </div>
 
       {isOpen && (

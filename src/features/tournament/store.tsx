@@ -46,6 +46,11 @@ interface TournamentContextType {
     playerId: string,
     qualsCompleted: boolean
   ) => void;
+  togglePlayerQualifierVerified: (
+    tournamentId: string,
+    playerId: string,
+    isVerified?: boolean
+  ) => void;
   lockTournament: (tournamentId: string) => void;
   unlockBrackets: (tournamentId: string) => { success: boolean; error?: string };
   recordGameScore: (
@@ -358,6 +363,29 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     );
   };
 
+  const togglePlayerQualifierVerified = (
+    tournamentId: string,
+    playerId: string,
+    isVerified?: boolean
+  ) => {
+    setTournaments(prev =>
+      prev.map(t => {
+        if (t.id !== tournamentId) return t;
+        const currentPlayers = t.tournamentPlayers || {};
+        const existing = currentPlayers[playerId] || {
+          playerId,
+          tournamentId,
+        };
+        const newVerified = isVerified !== undefined ? isVerified : !existing.isVerified;
+        const updatedPlayers = {
+          ...currentPlayers,
+          [playerId]: { ...existing, isVerified: newVerified },
+        };
+        return { ...t, tournamentPlayers: updatedPlayers };
+      })
+    );
+  };
+
   const lockTournament = (tournamentId: string) => {
     setTournaments(prev =>
       prev.map(t => {
@@ -367,10 +395,25 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           ...tier,
           isLocked: true,
         }));
+        // If the bracket is finalized and locked, all players not verified and completed will be auto-flipped to "verified"
+        const currentPlayers = t.tournamentPlayers || {};
+        const updatedPlayers = { ...currentPlayers };
+        (t.playersPool || []).forEach(p => {
+          const existing = updatedPlayers[p.id] || {
+            playerId: p.id,
+            tournamentId: t.id,
+          };
+          updatedPlayers[p.id] = {
+            ...existing,
+            isVerified: true,
+            qualsCompleted: true,
+          };
+        });
         return {
           ...t,
           isLocked: true,
           tiers: lockedTiers,
+          tournamentPlayers: updatedPlayers,
         };
       })
     );
@@ -1125,6 +1168,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         deleteQualifierScore,
         togglePlayerDisqualification,
         togglePlayerQualsCompleted,
+        togglePlayerQualifierVerified,
         lockTournament,
         unlockBrackets,
         recordGameScore,

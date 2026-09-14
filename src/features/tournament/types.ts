@@ -67,12 +67,15 @@ export interface QualifierSubmission {
   submittedAt: number; // timestamp in ms
 }
 
+export type QualifierStatus = 'not started' | 'in progress' | 'verified' | 'awaiting verification';
+
 export interface TournamentPlayer {
   playerId: string;
   tournamentId: string;
   tierId?: string;
   seed?: number;
   qualsCompleted?: boolean;
+  isVerified?: boolean;
 }
 
 export interface QualifierScore {
