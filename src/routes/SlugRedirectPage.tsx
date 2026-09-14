@@ -17,8 +17,12 @@ export const SlugRedirectPage: React.FC = () => {
       navigate('/', { replace: true });
       return;
     }
+    if (tournament.tiers.length === 0) {
+      navigate(`/${slug}/leaderboard`, { replace: true });
+      return;
+    }
     const highestPriorityTier = [...tournament.tiers].sort((a, b) => a.priority - b.priority)[0];
-    const defaultTierSlug = highestPriorityTier ? highestPriorityTier.slug : 'gold';
+    const defaultTierSlug = highestPriorityTier.slug;
     navigate(`/${slug}/${defaultTierSlug}`, { replace: true });
   }, [slug, navigate, getTournamentBySlug]);
 

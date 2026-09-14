@@ -8,11 +8,12 @@ export const PublicTierBracketPage: React.FC = () => {
   const { slug, tierSlug } = useParams<{ slug: string; tierSlug: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { getTierBySlug } = useTournament();
+  const { getTierBySlug, getTournamentBySlug } = useTournament();
 
   const isObsMode = searchParams.get('obs') === 'true';
 
   const tierData = slug && tierSlug ? getTierBySlug(slug, tierSlug) : undefined;
+  const tournamentFallback = slug ? getTournamentBySlug(slug) : undefined;
 
   // If in OBS mode, ensure background is transparent
   useEffect(() => {
@@ -27,6 +28,31 @@ export const PublicTierBracketPage: React.FC = () => {
   }, [isObsMode]);
 
   if (!tierData) {
+    if (tournamentFallback && tournamentFallback.tiers.length === 0) {
+      return (
+        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+          <TournamentNavbar
+            tournament={tournamentFallback}
+            activeView="bracket"
+          />
+          <main style={{ flex: 1, padding: '3rem 1.5rem', textAlign: 'center', maxWidth: '600px', margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
+            <h2 style={{ color: 'var(--color-text-primary)', fontSize: '1.4rem' }}>No Bracket Tiers Configured</h2>
+            <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem', lineHeight: 1.5 }}>
+              This tournament does not have any bracket tiers yet. Qualifiers can be entered and ranked on the leaderboard, or you can create bracket tiers in Settings.
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+              <button onClick={() => navigate(`/${tournamentFallback.slug}/leaderboard`)} className="btn btn-secondary">
+                🏆 View Qualifiers
+              </button>
+              <button onClick={() => navigate(`/${tournamentFallback.slug}/manage/settings`)} className="btn btn-primary">
+                ⚙️ Configure Tiers in Settings
+              </button>
+            </div>
+          </main>
+        </div>
+      );
+    }
+
     return (
       <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
         <h2>Bracket Not Found</h2>

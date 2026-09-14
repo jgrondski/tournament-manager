@@ -414,7 +414,9 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
               </div>
             ) : playerMatches.length === 0 ? (
               <div style={{ padding: '1.25rem', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.82rem' }}>
-                No bracket matches scheduled or recorded for this competitor yet.
+                {tournament.tiers.length === 0
+                  ? 'No bracket tiers configured for this tournament yet.'
+                  : 'No bracket matches scheduled or recorded for this competitor yet.'}
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>

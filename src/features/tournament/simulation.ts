@@ -174,7 +174,9 @@ export function generateSimulatedQualifiers(
 } {
   const totalCapacity = tournament.tiers.reduce((acc, t) => acc + (t.playerCount || 0), 0);
   const extra1d6 = Math.floor(Math.random() * 6) + 1; // 1d6 roll (1 to 6)
-  const targetCount = Math.max(8, totalCapacity + extra1d6);
+  const targetCount = totalCapacity > 0
+    ? Math.max(8, totalCapacity + extra1d6)
+    : Math.max(24, (tournament.playersPool || []).length) + extra1d6;
 
   // Preserve any competitors already added to the tournament
   const players: PlayerProfile[] = [...(tournament.playersPool || [])];

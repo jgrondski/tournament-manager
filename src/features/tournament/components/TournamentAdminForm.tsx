@@ -25,6 +25,7 @@ import {
   Check,
 } from 'lucide-react';
 import { generateTraditionalBracket, generateFlatBracket, getValidFlatWidths } from '../../bracket/math';
+import { generateDraftBracketsForTournament } from '../../qualifiers/scoring';
 import { BestOfSelect } from '../../bracket/components/BestOfSelect';
 import { ImportFromGlobalModal } from '../../players/components/ImportFromGlobalModal';
 import { PlayerEditModal } from '../../players/components/PlayerEditModal';
@@ -623,7 +624,9 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
         { bestOf: 3 }
       ),
     };
-    setTiers([...tiers, newTier]);
+    const nextTiers = [...tiers, newTier];
+    const draftTiers = generateDraftBracketsForTournament({ ...tournament, tiers: nextTiers });
+    setTiers(draftTiers);
   };
 
   const updateTier = (index: number, updates: Partial<TournamentTier>) => {
@@ -647,7 +650,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
         target = pruneInvalidRoundOverrides(target);
       }
       next[index] = target;
-      return next;
+      return generateDraftBracketsForTournament({ ...tournament, tiers: next });
     });
   };
 
@@ -661,19 +664,20 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
       const temp = next[index];
       next[index] = next[swapIndex];
       next[swapIndex] = temp;
-      return next.map((t, idx) => ({ ...t, priority: idx + 1 }));
+      const reordered = next.map((t, idx) => ({ ...t, priority: idx + 1 }));
+      return generateDraftBracketsForTournament({ ...tournament, tiers: reordered });
     });
   };
 
   const deleteTier = (index: number) => {
     setTiers(prev => {
-      const next = prev.filter((_, i) => i !== index);
-      return next.map((t, idx) => ({ ...t, priority: idx + 1 }));
+      const next = prev.filter((_, i) => i !== index).map((t, idx) => ({ ...t, priority: idx + 1 }));
+      return generateDraftBracketsForTournament({ ...tournament, tiers: next });
     });
   };
 
   const saveCurrentConfig = () => {
-    const updatedTiers = tiers.map(tier => {
+    const baseTiers = tiers.map(tier => {
       const dummyPlayers = Array.from({ length: tier.playerCount }, (_, i) => ({
         id: `dummy_${i + 1}`,
         name: `Seed ${i + 1}`,
@@ -698,6 +702,8 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
         bracket: newBracket,
       };
     });
+
+    const updatedTiers = generateDraftBracketsForTournament({ ...tournament, tiers: baseTiers });
 
     let parsedAvg = 2;
     if (qualFormat === 'AVERAGE_OF_X') {
@@ -1756,7 +1762,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
             <button
               type="button"
               onClick={handleSeedQualifiers}
-              disabled={!hasTiers || hasQualifiers || hasRecordedMatches}
+              disabled={hasQualifiers || hasRecordedMatches}
               className="btn btn-secondary"
               style={{
                 padding: '0.55rem 1.1rem',
@@ -1764,13 +1770,11 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '0.5rem',
-                opacity: (!hasTiers || hasQualifiers || hasRecordedMatches) ? 0.45 : 1,
-                cursor: (!hasTiers || hasQualifiers || hasRecordedMatches) ? 'not-allowed' : 'pointer',
+                opacity: (hasQualifiers || hasRecordedMatches) ? 0.45 : 1,
+                cursor: (hasQualifiers || hasRecordedMatches) ? 'not-allowed' : 'pointer',
               }}
               title={
-                !hasTiers
-                  ? 'Add at least one bracket tier first'
-                  : hasRecordedMatches
+                hasRecordedMatches
                   ? 'Match play has begun. Clear match scores or all tournament data to re-seed.'
                   : hasQualifiers
                   ? 'Qualifiers have already been seeded. Clear qualifier scores to re-seed.'
@@ -1797,7 +1801,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
               }}
               title={
                 !hasTiers
-                  ? 'Add at least one bracket tier first'
+                  ? 'Add at least one bracket tier first before simulating tournament matches'
                   : hasRecordedMatches
                   ? 'Match results have already been recorded. Clear match scores to simulate again.'
                   : hasQualifiers

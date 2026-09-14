@@ -22,8 +22,33 @@ export const ManageJudgePage: React.FC = () => {
     );
   }
 
-  const requestedTierSlug = searchParams.get('tier') || tournament.tiers[0]?.slug || 'gold';
+  const requestedTierSlug = searchParams.get('tier') || tournament.tiers[0]?.slug;
   const tier = tournament.tiers.find(t => t.slug === requestedTierSlug || t.id === requestedTierSlug) || tournament.tiers[0];
+
+  if (!tier) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <TournamentNavbar
+          tournament={tournament}
+          activeView="judge"
+        />
+        <main style={{ flex: 1, padding: '3rem 1.5rem', textAlign: 'center', maxWidth: '600px', margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
+          <h2 style={{ color: 'var(--color-text-primary)', fontSize: '1.4rem' }}>No Bracket Tiers Configured</h2>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem', lineHeight: 1.5 }}>
+            Floor Judge requires at least one bracket tier to manage matches. Once bracket tiers are configured, matches will appear here for scoring.
+          </p>
+          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button onClick={() => navigate(`/${tournament.slug}/leaderboard`)} className="btn btn-secondary">
+              🏆 View Qualifiers
+            </button>
+            <button onClick={() => navigate(`/${tournament.slug}/manage/settings`)} className="btn btn-primary">
+              ⚙️ Configure Tiers in Settings
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>

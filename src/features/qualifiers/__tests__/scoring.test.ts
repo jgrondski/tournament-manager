@@ -342,5 +342,32 @@ describe('Qualifiers Scoring Engine', () => {
       expect(silverBracket.rounds[0].matches[0].player2.player?.name).toBe('Eve');
       expect(silverBracket.rounds[0].matches[0].player2.player?.seed).toBe(2);
     });
+
+    it('assigns ranks without marking players as DNQ when tournament has no tiers (bracketless quals)', () => {
+      const tierlessTournament: Tournament = {
+        ...tournament,
+        tiers: [],
+      };
+
+      const rows = deriveLeaderboard(tierlessTournament);
+      expect(rows).toHaveLength(6);
+
+      // Ranked 1 through 5, and DQ for Dave
+      expect(rows[0].rank).toBe(1);
+      expect(rows[0].player.name).toBe('Alice');
+      expect(rows[0].isDNQ).toBe(false);
+      expect(rows[0].assignedTier).toBeUndefined();
+      expect(rows[0].tierSeed).toBeUndefined();
+
+      expect(rows[4].rank).toBe(5);
+      expect(rows[4].player.name).toBe('Frank');
+      expect(rows[4].isDNQ).toBe(false);
+      expect(rows[4].assignedTier).toBeUndefined();
+      expect(rows[4].tierSeed).toBeUndefined();
+
+      expect(rows[5].rank).toBe('DQ');
+      expect(rows[5].isDisqualified).toBe(true);
+      expect(rows[5].isDNQ).toBe(false);
+    });
   });
 });

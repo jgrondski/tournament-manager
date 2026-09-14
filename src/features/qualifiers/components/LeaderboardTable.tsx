@@ -37,9 +37,10 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
     });
   });
 
+  const hasBrackets = tournament.tiers.length > 0;
   const format = tournament.qualFormat;
   const targetX = tournament.qualAverageCount || 2;
-  const tableColSpan = 5;
+  const tableColSpan = hasBrackets ? 5 : 4;
 
   return (
     <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -131,14 +132,18 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                 </>
               )}
 
-              <th style={{ ...thStyle, width: '150px', textAlign: 'center' }}>Bracket Seed</th>
+              {hasBrackets && (
+                <th style={{ ...thStyle, width: '150px', textAlign: 'center' }}>Bracket Seed</th>
+              )}
             </tr>
           </thead>
           <tbody>
             {filteredRows.length === 0 ? (
               <tr>
-                <td colSpan={tableColSpan} style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                  No competitors found matching &quot;{searchTerm}&quot;.
+                <td colSpan={tableColSpan} style={{ padding: '2.5rem 1.5rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                  {searchTerm
+                    ? `No competitors found matching "${searchTerm}".`
+                    : 'No competitors registered yet. Register competitors in Settings or click "Record Qual Submission" to add a player.'}
                 </td>
               </tr>
             ) : (
@@ -146,9 +151,9 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                 const isRankNumeric = typeof row.rank === 'number';
                 const cutoffInfo = isRankNumeric ? cutoffRanks.get(row.rank as number) : undefined;
 
-                // Subtle tier color row tinting
+                // Subtle tier color row tinting when brackets exist
                 let rowBg = idx % 2 === 0 ? 'var(--color-bg-surface)' : 'var(--color-bg-surface-elevated)';
-                if (row.assignedTier?.primaryColor) {
+                if (hasBrackets && row.assignedTier?.primaryColor) {
                   rowBg = `${row.assignedTier.primaryColor}0d`; // ~5% opacity tint
                 } else if (row.isDisqualified) {
                   rowBg = 'rgba(239, 68, 68, 0.05)';
@@ -390,43 +395,45 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                         </>
                       )}
 
-                      {/* Tier Cutoff & Seed Column */}
-                      <td style={{ ...tdStyle, textAlign: 'center' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-                          {row.assignedTier && row.tierSeed !== undefined ? (
-                            <span
-                              style={{
-                                display: 'inline-block',
-                                padding: '0.2rem 0.6rem',
-                                borderRadius: 'var(--radius-full)',
-                                fontSize: '0.75rem',
-                                fontWeight: 700,
-                                background: `${row.assignedTier.primaryColor || '#f59e0b'}26`,
-                                color: row.assignedTier.primaryColor || 'var(--color-gold-bright)',
-                                border: `1px solid ${row.assignedTier.primaryColor || 'var(--color-gold)'}4d`,
-                              }}
-                            >
-                              {row.assignedTier.name} #{row.tierSeed}
-                            </span>
-                          ) : row.isDisqualified ? (
-                            <span className="badge badge-muted" style={{ color: '#f87171' }}>
-                              Disqualified
-                            </span>
-                          ) : row.isDNQ ? (
-                            <span className="badge badge-muted" title="Did Not Qualify for active brackets">
-                              DNQ
-                            </span>
-                          ) : (
-                            <span className="badge badge-muted">Pending</span>
-                          )}
+                      {/* Tier Cutoff & Seed Column (Only when brackets exist) */}
+                      {hasBrackets && (
+                        <td style={{ ...tdStyle, textAlign: 'center' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                            {row.assignedTier && row.tierSeed !== undefined ? (
+                              <span
+                                style={{
+                                  display: 'inline-block',
+                                  padding: '0.2rem 0.6rem',
+                                  borderRadius: 'var(--radius-full)',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  background: `${row.assignedTier.primaryColor || '#f59e0b'}26`,
+                                  color: row.assignedTier.primaryColor || 'var(--color-gold-bright)',
+                                  border: `1px solid ${row.assignedTier.primaryColor || 'var(--color-gold)'}4d`,
+                                }}
+                              >
+                                {row.assignedTier.name} #{row.tierSeed}
+                              </span>
+                            ) : row.isDisqualified ? (
+                              <span className="badge badge-muted" style={{ color: '#f87171' }}>
+                                Disqualified
+                              </span>
+                            ) : row.isDNQ ? (
+                              <span className="badge badge-muted" title="Did Not Qualify for active brackets">
+                                DNQ
+                              </span>
+                            ) : (
+                              <span className="badge badge-muted">Pending</span>
+                            )}
 
-                          <ChevronRight size={14} color="var(--color-text-muted)" />
-                        </div>
-                      </td>
+                            <ChevronRight size={14} color="var(--color-text-muted)" />
+                          </div>
+                        </td>
+                      )}
                     </tr>
 
-                    {/* Dynamic Tier Cutoff Line Divider */}
-                    {cutoffInfo && (
+                    {/* Dynamic Tier Cutoff Line Divider (Only when brackets exist) */}
+                    {hasBrackets && cutoffInfo && (
                       <tr
                         style={{
                           background: `${cutoffInfo.color}1a`,

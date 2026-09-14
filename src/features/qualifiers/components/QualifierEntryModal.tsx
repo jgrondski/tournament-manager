@@ -184,6 +184,11 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
               onSelectGlobalPlayer={handleSelectGlobalPlayer}
               onCreatePlayer={handleCreatePlayer}
             />
+            {tournament.playersPool.length === 0 && (
+              <p style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', marginTop: '0.4rem', fontStyle: 'italic' }}>
+                💡 Roster is currently empty. Type a player name above to register a competitor and record their score, or select from global pool.
+              </p>
+            )}
           </div>
 
           {selectedPlayer && (

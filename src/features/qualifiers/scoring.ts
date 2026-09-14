@@ -274,6 +274,18 @@ export function deriveLeaderboard(tournament: Tournament): LeaderboardRankRow[] 
       };
     }
 
+    // If no tiers configured yet (pure qualifiers mode before brackets are added)
+    if (tierRanges.length === 0) {
+      return {
+        ...item,
+        rank,
+        globalRank: idx + 1,
+        assignedTier: undefined,
+        tierSeed: undefined,
+        isDNQ: false,
+      };
+    }
+
     return {
       ...item,
       rank,

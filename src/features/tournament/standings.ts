@@ -617,7 +617,37 @@ export function calculateGlobalStandings(tournament: Tournament): GlobalStanding
     }
   }
 
-  // 3. Handle any bracket players who were not eliminated or placed yet (e.g. tournament in-progress)
+  // 3. Handle pure qualifiers tournament without tiers/brackets
+  if (sortedTiers.length === 0) {
+    const qualRows = leaderboard.filter(r => !r.isDisqualified && !placedPlayerIds.has(r.player.id));
+    for (const row of qualRows) {
+      const stats = calculatePlayerStats(tournament, row.player.id);
+      const qualRank = qualRankMap.get(row.player.id);
+      const finalRank = currentRank++;
+
+      globalStandings.push({
+        finalRank,
+        rankLabel: getRankOrdinal(finalRank),
+        player: {
+          id: row.player.id,
+          name: row.player.name,
+          country: row.player.country,
+          playstyle: row.player.playstyle,
+        },
+        tier: undefined,
+        eliminationRound: 'Qualifier',
+        stats,
+        qualScore: row.finalScore,
+        qualRank,
+        rankDelta: 0,
+        isDNQ: false,
+        isDisqualified: false,
+      });
+      placedPlayerIds.add(row.player.id);
+    }
+  }
+
+  // 4. Handle any bracket players who were not eliminated or placed yet (e.g. tournament in-progress)
   for (const tier of sortedTiers) {
     const tierRows = leaderboard.filter(r => r.assignedTier?.id === tier.id && !placedPlayerIds.has(r.player.id));
     for (const row of tierRows) {

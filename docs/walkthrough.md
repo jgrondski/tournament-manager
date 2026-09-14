@@ -1,70 +1,114 @@
-# Walkthrough: Profile Reorder, Standings & Qualifier Styling, Points Chips & Simulation Scaling
+# Walkthrough: Bracketless Tournament Creation & Adaptive Qual Board
 
-This update implements 5 user-requested improvements across player profiles, tournament standings, qualifier leaderboards, and simulation scoring.
+This update implements the workflow where new tournaments are created with zero initial brackets or tiers, allowing organizers to register competitors and log qualifier submissions immediately on a pure **qual board**. Once bracket tiers are created in Settings, the full **bracket-seeding leaderboard view** activates seamlessly.
 
 ---
 
 ## 1. Summary of Changes
 
-### 1.1 Player Profile Layout Reordering
-* **File:** [PlayerDetailDrawer.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/qualifiers/components/PlayerDetailDrawer.tsx)
+### 1.1 Zero Initial Brackets on Tournament Creation
+* **File:** [TournamentSwitcherPage.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/routes/TournamentSwitcherPage.tsx)
 * **Change:**
-  * Reordered the drawer sections so **Bracket Match Play Record** appears directly beneath the Competitor Profile grid.
-  * Moved **Qual Submissions Audit Log** (along with the "Log Attempt" action button) to the very bottom of the page.
+  * Removed default generation of Gold & Silver tiers and mock seed players upon tournament creation (`tiers: []`).
+  * Updated tournament cards on the home page:
+    * Displays competitor count from `playersPool` instead of seeded bracket counts when `tiers.length === 0`.
+    * Replaces tier badges with a subtle *"No bracket tiers configured (Qualifiers open)"* notice.
+    * Makes **🏆 Qualifiers** the primary action button (`btn-primary`) when no brackets exist.
+    * Safely links Sheet, Bracket, and Judge buttons to Settings or graceful fallback states.
 
-### 1.2 Standings Page Placement Colors & Visible Row Separators
-* **File:** [FinalStandingsTable.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/tournament/components/FinalStandingsTable.tsx)
+### 1.2 Graceful Routing & Tierless Navigation
+* **Files:**
+  * [SlugRedirectPage.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/routes/SlugRedirectPage.tsx)
+  * [TournamentNavbar.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/components/TournamentNavbar.tsx)
+  * [ManageSheetPage.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/routes/ManageSheetPage.tsx)
+  * [ManageJudgePage.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/routes/ManageJudgePage.tsx)
+  * [PublicTierBracketPage.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/routes/PublicTierBracketPage.tsx)
 * **Change:**
-  * Added tier-colored background tinting to all standings rows (Gold rows receive gold tint, Silver rows receive silver tint, etc.), matching the qualifiers leaderboard styling.
-  * Replaced the low-contrast row border (`#1e293b`) with a much darker, crisp separator: `1px solid rgba(0, 0, 0, 0.65)`.
+  * Root tournament URL `/:slug` redirects directly to `/:slug/leaderboard` when `tiers.length === 0`, rather than failing looking for a nonexistent `/gold` tier.
+  * In `TournamentNavbar`, if no tiers are configured, displays a `+ Add Bracket Tier in Settings` link in the tier sub-row.
+  * In `ManageSheetPage`, `ManageJudgePage`, and `PublicTierBracketPage`, if accessed while no tiers exist, renders a friendly, styled empty state guiding the organizer to view Qualifiers or configure tiers in Settings.
 
-### 1.3 Qualifiers Leaderboard Visible Row Separators
-* **File:** [LeaderboardTable.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/qualifiers/components/LeaderboardTable.tsx)
+### 1.3 Pure Qual Board vs. Full Tiered Leaderboard
+* **Files:**
+  * [scoring.ts](file:///Users/jgrondski/src/repos/tournament-manager/src/features/qualifiers/scoring.ts)
+  * [LeaderboardTable.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/qualifiers/components/LeaderboardTable.tsx)
+  * [QualifierEntryModal.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/qualifiers/components/QualifierEntryModal.tsx)
 * **Change:**
-  * Darkened the row separator border in the qualifiers leaderboard table from `#1a253a` to `1px solid rgba(0, 0, 0, 0.65)`.
-  * Rows and tier groups now have clear, distinct separation even over dark and tinted backgrounds.
+  * In `scoring.ts`: when `tournament.tiers.length === 0`, all ranked competitors have `isDNQ: false` (no cutoffs exist yet, so no player has missed qualification).
+  * In `LeaderboardTable.tsx`:
+    * When `tiers.length === 0` (no brackets made):
+      * Renders as a pure **qual board**: Rank, Competitor, and Format Scores/Points.
+      * Omit the **Bracket Seed** column (`<th>` and `<td>` removed).
+      * Omit tier cutoff divider lines.
+      * Omit tier background tinting (clean neutral alternating rows).
+      * Displays an informative empty state if 0 competitors are registered yet.
+    * When `tiers.length > 0` (brackets created):
+      * Activates the full **current leaderboard view** with Bracket Seed column, tier cutoffs, and tier tints, regardless of whether qualifiers are open or locked.
+  * In `QualifierEntryModal.tsx`:
+    * Added a helpful empty-roster hint under the combobox: *"💡 Roster is currently empty. Type a player name above to register a competitor and record their score, or select from global pool."*
 
-### 1.4 Points Qual Sheet: Only Show Points-Bearing Chips
-* **File:** [LeaderboardTable.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/qualifiers/components/LeaderboardTable.tsx)
+### 1.4 Standings Page for Bracketless Tournaments
+* **Files:**
+  * [standings.ts](file:///Users/jgrondski/src/repos/tournament-manager/src/features/tournament/standings.ts)
+  * [FinalStandingsTable.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/tournament/components/FinalStandingsTable.tsx)
 * **Change:**
-  * Filtered points breakdown chips to only render attempts that earned points:
-    ```tsx
-    const nonZeroPoints = ptsResult.pointsPerAttempt.filter(pts => pts > 0);
-    ```
-  * Submissions with 0 points (or non-point attempts) no longer clutter the qualifier table with `+0` chips.
-
-### 1.5 Simulation: Occasional High Points (60s and 70s) for Top Players
-* **File:** [simulation.ts](file:///Users/jgrondski/src/repos/tournament-manager/src/features/tournament/simulation.ts)
-* **Change:**
-  * Configured `playerTargetAttempts` for points-based qualifying:
-    * Top seeds simulate 4 to 6 qualifying attempts (instead of being limited to 2-3).
-    * Introduced an occasional "legendary points run" (~18% chance for seed 1, ~8% chance for seeds 2-3) generating 6 to 7 attempts.
-    * Score generation for these high runs scales up to 2,150,000, triggering the highest tier thresholds (9 to 13 points per attempt).
-    * Total points for top performers now occasionally reach the 60s and 70s, accurately mirroring competitive high-tier point tournaments while remaining rare.
+  * In `standings.ts`: when `tournament.tiers.length === 0`, all qualifier players are placed in global standings with `eliminationRound: 'Qualifier'`, `isDNQ: false`, ranked 1..N.
+  * In `FinalStandingsTable.tsx`:
+    * Renders a unified **"Qualifier Standings"** section rather than marking everyone as DNQ.
+    * Added a banner: *"No bracket tiers have been created yet. Standings below reflect live qualifier rankings."* with a direct link to Settings.
 
 ---
 
 ## 2. Verification Results
 
 ### 2.1 Automated Tests
-All 85 tests across 11 test suites pass:
+### 1.5 Bracketless Navigation & Standings Gating
+* **Files:**
+  * [TournamentNavbar.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/components/TournamentNavbar.tsx)
+  * [TournamentSwitcherPage.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/routes/TournamentSwitcherPage.tsx)
+  * [PublicTierBracketPage.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/routes/PublicTierBracketPage.tsx)
+  * [FinalStandingsTable.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/tournament/components/FinalStandingsTable.tsx)
+* **Change:**
+  * In `TournamentNavbar` and `TournamentSwitcherPage`, clicking "Visual Bracket" when no tiers exist routes to `/:slug/bracket` instead of redirecting to Settings.
+  * In `PublicTierBracketPage`, renders the exact empty state from the Organizer Sheet: title **"No Bracket Tiers Configured"** with buttons to `[🏆 View Qualifiers]` and `[⚙️ Configure Tiers in Settings]`.
+  * In `FinalStandingsTable`, premature placement rankings (1st..Nth) and tournament statistics are hidden until qualifiers and brackets are finalized:
+    * If `tiers.length === 0`: shows **"No Bracket Tiers Configured"** with redirect buttons to Qualifiers and Settings.
+    * If `!isLocked`: shows **"Brackets Not Finalized"** with redirect buttons to Qualifiers, Visual Bracket, and Settings.
+
+### 1.6 Decoupled Seeding & Reactive Bracket Population
+* **Files:**
+  * [simulation.ts](file:///Users/jgrondski/src/repos/tournament-manager/src/features/tournament/simulation.ts)
+  * [TournamentAdminForm.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/tournament/components/TournamentAdminForm.tsx)
+* **Change:**
+  * In `simulation.ts`: `generateSimulatedQualifiers` generates 25–30 competitors with qualifier attempts when `totalCapacity === 0`.
+  * In `TournamentAdminForm.tsx`:
+    * "Seed Qualifiers Only" is enabled regardless of whether brackets exist.
+    * "Simulate Tournament" / "Simulate Matches" remains gated on bracket tiers existing.
+    * When adding, modifying, or removing bracket tiers, `generateDraftBracketsForTournament` evaluates dynamically, immediately populating the newly created tiers with the top qualified competitors from the leaderboard.
+
+---
+
+## 2. Verification Results
+
+### 2.1 Automated Tests
+All 88 unit tests across 11 test suites pass:
 ```bash
 npm test
 
- ✓ src/features/bracket/math/__tests__/advance.test.ts (7 tests)
  ✓ src/features/bracket/math/__tests__/traditional.test.ts (13 tests)
- ✓ src/features/tournament/__tests__/store.test.ts (3 tests)
+ ✓ src/features/bracket/math/__tests__/advance.test.ts (7 tests)
  ✓ src/features/bracket/math/__tests__/flat.test.ts (13 tests)
+ ✓ src/features/tournament/__tests__/store.test.ts (3 tests)
  ✓ src/features/tournament/__tests__/standings.test.ts (8 tests)
  ✓ src/features/bracket/math/__tests__/round-overrides.test.ts (8 tests)
  ✓ src/features/players/__tests__/players.test.ts (5 tests)
- ✓ src/features/tournament/__tests__/simulation.test.ts (7 tests)
- ✓ src/features/qualifiers/__tests__/scoring.test.ts (13 tests)
+ ✓ src/features/tournament/__tests__/simulation.test.ts (9 tests)
+ ✓ src/features/qualifiers/__tests__/scoring.test.ts (14 tests)
  ✓ src/features/tournament/__tests__/verification.test.ts (4 tests)
  ✓ src/features/bracket/__tests__/colorUtils.test.ts (4 tests)
 
  Test Files  11 passed (11)
-      Tests  85 passed (85)
+      Tests  88 passed (88)
 ```
 
 ### 2.2 TypeScript & Lint Checks
@@ -81,5 +125,5 @@ npm run lint
 npm run build
 # vite v6.4.3 building for production...
 # ✓ 1900 modules transformed.
-# ✓ built in 3.05s
+# ✓ built in 3.07s
 ```

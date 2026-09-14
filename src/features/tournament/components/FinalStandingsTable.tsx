@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Tournament, TournamentTier, PlayerProfile } from '../types';
 import { calculateGlobalStandings, GlobalStandingRow } from '../standings';
 import { colorWithAlpha } from '../../bracket/colorUtils';
@@ -27,6 +28,7 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
   tournament,
   initialTierId,
 }) => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<string>(initialTierId || 'ALL');
   const [selectedPlayerForDrawer, setSelectedPlayerForDrawer] = useState<PlayerProfile | null>(null);
@@ -145,6 +147,7 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
 
     // When viewing ALL: group consecutively by tier / DNQ / DQ
     const grouped: StandingsSection[] = [];
+
     const sortedTiers = [...tournament.tiers].sort((a, b) => a.priority - b.priority);
 
     for (const tier of sortedTiers) {
@@ -187,6 +190,48 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
 
     return grouped;
   }, [selectedFilter, filteredRows, tournament.tiers]);
+
+  // Until brackets are configured and finalized into match play, render informative empty state
+  if (tournament.tiers.length === 0) {
+    return (
+      <div style={{ padding: '3rem 1.5rem', textAlign: 'center', maxWidth: '600px', margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
+        <h2 style={{ color: 'var(--color-text-primary)', fontSize: '1.4rem' }}>No Bracket Tiers Configured</h2>
+        <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem', lineHeight: 1.5 }}>
+          This tournament does not have any bracket tiers yet. Qualifiers can be entered and ranked on the leaderboard, or you can create bracket tiers in Settings.
+        </p>
+        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <button onClick={() => navigate(`/${tournament.slug}/leaderboard`)} className="btn btn-secondary">
+            🏆 View Qualifiers
+          </button>
+          <button onClick={() => navigate(`/${tournament.slug}/manage/settings`)} className="btn btn-primary">
+            ⚙️ Configure Tiers in Settings
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!tournament.isLocked) {
+    return (
+      <div style={{ padding: '3rem 1.5rem', textAlign: 'center', maxWidth: '600px', margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
+        <h2 style={{ color: 'var(--color-text-primary)', fontSize: '1.4rem' }}>Brackets Not Finalized</h2>
+        <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem', lineHeight: 1.5 }}>
+          Qualifiers are currently running and tournament brackets have not been locked into match play. Final standings will become available once qualifiers conclude and brackets are finalized.
+        </p>
+        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <button onClick={() => navigate(`/${tournament.slug}/leaderboard`)} className="btn btn-secondary">
+            🏆 View Qualifiers
+          </button>
+          <button onClick={() => navigate(`/${tournament.slug}/${tournament.tiers[0]?.slug}`)} className="btn btn-secondary">
+            🌲 Visual Bracket
+          </button>
+          <button onClick={() => navigate(`/${tournament.slug}/manage/settings`)} className="btn btn-primary">
+            ⚙️ Finalize in Settings
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>

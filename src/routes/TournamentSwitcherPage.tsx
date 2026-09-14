@@ -3,8 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useTournament } from '../features/tournament/store';
 import { colorWithAlpha } from '../features/bracket/colorUtils';
 import { Calendar, MapPin, Users, Layers, Plus, Settings, Trophy, ShieldCheck, AlertTriangle, X, Trash2 } from 'lucide-react';
-import { QualFormat, Tournament, TournamentTier, DEFAULT_POINTS_THRESHOLDS } from '../features/tournament/types';
-import { generateTraditionalBracket } from '../features/bracket/math';
+import { QualFormat, Tournament, DEFAULT_POINTS_THRESHOLDS } from '../features/tournament/types';
 import { ClearableNumberInput } from '../components/ClearableNumberInput';
 
 export const TournamentSwitcherPage: React.FC = () => {
@@ -48,43 +47,6 @@ export const TournamentSwitcherPage: React.FC = () => {
     e.preventDefault();
     if (!newTourneyName.trim() || !newTourneySlug.trim()) return;
 
-    // Default 2 tiers: Gold (16) and Silver (16)
-    const initialTiers: TournamentTier[] = [
-      {
-        id: `gold_${Date.now()}`,
-        slug: 'gold',
-        name: 'Gold Championship',
-        priority: 1,
-        bracketType: 'TRADITIONAL',
-        playerCount: 16,
-        bestOf: 5,
-        primaryColor: '#f59e0b',
-        secondaryColor: '#fbbf24',
-        isLocked: false,
-        bracket: generateTraditionalBracket(
-          Array.from({ length: 16 }, (_, i) => ({ id: `p${i + 1}`, name: `Seed ${i + 1}`, seed: i + 1 })),
-          { bestOf: 5 }
-        ),
-      },
-      {
-        id: `silver_${Date.now()}`,
-        slug: 'silver',
-        name: 'Silver Bracket',
-        priority: 2,
-        bracketType: 'FLAT',
-        flatWidth: 4,
-        playerCount: 16,
-        bestOf: 3,
-        primaryColor: '#06b6d4',
-        secondaryColor: '#38bdf8',
-        isLocked: false,
-        bracket: generateTraditionalBracket(
-          Array.from({ length: 16 }, (_, i) => ({ id: `p${i + 17}`, name: `Seed ${i + 1}`, seed: i + 1 })),
-          { bestOf: 3 }
-        ),
-      },
-    ];
-
     let parsedAvgCount = 2;
     if (newTourneyFormat === 'AVERAGE_OF_X') {
       if (newTourneyAvgCount === undefined || isNaN(newTourneyAvgCount) || newTourneyAvgCount < 1) {
@@ -103,7 +65,7 @@ export const TournamentSwitcherPage: React.FC = () => {
       qualAverageCount: parsedAvgCount,
       pointsConfig: newTourneyFormat === 'POINTS' ? DEFAULT_POINTS_THRESHOLDS : undefined,
       isLocked: false,
-      tiers: initialTiers,
+      tiers: [],
     });
 
     setIsCreateModalOpen(false);
@@ -201,7 +163,8 @@ export const TournamentSwitcherPage: React.FC = () => {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(480px, 1fr))', gap: '1.5rem' }}>
             {tournaments.map(tournament => {
-              const defaultTier = tournament.tiers[0] || { slug: 'default', name: 'Bracket' };
+              const hasTiers = tournament.tiers.length > 0;
+              const defaultTier = hasTiers ? tournament.tiers[0] : undefined;
               const totalPlayers = tournament.tiers.reduce((acc, t) => acc + t.playerCount, 0);
 
               return (
@@ -279,81 +242,92 @@ export const TournamentSwitcherPage: React.FC = () => {
                     </span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                       <Users size={15} color="var(--color-gold-bright)" />
-                      {totalPlayers} Players Seeded
+                      {hasTiers
+                        ? `${totalPlayers} Players Seeded`
+                        : `${(tournament.playersPool || []).length} Competitors Registered`}
                     </span>
                   </div>
 
                   {/* Tier Badges */}
-                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-                    {tournament.tiers.map(t => {
-                      const tColor = t.primaryColor || '#f59e0b';
-                      return (
-                        <Link
-                          key={t.id}
-                          to={`/${tournament.slug}/${t.slug}`}
-                          style={{
-                            textDecoration: 'none',
-                            padding: '0.35rem 0.75rem',
-                            background: colorWithAlpha(tColor, 0.08, 'var(--color-bg-surface-elevated)'),
-                            borderRadius: 'var(--radius-sm)',
-                            border: `1px solid ${colorWithAlpha(tColor, 0.35, 'var(--color-border)')}`,
-                            fontSize: '0.8rem',
-                            fontWeight: 600,
-                            color: 'var(--color-text-primary)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.45rem',
-                            transition: 'all 0.15s ease',
-                          }}
-                        >
-                          <span
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem', minHeight: '26px', alignItems: 'center' }}>
+                    {hasTiers ? (
+                      tournament.tiers.map(t => {
+                        const tColor = t.primaryColor || '#f59e0b';
+                        return (
+                          <Link
+                            key={t.id}
+                            to={`/${tournament.slug}/${t.slug}`}
                             style={{
-                              width: '7px',
-                              height: '7px',
-                              borderRadius: '50%',
-                              background: tColor,
-                              flexShrink: 0,
+                              textDecoration: 'none',
+                              padding: '0.35rem 0.75rem',
+                              background: colorWithAlpha(tColor, 0.08, 'var(--color-bg-surface-elevated)'),
+                              borderRadius: 'var(--radius-sm)',
+                              border: `1px solid ${colorWithAlpha(tColor, 0.35, 'var(--color-border)')}`,
+                              fontSize: '0.8rem',
+                              fontWeight: 600,
+                              color: 'var(--color-text-primary)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.45rem',
+                              transition: 'all 0.15s ease',
                             }}
-                          />
-                          <span style={{ color: tColor }}>{t.name}</span>
-                          <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>
-                            ({t.playerCount}p • {t.bracketType})
-                          </span>
-                        </Link>
-                      );
-                    })}
+                          >
+                            <span
+                              style={{
+                                width: '7px',
+                                height: '7px',
+                                borderRadius: '50%',
+                                background: tColor,
+                                flexShrink: 0,
+                              }}
+                            />
+                            <span style={{ color: tColor }}>{t.name}</span>
+                            <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>
+                              ({t.playerCount}p • {t.bracketType})
+                            </span>
+                          </Link>
+                        );
+                      })
+                    ) : (
+                      <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+                        No bracket tiers configured (Qualifiers open)
+                      </span>
+                    )}
                   </div>
                 </div>
 
                 {/* Quick Action Navigation Grid */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.6rem' }}>
                   <Link
-                    to={`/${tournament.slug}/manage/sheet?tier=${defaultTier.slug}`}
-                    className="btn btn-primary"
-                    style={{ padding: '0.55rem 0.75rem', fontSize: '0.8rem' }}
+                    to={hasTiers ? `/${tournament.slug}/manage/sheet?tier=${defaultTier!.slug}` : `/${tournament.slug}/manage/sheet`}
+                    className={hasTiers ? 'btn btn-primary' : 'btn btn-secondary'}
+                    style={{ padding: '0.55rem 0.75rem', fontSize: '0.8rem', opacity: hasTiers ? 1 : 0.7 }}
+                    title={hasTiers ? 'Organizer Sheet' : 'No brackets yet'}
                   >
                     📊 Sheet
                   </Link>
 
                   <Link
-                    to={`/${tournament.slug}/${defaultTier.slug}`}
+                    to={hasTiers ? `/${tournament.slug}/${defaultTier!.slug}` : `/${tournament.slug}/bracket`}
                     className="btn btn-secondary"
-                    style={{ padding: '0.55rem 0.75rem', fontSize: '0.8rem' }}
+                    style={{ padding: '0.55rem 0.75rem', fontSize: '0.8rem', opacity: hasTiers ? 1 : 0.7 }}
+                    title={hasTiers ? 'Visual Bracket' : 'No brackets yet'}
                   >
                     🌲 Bracket
                   </Link>
 
                   <Link
-                    to={`/${tournament.slug}/manage/judge?tier=${defaultTier.slug}`}
+                    to={hasTiers ? `/${tournament.slug}/manage/judge?tier=${defaultTier!.slug}` : `/${tournament.slug}/manage/judge`}
                     className="btn btn-secondary"
-                    style={{ padding: '0.55rem 0.75rem', fontSize: '0.8rem' }}
+                    style={{ padding: '0.55rem 0.75rem', fontSize: '0.8rem', opacity: hasTiers ? 1 : 0.7 }}
+                    title={hasTiers ? 'Floor Judge' : 'No brackets yet'}
                   >
                     📱 Floor Judge
                   </Link>
 
                   <Link
                     to={`/${tournament.slug}/leaderboard`}
-                    className="btn btn-secondary"
+                    className={!hasTiers ? 'btn btn-primary' : 'btn btn-secondary'}
                     style={{ padding: '0.55rem 0.75rem', fontSize: '0.8rem' }}
                   >
                     🏆 Qualifiers

@@ -7,6 +7,7 @@ import {
 } from '../simulation';
 import { Tournament, TournamentTier, PlayerProfile } from '../types';
 import { generateTraditionalBracket, generateFlatBracket } from '../../bracket/math';
+import { generateDraftBracketsForTournament, deriveLeaderboard } from '../../qualifiers/scoring';
 
 describe('Simulation Engine', () => {
   describe('generateRealisticPlayers', () => {
@@ -149,6 +150,18 @@ describe('Simulation Engine', () => {
       expect(players.length).toBeLessThanOrEqual(14);
       expect(submissions).toHaveLength(players.length * 3); // 3 attempts per player
     });
+
+    it('generates 25-30 competitors when tournament has zero tiers (pure qualifiers state)', () => {
+      const bracketlessTourney: Tournament = {
+        ...mockTournament,
+        tiers: [],
+      };
+
+      const { players, submissions } = generateSimulatedQualifiers(bracketlessTourney);
+      expect(players.length).toBeGreaterThanOrEqual(25);
+      expect(players.length).toBeLessThanOrEqual(30);
+      expect(submissions).toHaveLength(players.length * 2);
+    });
   });
 
   describe('runFullSimulation', () => {
@@ -289,6 +302,112 @@ describe('Simulation Engine', () => {
       expect(finishedTourney.qualifierSubmissions.map(s => s.id)).toEqual(initialSubIds);
       expect(finishedTourney.isLocked).toBe(true);
       expect(Object.keys(finishedTourney.matchScores).length).toBeGreaterThan(0);
+    });
+
+    it('supports seeding qualifiers with zero tiers, subsequently adding tiers, and simulating matches', () => {
+      // 1. New tournament with zero tiers
+      const zeroTierTourney: Tournament = {
+        id: 'tourney-dynamic',
+        slug: 'dynamic-tourney',
+        name: 'Dynamic Tourney',
+        date: '2026-09-10',
+        location: 'Virtual',
+        qualFormat: 'AVERAGE_OF_X',
+        qualAverageCount: 2,
+        tiers: [],
+        playersPool: [],
+        qualifierSubmissions: [],
+        tournamentPlayers: {},
+        matchScores: {},
+        isLocked: false,
+      };
+
+      // 2. Seed qualifiers only
+      const { players, submissions } = generateSimulatedQualifiers(zeroTierTourney);
+      const seededTourney: Tournament = {
+        ...zeroTierTourney,
+        playersPool: players,
+        qualifierSubmissions: submissions,
+      };
+      expect(seededTourney.playersPool.length).toBeGreaterThanOrEqual(25);
+
+      // 3. Compute leaderboard rankings from the seeded qualifiers
+      const leaderboard = deriveLeaderboard(seededTourney);
+      expect(leaderboard.length).toBe(seededTourney.playersPool.length);
+
+      // 4. Organizer adds Tier 1 (Gold, 8 players)
+      const tierGold: TournamentTier = {
+        id: 'tier_gold',
+        slug: 'gold',
+        name: 'Gold Championship',
+        priority: 1,
+        bracketType: 'TRADITIONAL',
+        playerCount: 8,
+        bestOf: 3,
+        primaryColor: '#f59e0b',
+        secondaryColor: '#fbbf24',
+        isLocked: false,
+        bracket: generateTraditionalBracket(
+          Array.from({ length: 8 }, (_, i) => ({ id: `p${i + 1}`, name: `Player ${i + 1}`, seed: i + 1 })),
+          { bestOf: 3 }
+        ),
+      };
+
+      const tourneyWithGold: Tournament = {
+        ...seededTourney,
+        tiers: [tierGold],
+      };
+      const draftedTiers1 = generateDraftBracketsForTournament(tourneyWithGold);
+      const goldBracketPlayers = draftedTiers1[0].bracket.rounds[0].matches
+        .flatMap(m => [m.player1.player, m.player2.player])
+        .filter(Boolean);
+      // Top 8 players from leaderboard should populate the Gold bracket
+      const top8Ids = new Set(leaderboard.slice(0, 8).map(r => r.player.id));
+      goldBracketPlayers.forEach(p => {
+        expect(top8Ids.has(p!.id)).toBe(true);
+      });
+
+      // 5. Organizer adds Tier 2 (Silver, 8 players)
+      const tierSilver: TournamentTier = {
+        id: 'tier_silver',
+        slug: 'silver',
+        name: 'Silver Tier',
+        priority: 2,
+        bracketType: 'TRADITIONAL',
+        playerCount: 8,
+        bestOf: 3,
+        primaryColor: '#94a3b8',
+        secondaryColor: '#cbd5e1',
+        isLocked: false,
+        bracket: generateTraditionalBracket(
+          Array.from({ length: 8 }, (_, i) => ({ id: `p${i + 1}`, name: `Player ${i + 1}`, seed: i + 1 })),
+          { bestOf: 3 }
+        ),
+      };
+
+      const tourneyWithBoth: Tournament = {
+        ...seededTourney,
+        tiers: [draftedTiers1[0], tierSilver],
+      };
+      const draftedTiers2 = generateDraftBracketsForTournament(tourneyWithBoth);
+      const silverBracketPlayers = draftedTiers2[1].bracket.rounds[0].matches
+        .flatMap(m => [m.player1.player, m.player2.player])
+        .filter(Boolean);
+      // Next 8 players (ranks 9-16) should populate Silver bracket
+      const next8Ids = new Set(leaderboard.slice(8, 16).map(r => r.player.id));
+      silverBracketPlayers.forEach(p => {
+        expect(next8Ids.has(p!.id)).toBe(true);
+      });
+
+      // 6. Simulate tournament matches to completion
+      const simulatedTourney = runFullSimulation({
+        ...tourneyWithBoth,
+        tiers: draftedTiers2,
+      });
+
+      expect(simulatedTourney.isLocked).toBe(true);
+      expect(simulatedTourney.tiers).toHaveLength(2);
+      expect(Object.keys(simulatedTourney.matchScores).length).toBeGreaterThan(0);
     });
   });
 });
