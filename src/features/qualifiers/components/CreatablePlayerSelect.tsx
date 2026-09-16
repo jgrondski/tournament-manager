@@ -155,12 +155,12 @@ export const CreatablePlayerSelect: React.FC<CreatablePlayerSelectProps> = ({
             top: 'calc(100% + 4px)',
             left: 0,
             right: 0,
-            maxHeight: '260px',
+            maxHeight: '340px',
             overflowY: 'auto',
             background: 'var(--color-bg-surface-elevated)',
             border: '1px solid var(--color-border)',
             borderRadius: 'var(--radius-md)',
-            boxShadow: 'var(--shadow-lg)',
+            boxShadow: '0 12px 28px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--color-border)',
             zIndex: 1000,
           }}
         >

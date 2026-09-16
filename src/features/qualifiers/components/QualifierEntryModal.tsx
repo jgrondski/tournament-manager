@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Tournament, PlayerProfile } from '../../tournament/types';
 import { useTournament } from '../../tournament/store';
 import { CreatablePlayerSelect } from './CreatablePlayerSelect';
-import { Trophy, Plus, Trash2, X, Check } from 'lucide-react';
+import { Trophy, Plus, Trash2, X, Check, User } from 'lucide-react';
 import { getPlayerQualifierStatus } from '../scoring';
 
 interface QualifierEntryModalProps {
@@ -102,9 +102,13 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
           background: 'var(--color-bg-surface)',
           borderRadius: 'var(--radius-lg)',
           border: '1px solid var(--color-border)',
-          maxWidth: '540px',
+          maxWidth: '560px',
           width: '100%',
-          boxShadow: 'var(--shadow-lg)',
+          minHeight: '520px',
+          maxHeight: '85vh',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: 'var(--shadow-xl)',
           overflow: 'hidden',
           animation: 'fadeIn 0.2s ease-out',
         }}
@@ -118,6 +122,7 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            flexShrink: 0,
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
@@ -159,7 +164,7 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
         </div>
 
         {/* Content */}
-        <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', maxHeight: '75vh', overflowY: 'auto' }}>
+        <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', flex: 1, overflowY: 'auto' }}>
           {/* 1. Player Selection */}
           <div>
             <label style={labelStyle}>Competitor</label>
@@ -177,6 +182,31 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
               </p>
             )}
           </div>
+
+          {!selectedPlayer && tournament.playersPool.length > 0 && (
+            <div
+              style={{
+                marginTop: '0.5rem',
+                padding: '2rem 1.5rem',
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--color-bg-base)',
+                border: '1px dashed var(--color-border)',
+                textAlign: 'center',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '0.6rem',
+              }}
+            >
+              <User size={28} color="var(--color-text-muted)" />
+              <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+                Select a Competitor
+              </div>
+              <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', margin: 0, maxWidth: '340px' }}>
+                Start typing a player's name above to search the roster or global catalog and record their qualifier score.
+              </p>
+            </div>
+          )}
 
           {selectedPlayer && (
             <>

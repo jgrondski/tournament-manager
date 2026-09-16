@@ -136,6 +136,9 @@ npm run build
    - [PlayerDetailDrawer.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/qualifiers/components/PlayerDetailDrawer.tsx): When qualifiers are open, the score entry form and judge verification toggle are at the very top of the drawer body.
 2. **Blank Player Selection & Auto-Filter in Qualifier Entry Modal**:
    - [QualifierEntryModal.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/qualifiers/components/QualifierEntryModal.tsx), [CreatablePlayerSelect.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/qualifiers/components/CreatablePlayerSelect.tsx): Starts blank, auto-filters matching competitors as typed, includes clear button (`X`), and displays status with judge verify button upon player selection.
+   - **Generous Default Window Height**: Configured `minHeight: '520px'` (and `maxHeight: '85vh'`, `flex: 1` content container) so the modal opens at a comfortable, spacious height even when no player is selected yet.
+   - **Search Pop-over Expansion**: Increased the dropdown search list's `maxHeight` to `340px` with enhanced elevated drop-shadows, ensuring 6–8 competitors are visible at a glance without awkward vertical scroll clipping or squishing.
+   - Added a helpful visual guidance card when no player is selected, prompting the user to search or pick a competitor.
 3. **3-State Qualifier Status Engine & Judge Verification**:
    - [scoring.ts](file:///Users/jgrondski/src/repos/tournament-manager/src/features/qualifiers/scoring.ts): Logic-based states: `'not started'` (0 attempts), `'in progress'` (1+ attempts), and `'verified'` (judge verified).
    - [LeaderboardTable.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/qualifiers/components/LeaderboardTable.tsx): Status badges rendered for each row on the Qual Board.
