@@ -11,11 +11,13 @@ export const PublicTierBracketPage: React.FC = () => {
   const { getTierBySlug, getTournamentBySlug } = useTournament();
 
   const isObsMode = searchParams.get('obs') === 'true';
+  const obsView = (searchParams.get('view') as any) || (isObsMode ? 'fit' : 'standard');
+  const chroma = searchParams.get('chroma');
 
   const tierData = slug && tierSlug ? getTierBySlug(slug, tierSlug) : undefined;
   const tournamentFallback = slug ? getTournamentBySlug(slug) : undefined;
 
-  // If in OBS mode, ensure background is transparent
+  // If in OBS mode, ensure background is transparent or chroma
   useEffect(() => {
     if (isObsMode) {
       document.body.classList.add('obs-overlay-mode');
@@ -67,26 +69,42 @@ export const PublicTierBracketPage: React.FC = () => {
   const { tournament, tier } = tierData;
 
   if (isObsMode) {
+    const chromaBg = chroma
+      ? chroma.startsWith('#')
+        ? chroma
+        : chroma.toLowerCase() === 'green'
+        ? '#00ff00'
+        : chroma.toLowerCase() === 'magenta'
+        ? '#ff00ff'
+        : chroma.toLowerCase() === 'blue'
+        ? '#0000ff'
+        : `#${chroma}`
+      : 'transparent';
+
     return (
-      <div className="obs-mode-canvas" style={{ width: '100%', minHeight: '100vh', background: 'transparent' }}>
+      <div className="obs-mode-canvas" style={{ width: '100%', minHeight: '100vh', background: chromaBg }}>
         <BracketVisualizer
           tournament={tournament}
           tier={tier}
           isObsMode={true}
           canManage={false}
+          obsView={obsView}
+          chroma={chroma}
         />
       </div>
     );
   }
 
+  const tierBg = tier.backgroundColor || 'var(--color-bg-base)';
+
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: tierBg }}>
       <TournamentNavbar
         tournament={tournament}
         activeTier={tier}
         activeView="bracket"
       />
-      <main style={{ flex: 1, padding: '1rem 0' }}>
+      <main style={{ flex: 1, padding: 0 }}>
         <BracketVisualizer
           tournament={tournament}
           tier={tier}

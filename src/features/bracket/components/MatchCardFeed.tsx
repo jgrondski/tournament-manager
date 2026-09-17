@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Tournament, TournamentTier, PlayerProfile } from '../../tournament/types';
 import { BracketMatch, isMatchPlayable } from '../types';
 import { MatchScoreDrawer } from './MatchScoreDrawer';
-import { BracketDraftBanner } from './BracketDraftBanner';
 import { colorWithAlpha } from '../colorUtils';
 import { Clock, CheckCircle2, ChevronRight, Lock } from 'lucide-react';
 import { PlayerDetailDrawer } from '../../qualifiers/components/PlayerDetailDrawer';
@@ -37,8 +36,6 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
 
   return (
     <div style={{ maxWidth: '680px', margin: '0 auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      <BracketDraftBanner tournament={tournament} />
-
       {/* Round Selector Bar */}
       <div style={{ overflowX: 'auto', display: 'flex', gap: '0.5rem', paddingBottom: '0.5rem' }}>
         {rounds.map((round, idx) => (

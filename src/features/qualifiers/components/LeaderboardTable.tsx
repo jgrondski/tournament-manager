@@ -3,16 +3,18 @@ import { Tournament, PlayerProfile } from '../../tournament/types';
 import { deriveLeaderboard, LeaderboardRankRow, calculatePoints } from '../scoring';
 import { QualifierEntryModal } from './QualifierEntryModal';
 import { PlayerDetailDrawer } from './PlayerDetailDrawer';
-import { Search, Trophy, Plus, User, Sparkles, ChevronRight, Check } from 'lucide-react';
+import { Search, Trophy, Plus, User, Sparkles, ChevronRight, Check, Video, ExternalLink } from 'lucide-react';
 
 interface LeaderboardTableProps {
   tournament: Tournament;
   canManage?: boolean;
+  isObsMode?: boolean;
 }
 
 export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
   tournament,
   canManage = true,
+  isObsMode = false,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
@@ -43,12 +45,21 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
   const tableColSpan = hasBrackets ? 5 : 4;
 
   return (
-    <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div
+      style={{
+        maxWidth: isObsMode ? '100%' : '1100px',
+        margin: '0 auto',
+        padding: isObsMode ? '0.5rem' : '1.5rem',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '1.25rem',
+      }}
+    >
       {/* Header with Search & Score Submission Button */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Trophy color="var(--color-gold-bright)" size={24} />
+          <h1 style={{ fontSize: isObsMode ? '1.35rem' : '1.5rem', fontWeight: 700, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Trophy color="var(--color-gold-bright)" size={isObsMode ? 20 : 24} />
             Qualifying Leaderboard
           </h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
@@ -59,47 +70,63 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          {/* Competitor Search */}
-          <div style={{ position: 'relative', width: '220px' }}>
-            <Search
-              size={15}
-              style={{
-                position: 'absolute',
-                left: '0.65rem',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: 'var(--color-text-muted)',
-              }}
-            />
-            <input
-              type="text"
-              placeholder="Search competitor..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.45rem 0.65rem 0.45rem 2rem',
-                fontSize: '0.85rem',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--color-border)',
-                background: 'var(--color-bg-base)',
-                color: 'var(--color-text-primary)',
-              }}
-            />
-          </div>
+        {!isObsMode && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            {/* Competitor Search */}
+            <div style={{ position: 'relative', width: '220px' }}>
+              <Search
+                size={15}
+                style={{
+                  position: 'absolute',
+                  left: '0.65rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: 'var(--color-text-muted)',
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Search competitor..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.45rem 0.65rem 0.45rem 2rem',
+                  fontSize: '0.85rem',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--color-border)',
+                  background: 'var(--color-bg-base)',
+                  color: 'var(--color-text-primary)',
+                }}
+              />
+            </div>
 
-          {canManage && (
-            <button
-              onClick={() => setIsEntryModalOpen(true)}
-              className="btn btn-primary"
-              style={{ padding: '0.45rem 0.95rem', fontSize: '0.85rem', gap: '0.4rem' }}
+            {/* Direct OBS Overlay Link */}
+            <a
+              href={`/${tournament.slug}/leaderboard?obs=true`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary"
+              title="Open OBS broadcast overlay in new tab (stripped chrome, transparent background)"
+              style={{ fontSize: '0.8rem', padding: '0.45rem 0.75rem', gap: '0.4rem', whiteSpace: 'nowrap' }}
             >
-              <Plus size={16} />
-              Record Qual Submission
-            </button>
-          )}
-        </div>
+              <Video size={14} color="var(--color-gold-bright)" />
+              <span>OBS Overlay</span>
+              <ExternalLink size={12} />
+            </a>
+
+            {canManage && (
+              <button
+                onClick={() => setIsEntryModalOpen(true)}
+                className="btn btn-primary"
+                style={{ padding: '0.45rem 0.95rem', fontSize: '0.85rem', gap: '0.4rem' }}
+              >
+                <Plus size={16} />
+                Record Qual Submission
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Main Leaderboard Table */}
@@ -160,15 +187,16 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                   <React.Fragment key={row.player.id}>
                     <tr
                       onClick={() => {
+                        if (isObsMode) return;
                         setSelectedPlayer(row.player);
                         setSelectedRankRow(row);
                       }}
-                      title="Click to view detailed competitor profile, audit log, and match stats"
+                      title={isObsMode ? undefined : "Click to view detailed competitor profile, audit log, and match stats"}
                       style={{
                         background: rowBg,
                         borderBottom: '1px solid rgba(0, 0, 0, 0.65)',
                         transition: 'all 0.15s ease',
-                        cursor: 'pointer',
+                        cursor: isObsMode ? 'default' : 'pointer',
                       }}
                     >
                       {/* Rank */}

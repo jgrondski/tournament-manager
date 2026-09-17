@@ -54,6 +54,8 @@ export interface TournamentTier {
   playerCount: number;
   primaryColor?: string;
   secondaryColor?: string;
+  cardColor?: string; // Background for match cards / player names
+  backgroundColor?: string; // Overall background for the entire bracket canvas
   bracket: BracketStructure;
   isLocked: boolean;
   roundBestOfOverrides?: Record<number, number>; // Key: roundNumber (1, 2, ...), Value: bestOf (1..99)

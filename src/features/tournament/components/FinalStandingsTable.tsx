@@ -17,16 +17,20 @@ import {
   Minus,
   AlertTriangle,
   Flame,
+  Video,
+  ExternalLink,
 } from 'lucide-react';
 
 interface FinalStandingsTableProps {
   tournament: Tournament;
   initialTierId?: string;
+  isObsMode?: boolean;
 }
 
 export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
   tournament,
   initialTierId,
+  isObsMode = false,
 }) => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
@@ -234,40 +238,58 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
   }
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+    <div style={{ maxWidth: isObsMode ? '100%' : '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Header & Title */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.65rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '0.65rem', letterSpacing: '-0.01em' }}>
-            <Trophy color="var(--color-gold-bright)" size={28} />
+          <h1 style={{ fontSize: isObsMode ? '1.45rem' : '1.65rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '0.65rem', letterSpacing: '-0.01em' }}>
+            <Trophy color="var(--color-gold-bright)" size={isObsMode ? 24 : 28} />
             Tournament Standings
           </h1>
-          <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', marginTop: '0.25rem', maxWidth: '650px', lineHeight: 1.5 }}>
+          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginTop: '0.25rem', maxWidth: '650px', lineHeight: 1.5 }}>
             Official global tournament rankings determined through bracket completion and the Competitive Intra-Round Exit Tiebreaker engine.
           </p>
         </div>
 
-        {/* Search Bar */}
-        <div style={{ position: 'relative', minWidth: '260px' }}>
-          <Search size={16} color="var(--color-text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-          <input
-            type="text"
-            placeholder="Search player, country, style..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '0.55rem 0.85rem 0.55rem 2.25rem',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--color-border)',
-              background: 'var(--color-bg-surface)',
-              color: 'var(--color-text-primary)',
-              fontSize: '0.85rem',
-              outline: 'none',
-              transition: 'border-color 0.15s ease',
-            }}
-          />
-        </div>
+        {!isObsMode && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            {/* Search Bar */}
+            <div style={{ position: 'relative', minWidth: '240px' }}>
+              <Search size={16} color="var(--color-text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+              <input
+                type="text"
+                placeholder="Search player, country, style..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.55rem 0.85rem 0.55rem 2.25rem',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--color-border)',
+                  background: 'var(--color-bg-surface)',
+                  color: 'var(--color-text-primary)',
+                  fontSize: '0.85rem',
+                  outline: 'none',
+                  transition: 'border-color 0.15s ease',
+                }}
+              />
+            </div>
+
+            {/* Direct OBS Overlay Link */}
+            <a
+              href={`/${tournament.slug}/standings?obs=true`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary"
+              title="Open OBS broadcast overlay in new tab (stripped chrome, transparent background)"
+              style={{ fontSize: '0.8rem', padding: '0.5rem 0.85rem', gap: '0.4rem', whiteSpace: 'nowrap' }}
+            >
+              <Video size={15} color="var(--color-gold-bright)" />
+              <span>OBS Overlay</span>
+              <ExternalLink size={13} />
+            </a>
+          </div>
+        )}
       </div>
 
       {/* Overview Stat Cards */}

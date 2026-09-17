@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import { Tournament, TournamentTier, MatchScoreRecord, PlayerProfile } from '../../tournament/types';
 import { BracketMatch, isMatchPlayable } from '../types';
 import { MatchScoreDrawer } from './MatchScoreDrawer';
-import { BracketDraftBanner } from './BracketDraftBanner';
 import { colorWithAlpha } from '../colorUtils';
 import { Filter, Check, ChevronDown, Clock, CheckCircle2, Sparkles } from 'lucide-react';
 import { PlayerDetailDrawer } from '../../qualifiers/components/PlayerDetailDrawer';
@@ -133,8 +132,6 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      <BracketDraftBanner tournament={tournament} />
-
       {/* Top Filter & Telemetry Bar */}
       <div style={telemetryBarStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
