@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { PlayerProfile } from '../../tournament/types';
+import { PlayerProfile, Playstyle } from '../../tournament/types';
 import { User, X, AlertTriangle, Check } from 'lucide-react';
+import { COUNTRIES, CountryFlag } from '../flagUtils';
+import { PlaystyleChip } from './PlaystyleChip';
 
 interface PlayerEditModalProps {
   isOpen: boolean;
@@ -20,7 +22,7 @@ export const PlayerEditModal: React.FC<PlayerEditModalProps> = ({
   const [name, setName] = useState('');
   const [country, setCountry] = useState('');
   const [personalBest, setPersonalBest] = useState<string>('1000000');
-  const [playstyle, setPlaystyle] = useState<'Rolling' | 'DAS' | 'Hypertap'>('Rolling');
+  const [playstyle, setPlaystyle] = useState<Playstyle>('Rolling');
   const [notes, setNotes] = useState('');
   const [isDisqualified, setIsDisqualified] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -209,13 +211,14 @@ export const PlayerEditModal: React.FC<PlayerEditModalProps> = ({
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '0.35rem' }}>
-                  Country (2-letter)
+                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '0.35rem' }}>
+                  <span>Country</span>
+                  {country && <CountryFlag country={country} />}
                 </label>
                 <input
                   type="text"
-                  maxLength={4}
-                  placeholder="US, JP, etc."
+                  list="country-options"
+                  placeholder="US, JP, IS, etc."
                   value={country}
                   onChange={e => setCountry(e.target.value.toUpperCase())}
                   style={{
@@ -230,18 +233,28 @@ export const PlayerEditModal: React.FC<PlayerEditModalProps> = ({
                     fontWeight: 700,
                   }}
                 />
+                <datalist id="country-options">
+                  {COUNTRIES.map(c => (
+                    <option key={c.code} value={c.code}>
+                      {c.name}
+                    </option>
+                  ))}
+                </datalist>
               </div>
             </div>
 
             {/* Playstyle & Personal Best */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '0.35rem' }}>
-                  Playstyle
-                </label>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                    Playstyle
+                  </label>
+                  <PlaystyleChip style={playstyle} />
+                </div>
                 <select
                   value={playstyle}
-                  onChange={e => setPlaystyle(e.target.value as 'Rolling' | 'DAS' | 'Hypertap')}
+                  onChange={e => setPlaystyle(e.target.value as Playstyle)}
                   style={{
                     width: '100%',
                     padding: '0.65rem 0.85rem',
@@ -252,9 +265,10 @@ export const PlayerEditModal: React.FC<PlayerEditModalProps> = ({
                     fontSize: '0.9rem',
                   }}
                 >
-                  <option value="Rolling">Rolling</option>
+                  <option value="Rolling">Rolling / Roll</option>
                   <option value="DAS">DAS</option>
-                  <option value="Hypertap">Hypertap</option>
+                  <option value="Hypertap">Hypertap / Tap</option>
+                  <option value="Hybrid">Hybrid</option>
                 </select>
               </div>
 

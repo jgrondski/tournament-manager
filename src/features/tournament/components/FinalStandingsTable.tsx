@@ -1,9 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Tournament, TournamentTier, PlayerProfile } from '../types';
+import { Tournament, TournamentTier, PlayerProfile, Playstyle } from '../types';
 import { calculateGlobalStandings, GlobalStandingRow } from '../standings';
 import { colorWithAlpha } from '../../bracket/colorUtils';
 import { PlayerDetailDrawer } from '../../qualifiers/components/PlayerDetailDrawer';
+import { CountryFlag } from '../../players/flagUtils';
+import { PlaystyleChip } from '../../players/components/PlaystyleChip';
 import {
   Trophy,
   Medal,
@@ -38,7 +40,7 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
   const [selectedPlayerForDrawer, setSelectedPlayerForDrawer] = useState<PlayerProfile | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  const handlePlayerClick = (pId: string, pName: string, country?: string, playstyle?: 'DAS' | 'Rolling' | 'Hypertap') => {
+  const handlePlayerClick = (pId: string, pName: string, country?: string, playstyle?: Playstyle) => {
     const profile = (tournament.playersPool || []).find(p => p.id === pId) || {
       id: pId,
       name: pName,
@@ -336,9 +338,19 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
               }}
             >
-              {championRow ? championRow.player.name : 'In Progress'}
+              {championRow ? (
+                <>
+                  <CountryFlag country={championRow.player.country} />
+                  <span>{championRow.player.name}</span>
+                </>
+              ) : (
+                'In Progress'
+              )}
             </div>
           </div>
         </div>
@@ -715,6 +727,7 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
                         style={{
                           background: rowBg,
                           borderBottom: '1px solid rgba(0, 0, 0, 0.65)',
+                          borderLeft: row.tier ? `4px solid ${tierColor}` : '4px solid transparent',
                           transition: 'background 0.15s ease',
                         }}
                       >
@@ -779,6 +792,7 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
                         <td style={tdStyle}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                              <CountryFlag country={row.player.country} />
                               <button
                                 type="button"
                                 onClick={() => handlePlayerClick(row.player.id, row.player.name, row.player.country, row.player.playstyle)}
@@ -809,43 +823,8 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
                                 {row.player.name}
                               </button>
 
-                              {row.player.country && (
-                                <span
-                                  style={{
-                                    fontSize: '0.7rem',
-                                    color: 'var(--color-text-muted)',
-                                    background: 'rgba(255, 255, 255, 0.06)',
-                                    padding: '0.1rem 0.35rem',
-                                    borderRadius: 'var(--radius-sm)',
-                                  }}
-                                >
-                                  {row.player.country}
-                                </span>
-                              )}
-
                               {row.player.playstyle && (
-                                <span
-                                  style={{
-                                    fontSize: '0.68rem',
-                                    fontWeight: 600,
-                                    padding: '0.1rem 0.4rem',
-                                    borderRadius: 'var(--radius-sm)',
-                                    background:
-                                      row.player.playstyle === 'Rolling'
-                                        ? 'rgba(56, 189, 248, 0.15)'
-                                        : row.player.playstyle === 'Hypertap'
-                                        ? 'rgba(244, 63, 94, 0.15)'
-                                        : 'rgba(245, 158, 11, 0.15)',
-                                    color:
-                                      row.player.playstyle === 'Rolling'
-                                        ? '#38bdf8'
-                                        : row.player.playstyle === 'Hypertap'
-                                        ? '#fb7185'
-                                        : '#fbbf24',
-                                  }}
-                                >
-                                  {row.player.playstyle}
-                                </span>
+                                <PlaystyleChip style={row.player.playstyle} />
                               )}
                             </div>
 

@@ -19,8 +19,8 @@ export const DEFAULT_LAYOUT_CONFIG: LayoutConfig = {
   matchHeight: 80, // Fits header strip + 2 player rows perfectly without vertical clipping
   baseRowHeight: 98, // 80px card + 18px compact gap
   roundGap: 56, // Compact horizontal spacing for broadcast/OBS
-  headerHeight: 64, // 26px vertical breathing room between 38px header badge and top matches
-  paddingTop: 16,
+  headerHeight: 48, // Balanced vertical breathing room between header badge and top matches
+  paddingTop: 8, // Closer to the top boundary of the container
   paddingLeft: 20,
   paddingRight: 32,
   paddingBottom: 24,
@@ -28,21 +28,7 @@ export const DEFAULT_LAYOUT_CONFIG: LayoutConfig = {
   championHeight: 76,
 };
 
-export const DENSE_LAYOUT_CONFIG: LayoutConfig = {
-  matchWidth: 220,
-  matchHeight: 48, // Compact 48px card
-  baseRowHeight: 58, // 48px card + 10px gap
-  roundGap: 40,
-  headerHeight: 48,
-  paddingTop: 12,
-  paddingLeft: 16,
-  paddingRight: 24,
-  paddingBottom: 16,
-  championWidth: 220,
-  championHeight: 54,
-};
-
-export type BracketViewMode = 'standard' | 'fit' | 'split' | 'focus' | 'dense';
+export type BracketViewMode = 'standard' | 'fit' | 'split';
 
 export interface MatchPosition {
   matchId: string;
@@ -91,7 +77,7 @@ export interface BracketLayoutMetadata {
 }
 
 /**
- * Main Layout Calculator supporting standard, dense, split, and focus modes.
+ * Main Layout Calculator supporting standard, fit, and split bilateral modes.
  */
 export function calculateBracketLayout(
   bracket: BracketStructure,
@@ -101,12 +87,8 @@ export function calculateBracketLayout(
   if (viewMode === 'split') {
     return calculateSplitBracketLayout(bracket, customConfig);
   }
-  if (viewMode === 'focus') {
-    return calculateFocusBracketLayout(bracket, customConfig);
-  }
 
-  const baseConfig = viewMode === 'dense' ? DENSE_LAYOUT_CONFIG : DEFAULT_LAYOUT_CONFIG;
-  const config: LayoutConfig = { ...baseConfig, ...customConfig };
+  const config: LayoutConfig = { ...DEFAULT_LAYOUT_CONFIG, ...customConfig };
   const { rounds } = bracket;
 
   const matchPositions: Record<string, MatchPosition> = {};
@@ -786,242 +768,5 @@ export function calculateSplitBracketLayout(
     championPosition,
     championPath,
     viewMode: 'split',
-  };
-}
-
-/**
- * Strategy C: Stage-Gated Focus Windowing (Top 8 / Active Stage Focus)
- * Collapses early rounds into compact feeder badges while highlighting active rounds.
- */
-export function calculateFocusBracketLayout(
-  bracket: BracketStructure,
-  customConfig?: Partial<LayoutConfig>
-): BracketLayoutMetadata {
-  const { rounds } = bracket;
-  if (!rounds || rounds.length < 3) {
-    return calculateBracketLayout(bracket, customConfig, 'standard');
-  }
-
-  // If >= 4 rounds, collapse early rounds (before the final 3 rounds)
-  const focusThresholdRound = Math.max(1, rounds.length - 3);
-  const baseConfig: LayoutConfig = { ...DEFAULT_LAYOUT_CONFIG, ...customConfig };
-
-  const matchPositions: Record<string, MatchPosition> = {};
-  const roundHeaders: RoundHeaderPosition[] = [];
-  const paths: ConnectorPath[] = [];
-
-  // Compute X coordinates: early rounds use narrower column width (170px)
-  let currentX = baseConfig.paddingLeft;
-  const roundXPositions: number[] = [];
-  const roundWidths: number[] = [];
-
-  rounds.forEach((round, rIdx) => {
-    const isEarlyFeeder = rIdx < focusThresholdRound;
-    const colWidth = isEarlyFeeder ? 180 : baseConfig.matchWidth;
-    roundXPositions.push(currentX);
-    roundWidths.push(colWidth);
-
-    roundHeaders.push({
-      roundNumber: round.roundNumber,
-      name: isEarlyFeeder ? `${round.name} (Prelims)` : round.name,
-      x: currentX,
-      y: baseConfig.paddingTop,
-      width: colWidth,
-    });
-
-    currentX += colWidth + baseConfig.roundGap;
-  });
-
-  // Anchor round: the first focus round (e.g. Quarterfinals)
-  const anchorRoundIdx = focusThresholdRound;
-  const anchorRound = rounds[anchorRoundIdx];
-  const anchorX = roundXPositions[anchorRoundIdx];
-
-  anchorRound.matches.forEach((match, mIdx) => {
-    const topY = baseConfig.paddingTop + baseConfig.headerHeight + mIdx * baseConfig.baseRowHeight;
-    const centerY = topY + baseConfig.matchHeight / 2;
-
-    matchPositions[match.id] = {
-      matchId: match.id,
-      x: anchorX,
-      y: topY,
-      width: baseConfig.matchWidth,
-      height: baseConfig.matchHeight,
-      centerY,
-      centerX: anchorX + baseConfig.matchWidth / 2,
-      isCompactFeeder: false,
-    };
-  });
-
-  // Advance forwards towards Finals
-  for (let rIdx = anchorRoundIdx + 1; rIdx < rounds.length; rIdx++) {
-    const round = rounds[rIdx];
-    const roundX = roundXPositions[rIdx];
-
-    round.matches.forEach((match, mIdx) => {
-      const f1 = match.player1.sourceMatchId ? matchPositions[match.player1.sourceMatchId] : undefined;
-      const f2 = match.player2.sourceMatchId ? matchPositions[match.player2.sourceMatchId] : undefined;
-      let idealCenterY: number;
-      if (f1 && f2) idealCenterY = (f1.centerY + f2.centerY) / 2;
-      else if (f1) idealCenterY = f1.centerY;
-      else if (f2) idealCenterY = f2.centerY;
-      else idealCenterY = baseConfig.paddingTop + baseConfig.headerHeight + mIdx * baseConfig.baseRowHeight * 2;
-
-      if (mIdx > 0) {
-        const prevPos = matchPositions[round.matches[mIdx - 1].id];
-        if (prevPos && idealCenterY < prevPos.centerY + baseConfig.matchHeight + 12) {
-          idealCenterY = prevPos.centerY + baseConfig.matchHeight + 12;
-        }
-      }
-
-      const topY = idealCenterY - baseConfig.matchHeight / 2;
-      matchPositions[match.id] = {
-        matchId: match.id,
-        x: roundX,
-        y: topY,
-        width: baseConfig.matchWidth,
-        height: baseConfig.matchHeight,
-        centerY: idealCenterY,
-        centerX: roundX + baseConfig.matchWidth / 2,
-        isCompactFeeder: false,
-      };
-    });
-  }
-
-  // Work backwards into early feeder rounds (compact feeder cards)
-  for (let rIdx = anchorRoundIdx - 1; rIdx >= 0; rIdx--) {
-    const round = rounds[rIdx];
-    const roundX = roundXPositions[rIdx];
-    const cardWidth = roundWidths[rIdx];
-    const cardHeight = 44; // Compact feeder height
-
-    round.matches.forEach((match, mIdx) => {
-      let idealCenterY: number;
-      const downstreamRound = rounds[rIdx + 1];
-      let targetPos: MatchPosition | undefined;
-      let targetSlot = 1;
-
-      if (downstreamRound) {
-        for (const dsMatch of downstreamRound.matches) {
-          if (dsMatch.player1.sourceMatchId === match.id) {
-            targetPos = matchPositions[dsMatch.id];
-            targetSlot = 1;
-            break;
-          }
-          if (dsMatch.player2.sourceMatchId === match.id) {
-            targetPos = matchPositions[dsMatch.id];
-            targetSlot = 2;
-            break;
-          }
-        }
-      }
-
-      if (targetPos) {
-        idealCenterY = targetSlot === 1
-          ? targetPos.y + targetPos.height * 0.25
-          : targetPos.y + targetPos.height * 0.75;
-      } else {
-        idealCenterY = baseConfig.paddingTop + baseConfig.headerHeight + mIdx * 52;
-      }
-
-      if (mIdx > 0) {
-        const prevPos = matchPositions[round.matches[mIdx - 1].id];
-        if (prevPos && idealCenterY < prevPos.centerY + cardHeight + 8) {
-          idealCenterY = prevPos.centerY + cardHeight + 8;
-        }
-      }
-
-      const topY = idealCenterY - cardHeight / 2;
-      matchPositions[match.id] = {
-        matchId: match.id,
-        x: roundX,
-        y: topY,
-        width: cardWidth,
-        height: cardHeight,
-        centerY: idealCenterY,
-        centerX: roundX + cardWidth / 2,
-        isCompactFeeder: true,
-      };
-    });
-  }
-
-  // Finals and Champion
-  const finalsRound = rounds[rounds.length - 1];
-  const finalsMatch = finalsRound?.matches[0];
-  const finalsPos = finalsMatch ? matchPositions[finalsMatch.id] : undefined;
-  const lastRoundX = roundXPositions[rounds.length - 1];
-  const championX = lastRoundX + baseConfig.matchWidth + baseConfig.roundGap;
-
-  let allYs = Object.values(matchPositions).map(p => p.centerY);
-  if (allYs.length === 0) allYs = [baseConfig.paddingTop + baseConfig.headerHeight];
-  const championCenterY = finalsPos ? finalsPos.centerY : (Math.min(...allYs) + Math.max(...allYs)) / 2;
-  const championTopY = championCenterY - baseConfig.championHeight / 2;
-
-  const championPosition = {
-    x: championX,
-    y: championTopY,
-    width: baseConfig.championWidth,
-    height: baseConfig.championHeight,
-    centerY: championCenterY,
-  };
-
-  // Connectors
-  for (let rIdx = 0; rIdx < rounds.length; rIdx++) {
-    const round = rounds[rIdx];
-    round.matches.forEach((childMatch) => {
-      const childPos = matchPositions[childMatch.id];
-      if (!childPos) return;
-
-      const f1 = childMatch.player1.sourceMatchId ? matchPositions[childMatch.player1.sourceMatchId] : undefined;
-      const f2 = childMatch.player2.sourceMatchId ? matchPositions[childMatch.player2.sourceMatchId] : undefined;
-      const childInX = childPos.x;
-      const childInY = childPos.centerY;
-
-      if (f1 && f2) {
-        const f1OutX = f1.x + f1.width;
-        const f1OutY = f1.centerY;
-        const f2OutX = f2.x + f2.width;
-        const f2OutY = f2.centerY;
-        const maxOutX = Math.max(f1OutX, f2OutX);
-        const midX = Math.round(maxOutX + (childInX - maxOutX) / 2);
-
-        paths.push({
-          id: `path-${childMatch.id}`,
-          d: `M ${f1OutX} ${f1OutY} H ${midX} V ${f2OutY} H ${f2OutX} M ${midX} ${childInY} H ${childInX}`,
-          sourceMatchIds: [f1.matchId, f2.matchId],
-          targetMatchId: childMatch.id,
-        });
-      } else if (f1) {
-        paths.push({
-          id: `path-${childMatch.id}-single`,
-          d: `M ${f1.x + f1.width} ${f1.centerY} H ${childInX}`,
-          sourceMatchIds: [f1.matchId],
-          targetMatchId: childMatch.id,
-        });
-      }
-    });
-  }
-
-  let championPath: { d: string; finalsMatchId: string } | undefined;
-  if (finalsPos) {
-    championPath = {
-      d: `M ${finalsPos.x + finalsPos.width} ${finalsPos.centerY} H ${championPosition.x}`,
-      finalsMatchId: finalsMatch.id,
-    };
-  }
-
-  const allCardBottoms = Object.values(matchPositions).map(p => p.y + p.height);
-  allCardBottoms.push(championPosition.y + championPosition.height);
-  const maxBottom = Math.max(...allCardBottoms, baseConfig.paddingTop + baseConfig.headerHeight + 200);
-
-  return {
-    totalWidth: championX + baseConfig.championWidth + baseConfig.paddingRight,
-    totalHeight: maxBottom + baseConfig.paddingBottom,
-    matchPositions,
-    roundHeaders,
-    paths,
-    championPosition,
-    championPath,
-    viewMode: 'focus',
   };
 }

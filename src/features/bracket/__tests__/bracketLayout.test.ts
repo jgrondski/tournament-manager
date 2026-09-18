@@ -130,7 +130,7 @@ describe('bracketLayout calculation engine', () => {
     }
   });
 
-  it('calculates dense layout with compact match cards', () => {
+  it('calculates auto-fit layout mode with standard positions', () => {
     const players = Array.from({ length: 16 }, (_, i) => ({
       id: `p${i + 1}`,
       name: `Player ${i + 1}`,
@@ -138,16 +138,12 @@ describe('bracketLayout calculation engine', () => {
     }));
 
     const bracket = generateTraditionalBracket(players, { tierId: 'gold' });
-    const layout = calculateBracketLayout(bracket, undefined, 'dense');
+    const layout = calculateBracketLayout(bracket, undefined, 'fit');
 
-    expect(layout.viewMode).toBe('dense');
-    // In dense mode, cards are 48px tall
-    Object.values(layout.matchPositions).forEach(pos => {
-      expect(pos.height).toBe(48);
-    });
-    // Overall height should be significantly smaller than standard
-    const standardLayout = calculateBracketLayout(bracket, undefined, 'standard');
-    expect(layout.totalHeight).toBeLessThan(standardLayout.totalHeight);
+    expect(layout.viewMode).toBe('fit');
+    expect(layout.totalWidth).toBeGreaterThan(0);
+    expect(layout.totalHeight).toBeGreaterThan(0);
+    expect(Object.keys(layout.matchPositions)).toHaveLength(15);
   });
 
   it('calculates bilateral split layout for deep tournaments', () => {
@@ -176,30 +172,5 @@ describe('bracketLayout calculation engine', () => {
     const lastR1Match = bracket.rounds[0].matches[bracket.rounds[0].matches.length - 1];
     const rightWingM = layout.matchPositions[lastR1Match.id];
     expect(rightWingM.x).toBeGreaterThan(finalsPos.x);
-  });
-
-  it('calculates stage focus layout with compact feeder cards', () => {
-    const players = Array.from({ length: 16 }, (_, i) => ({
-      id: `p${i + 1}`,
-      name: `Player ${i + 1}`,
-      seed: i + 1,
-    }));
-
-    const bracket = generateTraditionalBracket(players, { tierId: 'gold' });
-    const layout = calculateBracketLayout(bracket, undefined, 'focus');
-
-    expect(layout.viewMode).toBe('focus');
-    // Early rounds have isCompactFeeder flag
-    const r1Matches = bracket.rounds[0].matches;
-    r1Matches.forEach(m => {
-      const pos = layout.matchPositions[m.id];
-      expect(pos.isCompactFeeder).toBe(true);
-      expect(pos.height).toBe(44);
-    });
-    // Later rounds (e.g. Finals) have standard height
-    const finalsMatch = bracket.rounds[bracket.rounds.length - 1].matches[0];
-    const finalsPos = layout.matchPositions[finalsMatch.id];
-    expect(finalsPos.isCompactFeeder).toBeFalsy();
-    expect(finalsPos.height).toBe(80);
   });
 });

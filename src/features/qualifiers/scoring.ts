@@ -335,6 +335,8 @@ export function generateDraftBracketsForTournament(tournament: Tournament): Tour
       id: row.player.id,
       name: row.player.name,
       seed: row.tierSeed!,
+      country: row.player.country,
+      playstyle: row.player.playstyle,
     }));
 
     // If we have at least 2 players, generate fresh mathematical bracket

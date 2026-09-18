@@ -3,7 +3,10 @@ import { Tournament, PlayerProfile } from '../../tournament/types';
 import { deriveLeaderboard, LeaderboardRankRow, calculatePoints } from '../scoring';
 import { QualifierEntryModal } from './QualifierEntryModal';
 import { PlayerDetailDrawer } from './PlayerDetailDrawer';
-import { Search, Trophy, Plus, User, Sparkles, ChevronRight, Check, Video, ExternalLink } from 'lucide-react';
+import { Search, Trophy, Plus, Sparkles, ChevronRight, Check, Video, ExternalLink } from 'lucide-react';
+import { CountryFlag } from '../../players/flagUtils';
+import { PlaystyleChip } from '../../players/components/PlaystyleChip';
+import { getContrastingTextColor } from '../../bracket/colorUtils';
 
 interface LeaderboardTableProps {
   tournament: Tournament;
@@ -176,11 +179,15 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
             ) : (
               filteredRows.map((row: LeaderboardRankRow, idx) => {
                 const cutoffInfo = cutoffRanks.get(row.rank);
+                const assignedTier = row.assignedTier;
+                const isTierQualified = Boolean(hasBrackets && assignedTier && !row.isDNQ);
+                const tierColor = assignedTier?.primaryColor || '#f59e0b';
+                const tierContrastColor = getContrastingTextColor(tierColor);
 
-                // Subtle tier color row tinting when brackets exist
+                // Row background and accenting based on tier bracket palette
                 let rowBg = idx % 2 === 0 ? 'var(--color-bg-surface)' : 'var(--color-bg-surface-elevated)';
-                if (hasBrackets && row.assignedTier?.primaryColor) {
-                  rowBg = `${row.assignedTier.primaryColor}0d`; // ~5% opacity tint
+                if (isTierQualified) {
+                  rowBg = `${tierColor}12`;
                 }
 
                 return (
@@ -194,7 +201,8 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                       title={isObsMode ? undefined : "Click to view detailed competitor profile, audit log, and match stats"}
                       style={{
                         background: rowBg,
-                        borderBottom: '1px solid rgba(0, 0, 0, 0.65)',
+                        borderBottom: isTierQualified ? `1px solid ${tierColor}33` : '1px solid rgba(0, 0, 0, 0.65)',
+                        borderLeft: isTierQualified ? `4px solid ${tierColor}` : '4px solid transparent',
                         transition: 'all 0.15s ease',
                         cursor: isObsMode ? 'default' : 'pointer',
                       }}
@@ -210,15 +218,18 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                             width: '26px',
                             height: '26px',
                             borderRadius: '50%',
-                            background:
-                              row.rank <= 3
-                                ? 'var(--color-gold-bg)'
-                                : 'rgba(255,255,255,0.05)',
-                            color:
-                              row.rank <= 3
-                                ? 'var(--color-gold-bright)'
-                                : 'var(--color-text-secondary)',
+                            background: isTierQualified
+                              ? tierColor
+                              : row.rank <= 3
+                              ? 'var(--color-gold-bg)'
+                              : 'rgba(255,255,255,0.05)',
+                            color: isTierQualified
+                              ? tierContrastColor
+                              : row.rank <= 3
+                              ? 'var(--color-gold-bright)'
+                              : 'var(--color-text-secondary)',
                             fontSize: '0.8rem',
+                            fontWeight: 700,
                           }}
                         >
                           {row.rank}
@@ -228,19 +239,12 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                       {/* Player Info */}
                       <td style={tdStyle}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                          <User size={14} color="var(--color-text-muted)" />
+                          <CountryFlag country={row.player.country} />
                           <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
                             {row.player.name}
                           </span>
                           {row.player.playstyle && (
-                            <span className="badge badge-muted" style={{ fontSize: '0.65rem' }}>
-                              {row.player.playstyle}
-                            </span>
-                          )}
-                          {row.player.country && (
-                            <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', background: 'rgba(255,255,255,0.05)', padding: '0.1rem 0.35rem', borderRadius: 'var(--radius-sm)' }}>
-                              {row.player.country}
-                            </span>
+                            <PlaystyleChip style={row.player.playstyle} />
                           )}
 
                           {/* Qualifier State Badge */}
@@ -331,7 +335,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                           {/* Kicker Column */}
                           <td className="tabular-nums" style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, fontSize: '0.95rem' }}>
                             {row.kickerScore && row.kickerScore > 0 ? (
-                              <span style={{ color: '#ffffff' }}>
+                              <span style={{ color: isTierQualified ? tierColor : '#ffffff' }}>
                                 {row.kickerScore.toLocaleString()}
                               </span>
                             ) : row.maxoutCount && row.maxoutCount > 0 ? (
@@ -339,7 +343,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                                 No kicker
                               </span>
                             ) : row.finalScore > 0 ? (
-                              <span style={{ color: 'var(--color-text-secondary)' }}>
+                              <span style={{ color: isTierQualified ? tierColor : 'var(--color-text-secondary)' }}>
                                 {row.finalScore.toLocaleString()}
                               </span>
                             ) : (
@@ -360,7 +364,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                                 const score = row.attempts[slotIdx];
                                 const hasScore = typeof score === 'number';
                                 return (
-                                  <span
+                                   <span
                                     key={slotIdx}
                                     className="tabular-nums"
                                     style={{
@@ -383,7 +387,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                           {/* Average Score Column */}
                           <td style={{ ...tdStyle, textAlign: 'right' }}>
                             <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                              <span className="tabular-nums" style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--color-gold-bright)' }}>
+                              <span className="tabular-nums" style={{ fontWeight: 700, fontSize: '0.95rem', color: isTierQualified ? tierColor : 'var(--color-gold-bright)' }}>
                                 {row.finalScore > 0 ? row.finalScore.toLocaleString() : '—'}
                               </span>
                               <span style={{ fontSize: '0.68rem', color: row.attempts.length >= targetX ? '#34d399' : 'var(--color-text-muted)' }}>
@@ -444,7 +448,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                           </td>
 
                           {/* Total Points Column */}
-                          <td className="tabular-nums" style={{ ...tdStyle, textAlign: 'right', fontWeight: 800, fontSize: '0.98rem', color: 'var(--color-gold-bright)' }}>
+                          <td className="tabular-nums" style={{ ...tdStyle, textAlign: 'right', fontWeight: 800, fontSize: '0.98rem', color: isTierQualified ? tierColor : 'var(--color-gold-bright)' }}>
                             {row.finalScore} pts
                           </td>
                         </>
@@ -454,7 +458,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                       {hasBrackets && (
                         <td style={{ ...tdStyle, textAlign: 'center' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-                            {row.assignedTier && row.tierSeed !== undefined ? (
+                            {isTierQualified && row.tierSeed !== undefined ? (
                               <span
                                 style={{
                                   display: 'inline-block',
@@ -462,12 +466,11 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                                   borderRadius: 'var(--radius-full)',
                                   fontSize: '0.75rem',
                                   fontWeight: 700,
-                                  background: `${row.assignedTier.primaryColor || '#f59e0b'}26`,
-                                  color: row.assignedTier.primaryColor || 'var(--color-gold-bright)',
-                                  border: `1px solid ${row.assignedTier.primaryColor || 'var(--color-gold)'}4d`,
+                                  background: tierColor,
+                                  color: tierContrastColor,
                                 }}
                               >
-                                {row.assignedTier.name} #{row.tierSeed}
+                                {assignedTier!.name} #{row.tierSeed}
                               </span>
                             ) : row.isDNQ ? (
                               <span className="badge badge-muted" title="Did Not Qualify for active brackets">

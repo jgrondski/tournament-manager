@@ -129,22 +129,6 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
         subtitle: 'Top & bottom wings meeting at center Grand Finals',
         url: `/${tournament.slug}/${tier.slug}?obs=true&view=split${chromaParam}`,
         badgeColor: tColor,
-      },
-      {
-        key: `${tier.id}-focus`,
-        category: tier.name,
-        title: `${tier.name} — Stage Focus (Top 8 / Top 16)`,
-        subtitle: 'Expanded active round focus with collapsed feeder seeds',
-        url: `/${tournament.slug}/${tier.slug}?obs=true&view=focus${chromaParam}`,
-        badgeColor: tColor,
-      },
-      {
-        key: `${tier.id}-dense`,
-        category: tier.name,
-        title: `${tier.name} — Dense Micro-Cards`,
-        subtitle: '46px slim broadcast strips for large competitor fields',
-        url: `/${tournament.slug}/${tier.slug}?obs=true&view=dense${chromaParam}`,
-        badgeColor: tColor,
       }
     );
   });
@@ -160,10 +144,10 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
 
   return (
     <header style={headerContainerStyle}>
-      {/* Row 1: Logo, Tournament Switcher, Mode Pill Button, Bracket Nav, Player Pool, and All OBS Overlays */}
+      {/* Row 1: Logo, Tournament Switcher, Players, Mode Pill, Bracket Nav, and OBS Overlays */}
       <div style={topRowStyle}>
-        {/* Left Side: Brand, Tournament Select, and Interactive Mode Pill Button */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+        {/* Left Side: Brand, Tournament Select, and Global Players Button */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
           {/* Logo */}
           <Link
             to="/"
@@ -211,7 +195,22 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
             )}
           </div>
 
-          {/* Interactive Mode Pill Button (Row 4 Banner merged into Row 1 Pill!) */}
+          {/* Global Players Button (Directly next to Tournament Switcher dropdown) */}
+          <Link
+            to="/players"
+            onClick={e => handleLinkClick(e, '/players')}
+            className="btn btn-secondary"
+            title="Open Global Player Pool Directory"
+            style={{ fontSize: '0.74rem', padding: '0.28rem 0.55rem', gap: '0.35rem' }}
+          >
+            <Users size={13} color="var(--color-gold-bright)" />
+            <span>Players</span>
+          </Link>
+        </div>
+
+        {/* Right Side: Mode Pill Chip, Bracket Views Group, and All OBS Overlays */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+          {/* Interactive Mode Pill Button (Placed to the left of the Sheet button) */}
           {!tournament.isLocked ? (
             <button
               type="button"
@@ -267,10 +266,7 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
               {unlockError}
             </span>
           )}
-        </div>
 
-        {/* Center/Right: Bracket Navigation Pills + Global Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
           {/* Bracket Views Pill Group */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', background: 'var(--color-bg-surface-highlight)', padding: '0.15rem', borderRadius: 'var(--radius-sm)' }}>
             <Link
@@ -312,18 +308,6 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
               🌲 Bracket
             </Link>
           </div>
-
-          {/* Global Player Pool */}
-          <Link
-            to="/players"
-            onClick={e => handleLinkClick(e, '/players')}
-            className="btn btn-secondary"
-            title="Open Global Player Pool Directory"
-            style={{ fontSize: '0.74rem', padding: '0.28rem 0.55rem', gap: '0.35rem' }}
-          >
-            <Users size={13} color="var(--color-gold-bright)" />
-            <span>Players</span>
-          </Link>
 
           {/* Searchable All OBS Overlays Dropdown */}
           <div style={{ position: 'relative' }}>

@@ -6,6 +6,8 @@ import { TournamentNavbar } from '../components/TournamentNavbar';
 import { ImportFromGlobalModal } from '../features/players/components/ImportFromGlobalModal';
 import { PlayerEditModal } from '../features/players/components/PlayerEditModal';
 import { PlayerDetailDrawer } from '../features/qualifiers/components/PlayerDetailDrawer';
+import { CountryFlag } from '../features/players/flagUtils';
+import { PlaystyleChip } from '../features/players/components/PlaystyleChip';
 import {
   Users,
   UserPlus,
@@ -324,47 +326,49 @@ export const ManageTournamentPlayersPage: React.FC = () => {
                           {pIdx + 1}
                         </td>
                         <td style={{ padding: '0.75rem 1rem' }}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedPlayerForDrawer(player);
-                              setIsPlayerDrawerOpen(true);
-                            }}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              padding: 0,
-                              cursor: 'pointer',
-                              textAlign: 'left',
-                              fontWeight: 600,
-                              color: 'var(--color-text-primary)',
-                              fontSize: 'inherit',
-                              transition: 'color 0.15s ease',
-                            }}
-                            onMouseEnter={e => {
-                              e.currentTarget.style.color = 'var(--color-gold-bright)';
-                              e.currentTarget.style.textDecoration = 'underline';
-                            }}
-                            onMouseLeave={e => {
-                              e.currentTarget.style.color = 'var(--color-text-primary)';
-                              e.currentTarget.style.textDecoration = 'none';
-                            }}
-                            title="Click to view detailed competitor profile, audit log, and match stats"
-                          >
-                            {player.name}
-                          </button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                            <CountryFlag country={player.country} />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedPlayerForDrawer(player);
+                                setIsPlayerDrawerOpen(true);
+                              }}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                padding: 0,
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                fontWeight: 600,
+                                color: 'var(--color-text-primary)',
+                                fontSize: 'inherit',
+                                transition: 'color 0.15s ease',
+                              }}
+                              onMouseEnter={e => {
+                                e.currentTarget.style.color = 'var(--color-gold-bright)';
+                                e.currentTarget.style.textDecoration = 'underline';
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.color = 'var(--color-text-primary)';
+                                e.currentTarget.style.textDecoration = 'none';
+                              }}
+                              title="Click to view detailed competitor profile, audit log, and match stats"
+                            >
+                              {player.name}
+                            </button>
+                          </div>
                         </td>
                         <td style={{ padding: '0.75rem 1rem' }}>
                           {player.country ? (
-                            <span style={{ padding: '0.15rem 0.45rem', borderRadius: 'var(--radius-sm)', background: 'var(--color-bg-surface-highlight)', fontSize: '0.75rem', fontWeight: 700 }}>
-                              {player.country}
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.15rem 0.45rem', borderRadius: 'var(--radius-sm)', background: 'var(--color-bg-surface-highlight)', fontSize: '0.75rem', fontWeight: 700 }}>
+                              <CountryFlag country={player.country} />
+                              <span>{player.country}</span>
                             </span>
                           ) : '—'}
                         </td>
                         <td style={{ padding: '0.75rem 1rem' }}>
-                          <span className="badge badge-muted" style={{ fontSize: '0.7rem' }}>
-                            {player.playstyle || 'Rolling'}
-                          </span>
+                          <PlaystyleChip style={player.playstyle} />
                         </td>
                         <td className="tabular-nums" style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', fontWeight: 600 }}>
                           {player.personalBest ? player.personalBest.toLocaleString() : '—'}

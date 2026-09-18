@@ -4,7 +4,6 @@ import { BracketStructure, BracketMatch, isMatchPlayable } from '../types';
 import { Tournament, TournamentTier, PlayerProfile } from '../../tournament/types';
 import { MatchScoreDrawer } from './MatchScoreDrawer';
 import {
-  colorWithAlpha,
   getContrastingTextColor,
   getTierCanvasBackground,
   getTierCardBackground,
@@ -12,6 +11,7 @@ import {
 import { calculateBracketLayout, BracketViewMode } from '../bracketLayout';
 import { Trophy } from 'lucide-react';
 import { PlayerDetailDrawer } from '../../qualifiers/components/PlayerDetailDrawer';
+import { CountryFlag } from '../../players/flagUtils';
 
 interface BracketVisualizerProps {
   tournament: Tournament;
@@ -59,10 +59,11 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
     return () => window.removeEventListener('resize', updateDimensions);
   }, [effectiveObsView]);
 
-  const handlePlayerClick = (pId: string, pName: string) => {
+  const handlePlayerClick = (pId: string, pName: string, country?: string) => {
     const profile = (tournament.playersPool || []).find((p) => p.id === pId) || {
       id: pId,
       name: pName,
+      country,
       personalBest: 0,
       playstyle: 'DAS',
     };
@@ -103,6 +104,10 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
       ? finalMatch?.player2.player
       : null;
 
+  const championProfile = championPlayer
+    ? (tournament.playersPool || []).find((p) => p.id === championPlayer.id)
+    : null;
+
   // Resolve chroma color if requested
   const getChromaColor = (param?: string | null) => {
     if (!param) return null;
@@ -118,7 +123,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
   const cardBg = getTierCardBackground(cardColor, primaryColor);
   const canvasBg = getTierCanvasBackground(backgroundColor, primaryColor);
 
-  // In chroma key mode, card background must be 100% opaque without alpha to prevent chroma bleed
+  // Pure user-defined solid colors: no radial gradients, no assumed shades
   const effectiveCardBg = chromaHex ? (tier.cardColor || '#161922') : cardBg;
   const effectiveCanvasBg = chromaHex ? chromaHex : isObsMode ? 'transparent' : canvasBg;
 
@@ -133,6 +138,48 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
         minHeight: `${layout.totalHeight}px`,
       }}
     >
+      {/* Sticky Round Headers Bar (Pinned to top when scrolling down) */}
+      <div
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
+          width: `${layout.totalWidth}px`,
+          height: '42px',
+          background: effectiveCanvasBg,
+          pointerEvents: 'none',
+          marginBottom: '6px',
+        }}
+      >
+        {layout.roundHeaders.map((header) => (
+          <div
+            key={header.roundNumber}
+            style={{
+              position: 'absolute',
+              left: `${header.x}px`,
+              top: '4px',
+              width: `${header.width}px`,
+              height: '34px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '0.82rem',
+              fontWeight: 800,
+              color: primaryColor,
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              background: effectiveCardBg,
+              borderRadius: 'var(--radius-sm)',
+              border: `1.5px solid ${primaryColor}`,
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)',
+              pointerEvents: 'auto',
+            }}
+          >
+            {header.name}
+          </div>
+        ))}
+      </div>
+
       {/* Layer 1: Dynamic SVG Orthogonal Connector Lines */}
       <svg
         style={{
@@ -155,14 +202,12 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
               key={path.id}
               d={path.d}
               fill="none"
-              stroke={isTargetComplete ? primaryColor : colorWithAlpha(primaryColor, 0.55, '#f59e0b')}
+              stroke={primaryColor}
               strokeWidth={isTargetComplete ? 2.5 : 2}
               strokeLinecap="round"
               strokeLinejoin="round"
               style={{
-                filter: isTargetComplete
-                  ? `drop-shadow(0 0 5px ${colorWithAlpha(primaryColor, 0.45)})`
-                  : 'none',
+                filter: isTargetComplete ? `drop-shadow(0 0 5px ${primaryColor}66)` : 'none',
                 transition: 'all 0.2s ease',
               }}
             />
@@ -174,54 +219,19 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
           <path
             d={layout.championPath.d}
             fill="none"
-            stroke={championPlayer ? primaryColor : colorWithAlpha(primaryColor, 0.5, '#f59e0b')}
+            stroke={primaryColor}
             strokeWidth={championPlayer ? 3 : 2}
             strokeLinecap="round"
             strokeDasharray={championPlayer ? 'none' : '4 4'}
             style={{
-              filter: championPlayer
-                ? `drop-shadow(0 0 8px ${colorWithAlpha(primaryColor, 0.7)})`
-                : 'none',
+              filter: championPlayer ? `drop-shadow(0 0 8px ${primaryColor}99)` : 'none',
               transition: 'all 0.25s ease',
             }}
           />
         )}
       </svg>
 
-      {/* Layer 2: Round Headers */}
-      {layout.roundHeaders.map((header) => (
-        <div
-          key={header.roundNumber}
-          style={{
-            position: 'absolute',
-            left: `${header.x}px`,
-            top: `${header.y}px`,
-            width: `${header.width}px`,
-            height: '34px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '0.82rem',
-            fontWeight: 800,
-            color: primaryColor,
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
-            background: chromaHex
-              ? colorWithAlpha(primaryColor, 0.25, '#1e293b')
-              : isObsMode
-              ? colorWithAlpha(primaryColor, 0.18, 'rgba(15, 23, 42, 0.95)')
-              : colorWithAlpha(primaryColor, 0.12, 'rgba(245, 158, 11, 0.1)'),
-            borderRadius: 'var(--radius-sm)',
-            border: `1px solid ${colorWithAlpha(primaryColor, 0.4, 'var(--color-border)')}`,
-            boxShadow: `0 2px 8px ${colorWithAlpha(primaryColor, 0.15)}`,
-            zIndex: 2,
-          }}
-        >
-          {header.name}
-        </div>
-      ))}
-
-      {/* Layer 3: Match Cards Positioned at Geometric Coordinates */}
+      {/* Layer 2: Match Cards Positioned at Geometric Coordinates */}
       {rounds.map((round) =>
         round.matches.map((match) => {
           const pos = layout.matchPositions[match.id];
@@ -230,6 +240,9 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
           const record = tournament.matchScores[match.id];
           const p1 = match.player1.player;
           const p2 = match.player2.player;
+          const p1Profile = p1 ? (tournament.playersPool || []).find((p) => p.id === p1.id) : null;
+          const p2Profile = p2 ? (tournament.playersPool || []).find((p) => p.id === p2.id) : null;
+
           const p1Name =
             p1?.name ||
             (match.player1.sourceMatchId
@@ -267,7 +280,6 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
           const p1Won = Boolean(p1?.id && (match.winnerId === p1.id || record?.winnerPlayerId === p1.id));
           const p2Won = Boolean(p2?.id && (match.winnerId === p2.id || record?.winnerPlayerId === p2.id));
           const isMatchHovered = hoveredMatchId === match.id;
-          const isCompact = Boolean(pos.isCompactFeeder || pos.height <= 55);
 
           return (
             <div
@@ -287,18 +299,14 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                 height: `${pos.height}px`,
                 background: effectiveCardBg,
                 borderRadius: 'var(--radius-sm)',
-                border: inProgress
+                border: inProgress || isMatchHovered
                   ? `2px solid ${primaryColor}`
-                  : isMatchHovered
-                  ? `1.5px solid ${primaryColor}`
-                  : isComplete
-                  ? `1px solid ${colorWithAlpha(primaryColor, 0.45, 'var(--color-border)')}`
-                  : `1px solid ${colorWithAlpha(primaryColor, 0.24, 'var(--color-border-subtle)')}`,
+                  : `1.5px solid ${primaryColor}`,
                 boxShadow: inProgress
-                  ? `0 0 16px ${colorWithAlpha(primaryColor, 0.4)}`
+                  ? `0 0 16px ${primaryColor}66`
                   : isMatchHovered
-                  ? `0 4px 14px ${colorWithAlpha(primaryColor, 0.25)}`
-                  : '0 2px 6px rgba(0, 0, 0, 0.35)',
+                  ? `0 4px 14px ${primaryColor}40`
+                  : '0 2px 6px rgba(0, 0, 0, 0.45)',
                 cursor: !isObsMode && canManage && isPlayable && tournament.isLocked ? 'pointer' : 'default',
                 opacity: isPlayable ? 1 : 0.72,
                 overflow: 'hidden',
@@ -310,43 +318,42 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                 transition: 'all 0.15s ease',
               }}
             >
-              {/* Match Header Strip - High Contrast Themed */}
+              {/* Match Header Strip - Solid Themed */}
               <div
                 style={{
-                  height: isCompact ? '13px' : '20px',
-                  minHeight: isCompact ? '13px' : '20px',
-                  maxHeight: isCompact ? '13px' : '20px',
-                  padding: isCompact ? '0 0.35rem' : '0 0.5rem',
-                  background: colorWithAlpha(primaryColor, 0.22, 'rgba(0, 0, 0, 0.45)'),
-                  fontSize: isCompact ? '0.55rem' : '0.62rem',
-                  color: '#f8fafc',
+                  height: '20px',
+                  minHeight: '20px',
+                  maxHeight: '20px',
+                  padding: '0 0.5rem',
+                  background: effectiveCardBg,
+                  fontSize: '0.64rem',
+                  color: primaryColor,
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  borderBottom: `1px solid ${colorWithAlpha(primaryColor, 0.3, 'rgba(255, 255, 255, 0.07)')}`,
+                  borderBottom: `1px solid ${primaryColor}`,
                   boxSizing: 'border-box',
-                  lineHeight: isCompact ? '13px' : '20px',
+                  lineHeight: '20px',
+                  fontWeight: 800,
                 }}
               >
-                <span style={{ fontWeight: 700 }}>
-                  {isCompact ? `M#${match.matchNumber}` : `Match #${match.matchNumber}`}
-                </span>
-                <span style={{ fontWeight: 700 }}>Bo{matchBestOf}</span>
+                <span>Match #{match.matchNumber}</span>
+                <span>Bo{matchBestOf}</span>
               </div>
 
               {/* Slot 1: Player 1 */}
               <div
                 style={{
-                  height: isCompact ? '17px' : '28px',
-                  minHeight: isCompact ? '17px' : '28px',
-                  maxHeight: isCompact ? '17px' : '28px',
+                  height: '28px',
+                  minHeight: '28px',
+                  maxHeight: '28px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: isCompact ? '0 0.35rem' : '0 0.5rem',
-                  borderBottom: '1px solid rgba(255, 255, 255, 0.07)',
-                  background: p1Won ? colorWithAlpha(primaryColor, 0.22, 'var(--color-gold-bg)') : 'transparent',
-                  opacity: isComplete && !p1Won ? 0.4 : 1,
+                  padding: '0 0.5rem',
+                  borderBottom: `1px solid ${primaryColor}40`,
+                  background: 'transparent',
+                  opacity: isComplete && !p1Won ? 0.45 : 1,
                   boxSizing: 'border-box',
                 }}
               >
@@ -354,7 +361,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                   onClick={(e) => {
                     if (p1?.id) {
                       e.stopPropagation();
-                      handlePlayerClick(p1.id, p1.name);
+                      handlePlayerClick(p1.id, p1.name, p1Profile?.country);
                     }
                   }}
                   onMouseEnter={() => p1?.id && setHoveredPlayerKey(`p1-${match.id}`)}
@@ -362,12 +369,12 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: isCompact ? '0.25rem' : '0.4rem',
+                    gap: '0.35rem',
                     overflow: 'hidden',
-                    padding: isCompact ? '0.02rem 0.1rem' : '0.05rem 0.2rem',
+                    padding: '0.05rem 0.2rem',
                     borderRadius: 'var(--radius-sm)',
                     backgroundColor:
-                      hoveredPlayerKey === `p1-${match.id}` ? colorWithAlpha(secondaryColor, 0.18) : 'transparent',
+                      hoveredPlayerKey === `p1-${match.id}` ? `${secondaryColor}22` : 'transparent',
                     cursor: p1?.id ? 'pointer' : 'inherit',
                     transition: 'all 0.15s ease',
                   }}
@@ -379,25 +386,28 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                         display: 'inline-flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        minWidth: isCompact ? '13px' : '18px',
-                        height: isCompact ? '13px' : '18px',
-                        padding: isCompact ? '0 0.15rem' : '0 0.2rem',
+                        minWidth: '18px',
+                        height: '18px',
+                        padding: '0 0.2rem',
                         background: secondaryColor,
                         color: getContrastingTextColor(secondaryColor),
                         fontWeight: 800,
-                        fontSize: isCompact ? '0.55rem' : '0.68rem',
+                        fontSize: '0.68rem',
                         fontFamily: 'var(--font-mono)',
                         borderRadius: '2px',
                         flexShrink: 0,
-                        lineHeight: isCompact ? '13px' : '18px',
+                        lineHeight: '18px',
                       }}
                     >
                       {p1.seed}
                     </span>
                   )}
+                  {p1Profile?.country && (
+                    <CountryFlag country={p1Profile.country} style={{ fontSize: '0.9rem' }} />
+                  )}
                   <span
                     style={{
-                      fontSize: isCompact ? '0.68rem' : '0.84rem',
+                      fontSize: '0.84rem',
                       fontWeight: p1Won ? 800 : 600,
                       color:
                         hoveredPlayerKey === `p1-${match.id}`
@@ -418,19 +428,19 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                 <span
                   className="tabular-nums"
                   style={{
-                    fontSize: isCompact ? '0.68rem' : '0.88rem',
+                    fontSize: '0.88rem',
                     fontWeight: 800,
-                    minWidth: isCompact ? '14px' : '18px',
-                    height: isCompact ? '14px' : '18px',
+                    minWidth: '18px',
+                    height: '18px',
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: p1Won ? primaryColor : 'var(--color-text-secondary)',
-                    background: p1Won ? colorWithAlpha(primaryColor, 0.22) : 'rgba(255, 255, 255, 0.04)',
-                    padding: isCompact ? '0 0.2rem' : '0 0.35rem',
+                    color: p1Won ? getContrastingTextColor(primaryColor) : 'var(--color-text-secondary)',
+                    background: p1Won ? primaryColor : 'transparent',
+                    padding: '0 0.35rem',
                     borderRadius: '2px',
-                    border: p1Won ? `1px solid ${colorWithAlpha(primaryColor, 0.45)}` : '1px solid transparent',
-                    marginLeft: isCompact ? '0.2rem' : '0.35rem',
+                    border: `1px solid ${primaryColor}`,
+                    marginLeft: '0.35rem',
                     flexShrink: 0,
                     lineHeight: 1,
                   }}
@@ -442,15 +452,15 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
               {/* Slot 2: Player 2 */}
               <div
                 style={{
-                  height: isCompact ? '17px' : '28px',
-                  minHeight: isCompact ? '17px' : '28px',
-                  maxHeight: isCompact ? '17px' : '28px',
+                  height: '28px',
+                  minHeight: '28px',
+                  maxHeight: '28px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: isCompact ? '0 0.35rem' : '0 0.5rem',
-                  background: p2Won ? colorWithAlpha(primaryColor, 0.22, 'var(--color-gold-bg)') : 'transparent',
-                  opacity: isComplete && !p2Won ? 0.4 : 1,
+                  padding: '0 0.5rem',
+                  background: 'transparent',
+                  opacity: isComplete && !p2Won ? 0.45 : 1,
                   boxSizing: 'border-box',
                 }}
               >
@@ -458,7 +468,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                   onClick={(e) => {
                     if (p2?.id) {
                       e.stopPropagation();
-                      handlePlayerClick(p2.id, p2.name);
+                      handlePlayerClick(p2.id, p2.name, p2Profile?.country);
                     }
                   }}
                   onMouseEnter={() => p2?.id && setHoveredPlayerKey(`p2-${match.id}`)}
@@ -466,12 +476,12 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: isCompact ? '0.25rem' : '0.4rem',
+                    gap: '0.35rem',
                     overflow: 'hidden',
-                    padding: isCompact ? '0.02rem 0.1rem' : '0.05rem 0.2rem',
+                    padding: '0.05rem 0.2rem',
                     borderRadius: 'var(--radius-sm)',
                     backgroundColor:
-                      hoveredPlayerKey === `p2-${match.id}` ? colorWithAlpha(secondaryColor, 0.18) : 'transparent',
+                      hoveredPlayerKey === `p2-${match.id}` ? `${secondaryColor}22` : 'transparent',
                     cursor: p2?.id ? 'pointer' : 'inherit',
                     transition: 'all 0.15s ease',
                   }}
@@ -483,25 +493,28 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                         display: 'inline-flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        minWidth: isCompact ? '13px' : '18px',
-                        height: isCompact ? '13px' : '18px',
-                        padding: isCompact ? '0 0.15rem' : '0 0.2rem',
+                        minWidth: '18px',
+                        height: '18px',
+                        padding: '0 0.2rem',
                         background: secondaryColor,
                         color: getContrastingTextColor(secondaryColor),
                         fontWeight: 800,
-                        fontSize: isCompact ? '0.55rem' : '0.68rem',
+                        fontSize: '0.68rem',
                         fontFamily: 'var(--font-mono)',
                         borderRadius: '2px',
                         flexShrink: 0,
-                        lineHeight: isCompact ? '13px' : '18px',
+                        lineHeight: '18px',
                       }}
                     >
                       {p2.seed}
                     </span>
                   )}
+                  {p2Profile?.country && (
+                    <CountryFlag country={p2Profile.country} style={{ fontSize: '0.9rem' }} />
+                  )}
                   <span
                     style={{
-                      fontSize: isCompact ? '0.68rem' : '0.84rem',
+                      fontSize: '0.84rem',
                       fontWeight: p2Won ? 800 : 600,
                       color:
                         hoveredPlayerKey === `p2-${match.id}`
@@ -522,19 +535,19 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                 <span
                   className="tabular-nums"
                   style={{
-                    fontSize: isCompact ? '0.68rem' : '0.88rem',
+                    fontSize: '0.88rem',
                     fontWeight: 800,
-                    minWidth: isCompact ? '14px' : '18px',
-                    height: isCompact ? '14px' : '18px',
+                    minWidth: '18px',
+                    height: '18px',
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: p2Won ? primaryColor : 'var(--color-text-secondary)',
-                    background: p2Won ? colorWithAlpha(primaryColor, 0.22) : 'rgba(255, 255, 255, 0.04)',
-                    padding: isCompact ? '0 0.2rem' : '0 0.35rem',
+                    color: p2Won ? getContrastingTextColor(primaryColor) : 'var(--color-text-secondary)',
+                    background: p2Won ? primaryColor : 'transparent',
+                    padding: '0 0.35rem',
                     borderRadius: '2px',
-                    border: p2Won ? `1px solid ${colorWithAlpha(primaryColor, 0.45)}` : '1px solid transparent',
-                    marginLeft: isCompact ? '0.2rem' : '0.35rem',
+                    border: `1px solid ${primaryColor}`,
+                    marginLeft: '0.35rem',
                     flexShrink: 0,
                     lineHeight: 1,
                   }}
@@ -547,7 +560,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
         })
       )}
 
-      {/* Layer 4: Champion Showcase Plaque */}
+      {/* Layer 3: Champion Showcase Plaque */}
       <div
         style={{
           position: 'absolute',
@@ -569,8 +582,8 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
             background: effectiveCardBg,
             border: `2.5px solid ${primaryColor}`,
             boxShadow: championPlayer
-              ? `0 0 28px ${colorWithAlpha(primaryColor, 0.45)}`
-              : `0 0 12px ${colorWithAlpha(primaryColor, 0.15)}`,
+              ? `0 0 28px ${primaryColor}88`
+              : `0 0 12px ${primaryColor}33`,
             display: 'flex',
             alignItems: 'stretch',
             overflow: 'hidden',
@@ -580,14 +593,14 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
           {/* Seed Box */}
           <div
             style={{
-              width: layout.championPosition.height <= 55 ? '32px' : '46px',
+              width: '46px',
               background: secondaryColor,
               color: getContrastingTextColor(secondaryColor),
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontWeight: 900,
-              fontSize: layout.championPosition.height <= 55 ? '0.9rem' : '1.3rem',
+              fontSize: '1.3rem',
               fontFamily: 'var(--font-mono)',
               flexShrink: 0,
               borderRight: `2px solid ${primaryColor}`,
@@ -600,7 +613,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
           <div
             onClick={() => {
               if (championPlayer?.id) {
-                handlePlayerClick(championPlayer.id, championPlayer.name);
+                handlePlayerClick(championPlayer.id, championPlayer.name, championProfile?.country);
               }
             }}
             style={{
@@ -608,8 +621,9 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              gap: '0.5rem',
               padding: '0 0.85rem',
-              fontSize: layout.championPosition.height <= 55 ? '0.95rem' : '1.35rem',
+              fontSize: '1.35rem',
               fontWeight: 900,
               letterSpacing: '0.02em',
               color: '#ffffff',
@@ -617,19 +631,22 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
-              background: 'rgba(0, 0, 0, 0.25)',
+              background: 'transparent',
             }}
             title={championPlayer?.id ? 'View champion profile' : undefined}
           >
-            {championPlayer ? championPlayer.name : 'TBD'}
+            {championProfile?.country && (
+              <CountryFlag country={championProfile.country} style={{ fontSize: '1.25rem' }} />
+            )}
+            <span>{championPlayer ? championPlayer.name : 'TBD'}</span>
           </div>
         </div>
 
         {/* Champion Subtitle */}
         <div
           style={{
-            marginTop: layout.championPosition.height <= 55 ? '0.35rem' : '0.65rem',
-            fontSize: layout.championPosition.height <= 55 ? '0.8rem' : '1.05rem',
+            marginTop: '0.65rem',
+            fontSize: '1.05rem',
             fontWeight: 800,
             color: primaryColor,
             letterSpacing: '0.06em',
@@ -639,7 +656,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
             textTransform: 'capitalize',
           }}
         >
-          <Trophy size={layout.championPosition.height <= 55 ? 14 : 18} color={primaryColor} />
+          <Trophy size={18} color={primaryColor} />
           <span>{tier.name} Champion</span>
         </div>
       </div>
@@ -684,11 +701,11 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
           </div>
         </div>
       ) : (
-        /* Standard, Split, Focus, Dense Scrollable View */
+        /* Standard or Split Scrollable View (Halved top padding) */
         <div
           style={{
             width: '100%',
-            padding: isObsMode ? '1rem' : '1.5rem',
+            padding: isObsMode ? '0.5rem' : '0.75rem 1.5rem',
             overflowX: 'auto',
             overflowY: 'auto',
             display: 'flex',

@@ -3,6 +3,8 @@ import { useTournament } from '../../tournament/store';
 import { PlayerProfile } from '../../tournament/types';
 import { GenerateFakePlayersModal } from './GenerateFakePlayersModal';
 import { PlayerEditModal } from './PlayerEditModal';
+import { CountryFlag } from '../flagUtils';
+import { PlaystyleChip } from './PlaystyleChip';
 import {
   Users,
   Plus,
@@ -569,8 +571,9 @@ export const PlayerDirectory: React.FC = () => {
                             {player.name.substring(0, 2).toUpperCase()}
                           </div>
                           <div>
-                            <div style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                              {player.name}
+                            <div style={{ fontWeight: 700, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <CountryFlag country={player.country} />
+                              <span>{player.name}</span>
                             </div>
                             <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
                               ID: {player.id}
@@ -584,7 +587,9 @@ export const PlayerDirectory: React.FC = () => {
                         {player.country ? (
                           <span
                             style={{
-                              display: 'inline-block',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
                               padding: '0.15rem 0.45rem',
                               borderRadius: 'var(--radius-sm)',
                               background: 'var(--color-bg-surface-highlight)',
@@ -594,7 +599,8 @@ export const PlayerDirectory: React.FC = () => {
                               border: '1px solid var(--color-border-subtle)',
                             }}
                           >
-                            {player.country}
+                            <CountryFlag country={player.country} />
+                            <span>{player.country}</span>
                           </span>
                         ) : (
                           <span style={{ color: 'var(--color-text-muted)' }}>—</span>
@@ -603,36 +609,7 @@ export const PlayerDirectory: React.FC = () => {
 
                       {/* Playstyle */}
                       <td style={{ padding: '0.75rem 1rem' }}>
-                        <span
-                          style={{
-                            display: 'inline-block',
-                            padding: '0.2rem 0.55rem',
-                            borderRadius: 'var(--radius-sm)',
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            background:
-                              player.playstyle === 'Rolling'
-                                ? 'rgba(168, 85, 247, 0.15)'
-                                : player.playstyle === 'DAS'
-                                ? 'rgba(245, 158, 11, 0.15)'
-                                : 'rgba(20, 184, 166, 0.15)',
-                            color:
-                              player.playstyle === 'Rolling'
-                                ? '#c084fc'
-                                : player.playstyle === 'DAS'
-                                ? 'var(--color-gold-bright)'
-                                : '#2dd4bf',
-                            border: `1px solid ${
-                              player.playstyle === 'Rolling'
-                                ? 'rgba(168, 85, 247, 0.3)'
-                                : player.playstyle === 'DAS'
-                                ? 'rgba(245, 158, 11, 0.3)'
-                                : 'rgba(20, 184, 166, 0.3)'
-                            }`,
-                          }}
-                        >
-                          {player.playstyle || 'Rolling'}
-                        </span>
+                        <PlaystyleChip style={player.playstyle} />
                       </td>
 
                       {/* Personal Best */}

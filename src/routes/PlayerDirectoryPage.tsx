@@ -1,22 +1,30 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { PlayerDirectory } from '../features/players/components/PlayerDirectory';
+import { TournamentNavbar } from '../components/TournamentNavbar';
+import { useTournament } from '../features/tournament/store';
 import { Layers, ArrowLeft } from 'lucide-react';
 
 export const PlayerDirectoryPage: React.FC = () => {
+  const { tournaments } = useTournament();
+  const activeTournament = tournaments[0];
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--color-bg-base)' }}>
-      {/* Global Top Navbar */}
-      <header
-        style={{
-          background: 'var(--color-bg-surface)',
-          borderBottom: '1px solid var(--color-border)',
-          padding: '0.75rem 1.5rem',
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
-        }}
-      >
+      {activeTournament ? (
+        <TournamentNavbar tournament={activeTournament} activeView="players" />
+      ) : (
+        /* Global Top Navbar */
+        <header
+          style={{
+            background: 'var(--color-bg-surface)',
+            borderBottom: '1px solid var(--color-border)',
+            padding: '0.75rem 1.5rem',
+            position: 'sticky',
+            top: 0,
+            zIndex: 100,
+          }}
+        >
         <div
           style={{
             maxWidth: '1200px',
@@ -94,6 +102,7 @@ export const PlayerDirectoryPage: React.FC = () => {
           </div>
         </div>
       </header>
+    )}
 
       {/* Main Content */}
       <main style={{ flex: 1, padding: '2rem 1.5rem', maxWidth: '1200px', width: '100%', margin: '0 auto' }}>

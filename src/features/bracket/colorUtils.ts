@@ -43,16 +43,17 @@ export function getContrastingTextColor(hexColor: string | undefined, fallback: 
 }
 
 /**
- * Generates an atmospheric radial gradient for the tier canvas,
- * blending the tier's primary accent with the canvas background.
+ * Generates solid background for the tier canvas without gradients.
  */
 export function getTierCanvasBackground(
   backgroundColor: string | undefined,
-  primaryColor: string | undefined
+  _primaryColor?: string | undefined,
+  fallback: string = '#0c0d12'
 ): string {
-  const bg = backgroundColor || '#0e1015';
-  const primary = primaryColor || '#f59e0b';
-  return `radial-gradient(ellipse 80% 50% at 50% 10%, ${colorWithAlpha(primary, 0.09, 'rgba(245, 158, 11, 0.08)')} 0%, transparent 80%), ${bg}`;
+  if (backgroundColor && (backgroundColor.startsWith('#') || backgroundColor.startsWith('rgb'))) {
+    return backgroundColor;
+  }
+  return fallback;
 }
 
 /**
@@ -63,7 +64,7 @@ export function getTierCardBackground(
   _primaryColor?: string | undefined,
   fallback: string = '#161922'
 ): string {
-  if (cardColor && cardColor.startsWith('#')) {
+  if (cardColor && (cardColor.startsWith('#') || cardColor.startsWith('rgb'))) {
     return cardColor;
   }
   return fallback;

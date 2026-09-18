@@ -16,6 +16,8 @@ import {
 import { LeaderboardRankRow, MAXOUT_THRESHOLD, deriveLeaderboard, getPlayerQualifierStatus } from '../scoring';
 import { calculateGlobalStandings, getRankOrdinal } from '../../tournament/standings';
 import { colorWithAlpha } from '../../bracket/colorUtils';
+import { CountryFlag } from '../../players/flagUtils';
+import { PlaystyleChip } from '../../players/components/PlaystyleChip';
 
 interface PlayerDetailDrawerProps {
   isOpen: boolean;
@@ -125,6 +127,7 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
     roundName: string;
     opponentName: string;
     opponentSeed?: number;
+    opponentCountry?: string;
     playerWins: number;
     opponentWins: number;
     isWinner: boolean;
@@ -191,6 +194,7 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
           roundName: round.name,
           opponentName: opponent?.name || 'TBD',
           opponentSeed: opponent?.seed,
+          opponentCountry: opponent?.country,
           playerWins,
           opponentWins,
           isWinner,
@@ -279,40 +283,13 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
 
               {/* Playstyle */}
               {player.playstyle && (
-                <span
-                  style={{
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    padding: '0.15rem 0.5rem',
-                    borderRadius: 'var(--radius-sm)',
-                    background:
-                      player.playstyle === 'Rolling'
-                        ? 'rgba(56, 189, 248, 0.15)'
-                        : player.playstyle === 'Hypertap'
-                        ? 'rgba(244, 63, 94, 0.15)'
-                        : 'rgba(245, 158, 11, 0.15)',
-                    color:
-                      player.playstyle === 'Rolling'
-                        ? '#38bdf8'
-                        : player.playstyle === 'Hypertap'
-                        ? '#fb7185'
-                        : '#fbbf24',
-                  }}
-                >
-                  {player.playstyle}
-                </span>
-              )}
-
-              {/* Country */}
-              {player.country && (
-                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', background: 'rgba(255,255,255,0.06)', padding: '0.15rem 0.45rem', borderRadius: 'var(--radius-sm)' }}>
-                  {player.country}
-                </span>
+                <PlaystyleChip style={player.playstyle} />
               )}
             </div>
 
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.01em' }}>
-              {player.name}
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <CountryFlag country={player.country} />
+              <span>{player.name}</span>
             </h2>
           </div>
 
@@ -620,8 +597,10 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
                     {/* Match Score & Opponent */}
                     <div style={{ padding: '0.65rem 0.75rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
-                        <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
-                          vs <strong style={{ color: '#ffffff' }}>{m.opponentName}</strong>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <span>vs</span>
+                          <CountryFlag country={m.opponentCountry} />
+                          <strong style={{ color: '#ffffff' }}>{m.opponentName}</strong>
                           {m.opponentSeed && (
                             <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginLeft: '0.3rem' }}>
                               (Seed #{m.opponentSeed})

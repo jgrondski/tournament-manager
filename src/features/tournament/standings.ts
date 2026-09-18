@@ -1,4 +1,4 @@
-import { Tournament, TournamentTier, MatchScoreRecord } from './types';
+import { Tournament, TournamentTier, MatchScoreRecord, Playstyle } from './types';
 import { SeededPlayer, BracketMatch } from '../bracket/types';
 import { deriveLeaderboard, LeaderboardRankRow } from '../qualifiers/scoring';
 import { getRoundName } from '../bracket/math/seed-utils';
@@ -44,7 +44,7 @@ export interface GlobalStandingRow {
     seed?: number;
     tierSeed?: number;
     country?: string;
-    playstyle?: 'DAS' | 'Rolling' | 'Hypertap';
+    playstyle?: Playstyle;
   };
   tier?: TournamentTier;
   eliminationRound?: string; // "Champion", "Finals", "Semifinals", "Quarterfinals", etc.

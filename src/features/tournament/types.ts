@@ -80,6 +80,8 @@ export interface TournamentPlayer {
   isVerified?: boolean;
 }
 
+export type Playstyle = 'DAS' | 'Rolling' | 'Hypertap' | 'Hybrid' | 'Roll' | 'Tap';
+
 export interface QualifierScore {
   id: string;
   playerId: string;
@@ -91,7 +93,7 @@ export interface QualifierScore {
   totalScore: number;
   verified: boolean;
   assignedTierId?: string;
-  playstyle?: 'DAS' | 'Rolling' | 'Hypertap';
+  playstyle?: Playstyle;
   personalBest?: number;
 }
 
@@ -100,7 +102,7 @@ export interface PlayerProfile {
   name: string;
   country?: string;
   personalBest: number;
-  playstyle: 'DAS' | 'Rolling' | 'Hypertap';
+  playstyle: Playstyle;
   notes?: string;
   isDisqualified?: boolean;
 }
