@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTournament } from '../features/tournament/store';
 import { PlayerProfile } from '../features/tournament/types';
-import { TournamentNavbar } from '../components/TournamentNavbar';
+import { TournamentLayout } from '../components/TournamentLayout';
 import { ImportFromGlobalModal } from '../features/players/components/ImportFromGlobalModal';
 import { PlayerEditModal } from '../features/players/components/PlayerEditModal';
 import { PlayerDetailDrawer } from '../features/qualifiers/components/PlayerDetailDrawer';
@@ -110,19 +110,14 @@ export const ManageTournamentPlayersPage: React.FC = () => {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <TournamentNavbar
-        tournament={tournament}
-        activeView="players"
-      />
-
+    <TournamentLayout tournament={tournament} activeView="players">
       <main style={{ flex: 1, padding: '2rem 1.5rem', maxWidth: '1100px', width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         {/* Header Section */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <h1 style={{ fontSize: '1.6rem', fontWeight: 700, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <Users color="var(--color-gold-bright)" size={26} />
-              Register Players
+              Tournament Competitor Roster
             </h1>
             <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
               Manage registered competitors for <strong style={{ color: 'var(--color-text-primary)' }}>{tournament.name}</strong>. Players registered here can submit qualifier scores and seed into tournament brackets.
@@ -502,6 +497,6 @@ export const ManageTournamentPlayersPage: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+    </TournamentLayout>
   );
 };

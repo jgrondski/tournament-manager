@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTournament } from '../features/tournament/store';
-import { TournamentNavbar } from '../components/TournamentNavbar';
+import { TournamentLayout } from '../components/TournamentLayout';
 import { LeaderboardTable } from '../features/qualifiers/components/LeaderboardTable';
 
 export const PublicLeaderboardPage: React.FC = () => {
@@ -44,14 +44,10 @@ export const PublicLeaderboardPage: React.FC = () => {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <TournamentNavbar
-        tournament={tournament}
-        activeView="leaderboard"
-      />
+    <TournamentLayout tournament={tournament} activeView="leaderboard">
       <main style={{ flex: 1, padding: '1rem 0' }}>
         <LeaderboardTable tournament={tournament} />
       </main>
-    </div>
+    </TournamentLayout>
   );
 };

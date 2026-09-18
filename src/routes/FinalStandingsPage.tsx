@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTournament } from '../features/tournament/store';
-import { TournamentNavbar } from '../components/TournamentNavbar';
+import { TournamentLayout } from '../components/TournamentLayout';
 import { FinalStandingsTable } from '../features/tournament/components/FinalStandingsTable';
 
 export const FinalStandingsPage: React.FC = () => {
@@ -46,11 +46,7 @@ export const FinalStandingsPage: React.FC = () => {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <TournamentNavbar
-        tournament={tournament}
-        activeView="standings"
-      />
+    <TournamentLayout tournament={tournament} activeView="standings">
       <main
         style={
           isStandingsGated
@@ -71,6 +67,6 @@ export const FinalStandingsPage: React.FC = () => {
       >
         <FinalStandingsTable tournament={tournament} />
       </main>
-    </div>
+    </TournamentLayout>
   );
 };

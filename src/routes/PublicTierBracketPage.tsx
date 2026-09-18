@@ -1,8 +1,10 @@
-import React, { useEffect } from 'react';
-import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useParams, useSearchParams, useNavigate, Navigate } from 'react-router-dom';
 import { useTournament } from '../features/tournament/store';
-import { TournamentNavbar } from '../components/TournamentNavbar';
+import { TournamentLayout } from '../components/TournamentLayout';
 import { BracketVisualizer } from '../features/bracket/components/BracketVisualizer';
+import { BracketTierBar } from '../features/bracket/components/BracketTierBar';
+import { BracketViewMode } from '../features/bracket/bracketLayout';
 
 export const PublicTierBracketPage: React.FC = () => {
   const { slug, tierSlug } = useParams<{ slug: string; tierSlug: string }>();
@@ -11,8 +13,16 @@ export const PublicTierBracketPage: React.FC = () => {
   const { getTierBySlug, getTournamentBySlug } = useTournament();
 
   const isObsMode = searchParams.get('obs') === 'true';
-  const obsView = (searchParams.get('view') as any) || (isObsMode ? 'fit' : 'standard');
+  const urlView = searchParams.get('view') as BracketViewMode | null;
+  const [localViewMode, setLocalViewMode] = useState<BracketViewMode>(urlView || (isObsMode ? 'fit' : 'standard'));
   const chroma = searchParams.get('chroma');
+
+  // Update view mode if query param changes
+  useEffect(() => {
+    if (urlView) {
+      setLocalViewMode(urlView);
+    }
+  }, [urlView]);
 
   const tierData = slug && tierSlug ? getTierBySlug(slug, tierSlug) : undefined;
   const tournamentFallback = slug ? getTournamentBySlug(slug) : undefined;
@@ -29,15 +39,29 @@ export const PublicTierBracketPage: React.FC = () => {
     };
   }, [isObsMode]);
 
+  // Handle missing tier / friendly aliases (e.g. /:slug/brackets)
   if (!tierData) {
+    if (tournamentFallback && tournamentFallback.tiers.length > 0) {
+      return <Navigate to={`/${tournamentFallback.slug}/${tournamentFallback.tiers[0].slug}`} replace />;
+    }
+
     if (tournamentFallback && tournamentFallback.tiers.length === 0) {
       return (
-        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-          <TournamentNavbar
-            tournament={tournamentFallback}
-            activeView="bracket"
-          />
-          <main style={{ flex: 1, padding: '3rem 1.5rem', textAlign: 'center', maxWidth: '600px', margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
+        <TournamentLayout tournament={tournamentFallback} activeView="bracket">
+          <main
+            style={{
+              flex: 1,
+              padding: '3rem 1.5rem',
+              textAlign: 'center',
+              maxWidth: '600px',
+              margin: '0 auto',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '1rem',
+            }}
+          >
             <h2 style={{ color: 'var(--color-text-primary)', fontSize: '1.4rem' }}>No Bracket Tiers Configured</h2>
             <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem', lineHeight: 1.5 }}>
               This tournament does not have any bracket tiers yet. Qualifiers can be entered and ranked on the leaderboard, or you can create bracket tiers in Settings.
@@ -51,7 +75,7 @@ export const PublicTierBracketPage: React.FC = () => {
               </button>
             </div>
           </main>
-        </div>
+        </TournamentLayout>
       );
     }
 
@@ -68,6 +92,7 @@ export const PublicTierBracketPage: React.FC = () => {
 
   const { tournament, tier } = tierData;
 
+  // OBS Overlay Mode: strip all chrome, navbars, and sidebars completely
   if (isObsMode) {
     const chromaBg = chroma
       ? chroma.startsWith('#')
@@ -88,7 +113,7 @@ export const PublicTierBracketPage: React.FC = () => {
           tier={tier}
           isObsMode={true}
           canManage={false}
-          obsView={obsView}
+          obsView={localViewMode}
           chroma={chroma}
         />
       </div>
@@ -98,20 +123,28 @@ export const PublicTierBracketPage: React.FC = () => {
   const tierBg = tier.backgroundColor || 'var(--color-bg-base)';
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: tierBg }}>
-      <TournamentNavbar
+    <TournamentLayout
+      tournament={tournament}
+      activeTier={tier}
+      activeView="bracket"
+      contentStyle={{ background: tierBg, minHeight: '100vh' }}
+    >
+      <BracketTierBar
         tournament={tournament}
         activeTier={tier}
-        activeView="bracket"
+        viewMode={localViewMode}
+        onChangeViewMode={setLocalViewMode}
+        canManage={true}
       />
-      <main style={{ flex: 1, padding: 0 }}>
+      <main style={{ flex: 1, padding: 0, minHeight: 0 }}>
         <BracketVisualizer
           tournament={tournament}
           tier={tier}
           isObsMode={false}
           canManage={true}
+          obsView={localViewMode}
         />
       </main>
-    </div>
+    </TournamentLayout>
   );
 };

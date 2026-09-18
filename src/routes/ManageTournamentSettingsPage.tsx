@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTournament } from '../features/tournament/store';
-import { TournamentNavbar } from '../components/TournamentNavbar';
+import { TournamentLayout } from '../components/TournamentLayout';
 import { TournamentAdminForm } from '../features/tournament/components/TournamentAdminForm';
 import { AlertTriangle, X } from 'lucide-react';
 
@@ -49,12 +49,11 @@ export const ManageTournamentSettingsPage: React.FC = () => {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <TournamentNavbar
-        tournament={tournament}
-        activeView="settings"
-        onNavigate={handleNavigateAttempt}
-      />
+    <TournamentLayout
+      tournament={tournament}
+      activeView="settings"
+      onNavigate={handleNavigateAttempt}
+    >
       <main style={{ flex: 1, padding: '2rem 1.5rem', maxWidth: '1100px', width: '100%', margin: '0 auto' }}>
         <TournamentAdminForm
           tournament={tournament}
@@ -150,7 +149,7 @@ export const ManageTournamentSettingsPage: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+    </TournamentLayout>
   );
 };
 
