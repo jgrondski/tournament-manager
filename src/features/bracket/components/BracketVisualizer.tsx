@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { BracketStructure, BracketMatch, isMatchPlayable } from '../types';
 import { Tournament, TournamentTier, PlayerProfile } from '../../tournament/types';
@@ -7,6 +7,8 @@ import {
   getContrastingTextColor,
   getTierCanvasBackground,
   getTierCardBackground,
+  getAlternateShade,
+  getTextScale,
 } from '../colorUtils';
 import { calculateBracketLayout, BracketViewMode } from '../bracketLayout';
 import { Trophy } from 'lucide-react';
@@ -40,7 +42,9 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
   const [hoveredPlayerKey, setHoveredPlayerKey] = useState<string | null>(null);
   const [hoveredMatchId, setHoveredMatchId] = useState<string | null>(null);
 
-  // Dynamic window measurement for Strategy B (Fit to 1080p canvas)
+  const fitContainerRef = useRef<HTMLDivElement>(null);
+
+  // Dynamic measurement for Strategy B (Fit to 1080p / responsive canvas)
   const [viewportDim, setViewportDim] = useState({
     w: typeof window !== 'undefined' ? window.innerWidth : 1920,
     h: typeof window !== 'undefined' ? window.innerHeight : 1080,
@@ -48,15 +52,34 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
 
   useEffect(() => {
     if (effectiveObsView !== 'fit') return;
+    window.scrollTo(0, 0);
+
     const updateDimensions = () => {
-      setViewportDim({
-        w: window.innerWidth || 1920,
-        h: window.innerHeight || 1080,
-      });
+      if (fitContainerRef.current) {
+        const rect = fitContainerRef.current.getBoundingClientRect();
+        const availableHeight = Math.round(window.innerHeight - rect.top);
+        setViewportDim({
+          w: Math.round(rect.width) || window.innerWidth || 1920,
+          h: availableHeight > 100 ? availableHeight : (window.innerHeight - 52) || 1080,
+        });
+      } else {
+        setViewportDim({
+          w: window.innerWidth || 1920,
+          h: window.innerHeight || 1080,
+        });
+      }
     };
+
     updateDimensions();
+    const resizeObserver = new ResizeObserver(updateDimensions);
+    if (fitContainerRef.current) {
+      resizeObserver.observe(fitContainerRef.current);
+    }
     window.addEventListener('resize', updateDimensions);
-    return () => window.removeEventListener('resize', updateDimensions);
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', updateDimensions);
+    };
   }, [effectiveObsView]);
 
   const handlePlayerClick = (pId: string, pName: string, country?: string) => {
@@ -73,10 +96,22 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
 
   const bracket: BracketStructure = tier.bracket;
   const rounds = bracket?.rounds || [];
-  const primaryColor = tier.primaryColor || '#f59e0b';
-  const secondaryColor = tier.secondaryColor || '#fbbf24';
-  const cardColor = tier.cardColor || '#161922';
-  const backgroundColor = tier.backgroundColor || '#0c0d12';
+  const primaryColor = tier.primaryColor || '#ffc905';
+  const secondaryColor = tier.secondaryColor || '#705b33';
+  const cardColor = tier.cardColor || '#1b1c1d';
+  const backgroundColor = tier.backgroundColor || '#020203';
+  const textColor = tier.textColor || '#94A3B8';
+  const textScale = getTextScale(tier.textSize);
+
+  // Dynamic text scaling derived from smaller baseline:
+  const shelfFontSize = `${(0.64 * textScale).toFixed(3)}rem`;
+  const seedDim = Math.max(16, Math.round(18 * textScale));
+  const seedFontSize = `${(0.68 * textScale).toFixed(3)}rem`;
+  const flagFontSize = `${(0.9 * textScale).toFixed(3)}rem`;
+  const nameFontSize = `${(0.84 * textScale).toFixed(3)}rem`;
+  const scoreFontSize = `${(0.88 * textScale).toFixed(3)}rem`;
+  const scoreMinW = Math.max(18, Math.round(20 * textScale));
+  const scoreH = Math.max(18, Math.round(20 * textScale));
 
   // Calculate geometric coordinates and orthogonal SVG connector paths
   const layout = useMemo(() => {
@@ -86,8 +121,8 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
   // Fit scale calculation for 1080p / responsive OBS window
   const fitScale = useMemo(() => {
     if (effectiveObsView !== 'fit') return 1;
-    const availableW = Math.max(240, viewportDim.w - (isObsMode ? 24 : 48));
-    const availableH = Math.max(180, viewportDim.h - (isObsMode ? 24 : 48));
+    const availableW = Math.max(240, viewportDim.w - (isObsMode ? 16 : 32));
+    const availableH = Math.max(180, viewportDim.h - (isObsMode ? 12 : 24));
     const scaleX = availableW / layout.totalWidth;
     const scaleY = availableH / layout.totalHeight;
     return Math.min(scaleX, scaleY, 1.2);
@@ -138,14 +173,15 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
         minHeight: `${layout.totalHeight}px`,
       }}
     >
-      {/* Sticky Round Headers Bar (Pinned to top when scrolling down) */}
+      {/* Sticky Round Headers Bar (Pinned to top when scrolling down in standard mode; fixed at top in fit mode) */}
       <div
         style={{
-          position: 'sticky',
+          position: effectiveObsView === 'fit' ? 'absolute' : 'sticky',
           top: 0,
+          left: 0,
           zIndex: 10,
           width: `${layout.totalWidth}px`,
-          height: '42px',
+          height: `${Math.max(48, (layout.roundHeaders[0]?.y ?? 8) + 38)}px`,
           background: effectiveCanvasBg,
           pointerEvents: 'none',
           marginBottom: '6px',
@@ -157,7 +193,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
             style={{
               position: 'absolute',
               left: `${header.x}px`,
-              top: '4px',
+              top: `${header.y}px`,
               width: `${header.width}px`,
               height: '34px',
               display: 'flex',
@@ -202,12 +238,12 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
               key={path.id}
               d={path.d}
               fill="none"
-              stroke={primaryColor}
-              strokeWidth={isTargetComplete ? 2.5 : 2}
+              stroke={isTargetComplete ? primaryColor : secondaryColor}
+              strokeWidth={isTargetComplete ? 2.5 : 1.5}
               strokeLinecap="round"
               strokeLinejoin="round"
               style={{
-                filter: isTargetComplete ? `drop-shadow(0 0 5px ${primaryColor}66)` : 'none',
+                filter: isTargetComplete ? `drop-shadow(0 0 6px ${primaryColor}77)` : 'none',
                 transition: 'all 0.2s ease',
               }}
             />
@@ -280,6 +316,9 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
           const p1Won = Boolean(p1?.id && (match.winnerId === p1.id || record?.winnerPlayerId === p1.id));
           const p2Won = Boolean(p2?.id && (match.winnerId === p2.id || record?.winnerPlayerId === p2.id));
           const isMatchHovered = hoveredMatchId === match.id;
+          const p1Leading = inProgress && p1Wins > p2Wins;
+          const p2Leading = inProgress && p2Wins > p1Wins;
+          const p1ZebraBg = getAlternateShade(effectiveCardBg, 7);
 
           return (
             <div
@@ -298,14 +337,18 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                 width: `${pos.width}px`,
                 height: `${pos.height}px`,
                 background: effectiveCardBg,
-                borderRadius: 'var(--radius-sm)',
-                border: inProgress || isMatchHovered
+                borderRadius: '5px',
+                border: inProgress || isComplete
                   ? `2px solid ${primaryColor}`
-                  : `1.5px solid ${primaryColor}`,
+                  : isMatchHovered
+                  ? `1.5px solid ${primaryColor}`
+                  : `1.5px solid ${secondaryColor}`,
                 boxShadow: inProgress
                   ? `0 0 16px ${primaryColor}66`
+                  : isComplete
+                  ? `0 0 16px ${primaryColor}55`
                   : isMatchHovered
-                  ? `0 4px 14px ${primaryColor}40`
+                  ? `0 4px 14px ${secondaryColor}40`
                   : '0 2px 6px rgba(0, 0, 0, 0.45)',
                 cursor: !isObsMode && canManage && isPlayable && tournament.isLocked ? 'pointer' : 'default',
                 opacity: isPlayable ? 1 : 0.72,
@@ -318,23 +361,25 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                 transition: 'all 0.15s ease',
               }}
             >
-              {/* Match Header Strip - Solid Themed */}
+              {/* Match Header Strip - Solid Themed with Clean Non-Bold Typography */}
               <div
                 style={{
                   height: '20px',
                   minHeight: '20px',
                   maxHeight: '20px',
-                  padding: '0 0.5rem',
+                  padding: '0 0.55rem',
                   background: effectiveCardBg,
-                  fontSize: '0.64rem',
-                  color: primaryColor,
+                  fontSize: shelfFontSize,
+                  color: textColor,
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  borderBottom: `1px solid ${primaryColor}`,
+                  borderBottom: isComplete
+                    ? `1.5px solid ${p1Won ? primaryColor : secondaryColor}`
+                    : `1.5px solid ${secondaryColor}`,
                   boxSizing: 'border-box',
                   lineHeight: '20px',
-                  fontWeight: 800,
+                  fontWeight: 500,
                 }}
               >
                 <span>Match #{match.matchNumber}</span>
@@ -350,10 +395,9 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '0 0.5rem',
-                  borderBottom: `1px solid ${primaryColor}40`,
-                  background: 'transparent',
-                  opacity: isComplete && !p1Won ? 0.45 : 1,
+                  padding: '0 0.55rem',
+                  background: isComplete && p1Won ? secondaryColor : p1ZebraBg,
+                  opacity: 1,
                   boxSizing: 'border-box',
                 }}
               >
@@ -369,7 +413,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '0.35rem',
+                    gap: '0.4rem',
                     overflow: 'hidden',
                     padding: '0.05rem 0.2rem',
                     borderRadius: 'var(--radius-sm)',
@@ -377,6 +421,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                       hoveredPlayerKey === `p1-${match.id}` ? `${secondaryColor}22` : 'transparent',
                     cursor: p1?.id ? 'pointer' : 'inherit',
                     transition: 'all 0.15s ease',
+                    minWidth: 0,
                   }}
                   title={p1?.id ? 'View competitor tournament profile' : undefined}
                 >
@@ -386,35 +431,36 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                         display: 'inline-flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        minWidth: '18px',
-                        height: '18px',
-                        padding: '0 0.2rem',
-                        background: secondaryColor,
-                        color: getContrastingTextColor(secondaryColor),
-                        fontWeight: 800,
-                        fontSize: '0.68rem',
+                        width: `${seedDim}px`,
+                        height: `${seedDim}px`,
+                        minWidth: `${seedDim}px`,
+                        background: effectiveCardBg,
+                        border: `1.5px solid ${(isComplete && p1Won) || p1Leading ? primaryColor : secondaryColor}`,
+                        color: (isComplete && p1Won) || p1Leading ? primaryColor : textColor,
+                        fontWeight: 900,
+                        fontSize: seedFontSize,
                         fontFamily: 'var(--font-mono)',
-                        borderRadius: '2px',
+                        borderRadius: '3px',
                         flexShrink: 0,
-                        lineHeight: '18px',
+                        lineHeight: `${seedDim}px`,
                       }}
                     >
                       {p1.seed}
                     </span>
                   )}
                   {p1Profile?.country && (
-                    <CountryFlag country={p1Profile.country} style={{ fontSize: '0.9rem' }} />
+                    <CountryFlag country={p1Profile.country} style={{ fontSize: flagFontSize, lineHeight: 1, flexShrink: 0 }} />
                   )}
                   <span
                     style={{
-                      fontSize: '0.84rem',
-                      fontWeight: p1Won ? 800 : 600,
+                      fontSize: nameFontSize,
+                      fontWeight: (isComplete && p1Won) || p1Leading ? 900 : 700,
                       color:
                         hoveredPlayerKey === `p1-${match.id}`
-                          ? secondaryColor
-                          : p1Won
+                           ? secondaryColor
+                          : (isComplete && p1Won) || p1Leading
                           ? primaryColor
-                          : '#ffffff',
+                          : textColor,
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
@@ -425,29 +471,49 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                   </span>
                 </div>
 
+                {/* Score Box */}
                 <span
                   className="tabular-nums"
                   style={{
-                    fontSize: '0.88rem',
-                    fontWeight: 800,
-                    minWidth: '18px',
-                    height: '18px',
+                    fontSize: scoreFontSize,
+                    fontWeight: 900,
+                    minWidth: `${scoreMinW}px`,
+                    height: `${scoreH}px`,
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: p1Won ? getContrastingTextColor(primaryColor) : 'var(--color-text-secondary)',
-                    background: p1Won ? primaryColor : 'transparent',
-                    padding: '0 0.35rem',
-                    borderRadius: '2px',
-                    border: `1px solid ${primaryColor}`,
+                    color: !isComplete && !inProgress
+                      ? textColor
+                      : (isComplete && p1Won) || p1Leading
+                      ? getContrastingTextColor(primaryColor)
+                      : textColor,
+                    background: !isComplete && !inProgress
+                      ? effectiveCardBg
+                      : (isComplete && p1Won) || p1Leading
+                      ? primaryColor
+                      : 'transparent',
+                    border: !isComplete && !inProgress
+                      ? `1.5px solid ${secondaryColor}`
+                      : 'none',
+                    borderRadius: '3px',
                     marginLeft: '0.35rem',
                     flexShrink: 0,
                     lineHeight: 1,
                   }}
                 >
-                  {p1ScoreDisplay}
+                  {!isComplete && !inProgress ? '-' : p1ScoreDisplay}
                 </span>
               </div>
+
+              {/* Player-to-Player Divider: Primary if finished, Secondary otherwise */}
+              <div
+                style={{
+                  height: '1.5px',
+                  minHeight: '1.5px',
+                  background: isComplete ? primaryColor : secondaryColor,
+                  flexShrink: 0,
+                }}
+              />
 
               {/* Slot 2: Player 2 */}
               <div
@@ -458,9 +524,9 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '0 0.5rem',
-                  background: 'transparent',
-                  opacity: isComplete && !p2Won ? 0.45 : 1,
+                  padding: '0 0.55rem',
+                  background: isComplete && p2Won ? secondaryColor : effectiveCardBg,
+                  opacity: 1,
                   boxSizing: 'border-box',
                 }}
               >
@@ -476,7 +542,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '0.35rem',
+                    gap: '0.4rem',
                     overflow: 'hidden',
                     padding: '0.05rem 0.2rem',
                     borderRadius: 'var(--radius-sm)',
@@ -484,6 +550,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                       hoveredPlayerKey === `p2-${match.id}` ? `${secondaryColor}22` : 'transparent',
                     cursor: p2?.id ? 'pointer' : 'inherit',
                     transition: 'all 0.15s ease',
+                    minWidth: 0,
                   }}
                   title={p2?.id ? 'View competitor tournament profile' : undefined}
                 >
@@ -493,35 +560,36 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                         display: 'inline-flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        minWidth: '18px',
-                        height: '18px',
-                        padding: '0 0.2rem',
-                        background: secondaryColor,
-                        color: getContrastingTextColor(secondaryColor),
-                        fontWeight: 800,
-                        fontSize: '0.68rem',
+                        width: `${seedDim}px`,
+                        height: `${seedDim}px`,
+                        minWidth: `${seedDim}px`,
+                        background: effectiveCardBg,
+                        border: `1.5px solid ${(isComplete && p2Won) || p2Leading ? primaryColor : secondaryColor}`,
+                        color: (isComplete && p2Won) || p2Leading ? primaryColor : textColor,
+                        fontWeight: 900,
+                        fontSize: seedFontSize,
                         fontFamily: 'var(--font-mono)',
-                        borderRadius: '2px',
+                        borderRadius: '3px',
                         flexShrink: 0,
-                        lineHeight: '18px',
+                        lineHeight: `${seedDim}px`,
                       }}
                     >
                       {p2.seed}
                     </span>
                   )}
                   {p2Profile?.country && (
-                    <CountryFlag country={p2Profile.country} style={{ fontSize: '0.9rem' }} />
+                    <CountryFlag country={p2Profile.country} style={{ fontSize: flagFontSize, lineHeight: 1, flexShrink: 0 }} />
                   )}
                   <span
                     style={{
-                      fontSize: '0.84rem',
-                      fontWeight: p2Won ? 800 : 600,
+                      fontSize: nameFontSize,
+                      fontWeight: (isComplete && p2Won) || p2Leading ? 900 : 700,
                       color:
                         hoveredPlayerKey === `p2-${match.id}`
                           ? secondaryColor
-                          : p2Won
+                          : (isComplete && p2Won) || p2Leading
                           ? primaryColor
-                          : '#ffffff',
+                          : textColor,
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
@@ -532,27 +600,37 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                   </span>
                 </div>
 
+                {/* Score Box */}
                 <span
                   className="tabular-nums"
                   style={{
-                    fontSize: '0.88rem',
-                    fontWeight: 800,
-                    minWidth: '18px',
-                    height: '18px',
+                    fontSize: scoreFontSize,
+                    fontWeight: 900,
+                    minWidth: `${scoreMinW}px`,
+                    height: `${scoreH}px`,
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: p2Won ? getContrastingTextColor(primaryColor) : 'var(--color-text-secondary)',
-                    background: p2Won ? primaryColor : 'transparent',
-                    padding: '0 0.35rem',
-                    borderRadius: '2px',
-                    border: `1px solid ${primaryColor}`,
+                    color: !isComplete && !inProgress
+                      ? textColor
+                      : (isComplete && p2Won) || p2Leading
+                      ? getContrastingTextColor(primaryColor)
+                      : textColor,
+                    background: !isComplete && !inProgress
+                      ? effectiveCardBg
+                      : (isComplete && p2Won) || p2Leading
+                      ? primaryColor
+                      : 'transparent',
+                    border: !isComplete && !inProgress
+                      ? `1.5px solid ${secondaryColor}`
+                      : 'none',
+                    borderRadius: '3px',
                     marginLeft: '0.35rem',
                     flexShrink: 0,
                     lineHeight: 1,
                   }}
                 >
-                  {p2ScoreDisplay}
+                  {!isComplete && !inProgress ? '-' : p2ScoreDisplay}
                 </span>
               </div>
             </div>
@@ -667,7 +745,9 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
     <div
       style={{
         width: '100%',
-        minHeight: isObsMode ? '100vh' : 'calc(100vh - 100px)',
+        minHeight: effectiveObsView === 'fit' ? undefined : isObsMode ? '100vh' : 'calc(100vh - 100px)',
+        height: effectiveObsView === 'fit' ? '100%' : undefined,
+        flex: 1,
         background: effectiveCanvasBg,
         display: 'flex',
         flexDirection: 'column',
@@ -676,28 +756,42 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
       {effectiveObsView === 'fit' ? (
         /* Strategy B: Viewport Auto-Scaled 1080p View */
         <div
+          ref={fitContainerRef}
           style={{
-            width: '100vw',
-            height: '100vh',
+            width: isObsMode ? '100vw' : '100%',
+            height: isObsMode ? '100vh' : 'calc(100vh - 52px)',
+            flex: 1,
             overflow: 'hidden',
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'center',
+            justifyContent: 'flex-start',
+            paddingTop: isObsMode ? '4px' : '8px',
             background: effectiveCanvasBg,
             boxSizing: 'border-box',
           }}
         >
           <div
             style={{
-              width: `${layout.totalWidth}px`,
-              height: `${layout.totalHeight}px`,
-              transform: `scale(${fitScale})`,
-              transformOrigin: 'center center',
+              width: `${Math.ceil(layout.totalWidth * fitScale)}px`,
+              height: `${Math.ceil(layout.totalHeight * fitScale)}px`,
               position: 'relative',
               flexShrink: 0,
             }}
           >
-            {canvasContent}
+            <div
+              style={{
+                width: `${layout.totalWidth}px`,
+                height: `${layout.totalHeight}px`,
+                transform: `scale(${fitScale})`,
+                transformOrigin: 'top left',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+              }}
+            >
+              {canvasContent}
+            </div>
           </div>
         </div>
       ) : (

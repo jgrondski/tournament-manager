@@ -6,7 +6,7 @@ import { PlayerDetailDrawer } from './PlayerDetailDrawer';
 import { Search, Trophy, Plus, Sparkles, ChevronRight, Check, Video, ExternalLink } from 'lucide-react';
 import { CountryFlag } from '../../players/flagUtils';
 import { PlaystyleChip } from '../../players/components/PlaystyleChip';
-import { getContrastingTextColor } from '../../bracket/colorUtils';
+import { getContrastingTextColor, getAlternateShade } from '../../bracket/colorUtils';
 
 interface LeaderboardTableProps {
   tournament: Tournament;
@@ -187,7 +187,8 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                 // Row background and accenting based on tier bracket palette
                 let rowBg = idx % 2 === 0 ? 'var(--color-bg-surface)' : 'var(--color-bg-surface-elevated)';
                 if (isTierQualified) {
-                  rowBg = `${tierColor}12`;
+                  const baseCard = assignedTier?.cardColor || '#0E1420';
+                  rowBg = idx % 2 === 0 ? baseCard : getAlternateShade(baseCard, 6);
                 }
 
                 return (
@@ -201,7 +202,9 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                       title={isObsMode ? undefined : "Click to view detailed competitor profile, audit log, and match stats"}
                       style={{
                         background: rowBg,
-                        borderBottom: isTierQualified ? `1px solid ${tierColor}33` : '1px solid rgba(0, 0, 0, 0.65)',
+                        borderBottom: isTierQualified
+                          ? `1px solid ${assignedTier?.secondaryColor || `${tierColor}33`}`
+                          : '1px solid rgba(0, 0, 0, 0.65)',
                         borderLeft: isTierQualified ? `4px solid ${tierColor}` : '4px solid transparent',
                         transition: 'all 0.15s ease',
                         cursor: isObsMode ? 'default' : 'pointer',

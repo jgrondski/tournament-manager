@@ -17,10 +17,10 @@ export interface LayoutConfig {
 export const DEFAULT_LAYOUT_CONFIG: LayoutConfig = {
   matchWidth: 260,
   matchHeight: 80, // Fits header strip + 2 player rows perfectly without vertical clipping
-  baseRowHeight: 98, // 80px card + 18px compact gap
+  baseRowHeight: 112, // 80px card + 32px gap (refined vertical breathing room between matches)
   roundGap: 56, // Compact horizontal spacing for broadcast/OBS
-  headerHeight: 48, // Balanced vertical breathing room between header badge and top matches
-  paddingTop: 8, // Closer to the top boundary of the container
+  headerHeight: 66, // 34px badge + 32px gap to ensure distance between round headers and top matches matches inter-match distance
+  paddingTop: 8, // Top boundary padding
   paddingLeft: 20,
   paddingRight: 32,
   paddingBottom: 24,
@@ -89,6 +89,10 @@ export function calculateBracketLayout(
   }
 
   const config: LayoutConfig = { ...DEFAULT_LAYOUT_CONFIG, ...customConfig };
+  if (customConfig?.headerHeight === undefined) {
+    const interMatchGap = config.baseRowHeight - config.matchHeight;
+    config.headerHeight = 34 + interMatchGap;
+  }
   const { rounds } = bracket;
 
   const matchPositions: Record<string, MatchPosition> = {};
@@ -426,6 +430,10 @@ export function calculateSplitBracketLayout(
   }
 
   const config: LayoutConfig = { ...DEFAULT_LAYOUT_CONFIG, ...customConfig };
+  if (customConfig?.headerHeight === undefined) {
+    const interMatchGap = config.baseRowHeight - config.matchHeight;
+    config.headerHeight = 34 + interMatchGap;
+  }
   const matchPositions: Record<string, MatchPosition> = {};
   const roundHeaders: RoundHeaderPosition[] = [];
   const paths: ConnectorPath[] = [];
@@ -586,6 +594,53 @@ export function calculateSplitBracketLayout(
     });
   }
 
+  // Position Left Wing prelims before anchor
+  for (let rIdx = leftAnchorIdx - 1; rIdx >= 0; rIdx--) {
+    const round = rounds[rIdx];
+    const roundX = leftStartX + rIdx * (config.matchWidth + config.roundGap);
+    const roundMatches = round.matches.filter(m => leftMatchIds.has(m.id));
+
+    roundMatches.forEach((match, mIdx) => {
+      let idealCenterY: number;
+      let targetPos: MatchPosition | undefined;
+
+      const downstreamRound = rounds[rIdx + 1];
+      if (downstreamRound) {
+        for (const dsMatch of downstreamRound.matches) {
+          if (dsMatch.player1.sourceMatchId === match.id || dsMatch.player2.sourceMatchId === match.id) {
+            targetPos = matchPositions[dsMatch.id];
+            break;
+          }
+        }
+      }
+
+      if (targetPos) {
+        idealCenterY = targetPos.centerY;
+      } else {
+        idealCenterY = config.paddingTop + config.headerHeight + mIdx * config.baseRowHeight;
+      }
+
+      if (mIdx > 0) {
+        const prevId = roundMatches[mIdx - 1].id;
+        const prevPos = matchPositions[prevId];
+        if (prevPos && idealCenterY < prevPos.centerY + config.matchHeight + 12) {
+          idealCenterY = prevPos.centerY + config.matchHeight + 12;
+        }
+      }
+
+      const topY = idealCenterY - config.matchHeight / 2;
+      matchPositions[match.id] = {
+        matchId: match.id,
+        x: roundX,
+        y: topY,
+        width: config.matchWidth,
+        height: config.matchHeight,
+        centerY: idealCenterY,
+        centerX: roundX + config.matchWidth / 2,
+      };
+    });
+  }
+
   // Position Right Wing Anchor
   const rightAnchorMatches = rounds[leftAnchorIdx].matches.filter(m => rightMatchIds.has(m.id));
   const rightAnchorCol = wingRoundCount - 1 - leftAnchorIdx;
@@ -620,6 +675,54 @@ export function calculateSplitBracketLayout(
       else if (f1) idealCenterY = f1.centerY;
       else if (f2) idealCenterY = f2.centerY;
       else idealCenterY = config.paddingTop + config.headerHeight + mIdx * config.baseRowHeight * 2;
+
+      if (mIdx > 0) {
+        const prevId = roundMatches[mIdx - 1].id;
+        const prevPos = matchPositions[prevId];
+        if (prevPos && idealCenterY < prevPos.centerY + config.matchHeight + 12) {
+          idealCenterY = prevPos.centerY + config.matchHeight + 12;
+        }
+      }
+
+      const topY = idealCenterY - config.matchHeight / 2;
+      matchPositions[match.id] = {
+        matchId: match.id,
+        x: roundX,
+        y: topY,
+        width: config.matchWidth,
+        height: config.matchHeight,
+        centerY: idealCenterY,
+        centerX: roundX + config.matchWidth / 2,
+      };
+    });
+  }
+
+  // Position Right Wing prelims before anchor
+  for (let rIdx = leftAnchorIdx - 1; rIdx >= 0; rIdx--) {
+    const round = rounds[rIdx];
+    const colIdx = wingRoundCount - 1 - rIdx;
+    const roundX = rightStartX + colIdx * (config.matchWidth + config.roundGap);
+    const roundMatches = round.matches.filter(m => rightMatchIds.has(m.id));
+
+    roundMatches.forEach((match, mIdx) => {
+      let idealCenterY: number;
+      let targetPos: MatchPosition | undefined;
+
+      const downstreamRound = rounds[rIdx + 1];
+      if (downstreamRound) {
+        for (const dsMatch of downstreamRound.matches) {
+          if (dsMatch.player1.sourceMatchId === match.id || dsMatch.player2.sourceMatchId === match.id) {
+            targetPos = matchPositions[dsMatch.id];
+            break;
+          }
+        }
+      }
+
+      if (targetPos) {
+        idealCenterY = targetPos.centerY;
+      } else {
+        idealCenterY = config.paddingTop + config.headerHeight + mIdx * config.baseRowHeight;
+      }
 
       if (mIdx > 0) {
         const prevId = roundMatches[mIdx - 1].id;
@@ -692,6 +795,44 @@ export function calculateSplitBracketLayout(
           sourceMatchIds: [f1.matchId, f2.matchId],
           targetMatchId: childMatch.id,
         });
+      } else if (f1) {
+        const f1OutX = f1.x + f1.width;
+        const f1OutY = f1.centerY;
+        if (Math.abs(f1OutY - childInY) < 2) {
+          paths.push({
+            id: `path-${childMatch.id}-straight-p1`,
+            d: `M ${f1OutX} ${f1OutY} H ${childInX}`,
+            sourceMatchIds: [f1.matchId],
+            targetMatchId: childMatch.id,
+          });
+        } else {
+          const midX = Math.round(f1OutX + (childInX - f1OutX) / 2);
+          paths.push({
+            id: `path-${childMatch.id}-single-p1`,
+            d: `M ${f1OutX} ${f1OutY} H ${midX} V ${childInY} H ${childInX}`,
+            sourceMatchIds: [f1.matchId],
+            targetMatchId: childMatch.id,
+          });
+        }
+      } else if (f2) {
+        const f2OutX = f2.x + f2.width;
+        const f2OutY = f2.centerY;
+        if (Math.abs(f2OutY - childInY) < 2) {
+          paths.push({
+            id: `path-${childMatch.id}-straight-p2`,
+            d: `M ${f2OutX} ${f2OutY} H ${childInX}`,
+            sourceMatchIds: [f2.matchId],
+            targetMatchId: childMatch.id,
+          });
+        } else {
+          const midX = Math.round(f2OutX + (childInX - f2OutX) / 2);
+          paths.push({
+            id: `path-${childMatch.id}-single-p2`,
+            d: `M ${f2OutX} ${f2OutY} H ${midX} V ${childInY} H ${childInX}`,
+            sourceMatchIds: [f2.matchId],
+            targetMatchId: childMatch.id,
+          });
+        }
       }
     });
   }
@@ -721,6 +862,44 @@ export function calculateSplitBracketLayout(
           sourceMatchIds: [f1.matchId, f2.matchId],
           targetMatchId: childMatch.id,
         });
+      } else if (f1) {
+        const f1OutX = f1.x;
+        const f1OutY = f1.centerY;
+        if (Math.abs(f1OutY - childInY) < 2) {
+          paths.push({
+            id: `path-${childMatch.id}-straight-p1`,
+            d: `M ${f1OutX} ${f1OutY} H ${childInX}`,
+            sourceMatchIds: [f1.matchId],
+            targetMatchId: childMatch.id,
+          });
+        } else {
+          const midX = Math.round((f1OutX + childInX) / 2);
+          paths.push({
+            id: `path-${childMatch.id}-single-p1`,
+            d: `M ${f1OutX} ${f1OutY} H ${midX} V ${childInY} H ${childInX}`,
+            sourceMatchIds: [f1.matchId],
+            targetMatchId: childMatch.id,
+          });
+        }
+      } else if (f2) {
+        const f2OutX = f2.x;
+        const f2OutY = f2.centerY;
+        if (Math.abs(f2OutY - childInY) < 2) {
+          paths.push({
+            id: `path-${childMatch.id}-straight-p2`,
+            d: `M ${f2OutX} ${f2OutY} H ${childInX}`,
+            sourceMatchIds: [f2.matchId],
+            targetMatchId: childMatch.id,
+          });
+        } else {
+          const midX = Math.round((f2OutX + childInX) / 2);
+          paths.push({
+            id: `path-${childMatch.id}-single-p2`,
+            d: `M ${f2OutX} ${f2OutY} H ${midX} V ${childInY} H ${childInX}`,
+            sourceMatchIds: [f2.matchId],
+            targetMatchId: childMatch.id,
+          });
+        }
       }
     });
   }
@@ -728,22 +907,47 @@ export function calculateSplitBracketLayout(
   // 3. Connectors into Center Finals:
   // Semi 1 (Left Wing) stems into Finals Left Edge
   if (semi1Pos) {
-    paths.push({
-      id: `path-finals-semi1`,
-      d: `M ${semi1Pos.x + semi1Pos.width} ${semi1Pos.centerY} H ${centerX}`,
-      sourceMatchIds: [semi1Pos.matchId],
-      targetMatchId: finalsMatch.id,
-    });
+    const semi1OutX = semi1Pos.x + semi1Pos.width;
+    const semi1OutY = semi1Pos.centerY;
+    if (Math.abs(semi1OutY - finalsCenterY) < 2) {
+      paths.push({
+        id: `path-finals-semi1`,
+        d: `M ${semi1OutX} ${semi1OutY} H ${centerX}`,
+        sourceMatchIds: [semi1Pos.matchId],
+        targetMatchId: finalsMatch.id,
+      });
+    } else {
+      const midLeftX = Math.round(semi1OutX + (centerX - semi1OutX) / 2);
+      paths.push({
+        id: `path-finals-semi1`,
+        d: `M ${semi1OutX} ${semi1OutY} H ${midLeftX} V ${finalsCenterY} H ${centerX}`,
+        sourceMatchIds: [semi1Pos.matchId],
+        targetMatchId: finalsMatch.id,
+      });
+    }
   }
 
   // Semi 2 (Right Wing) stems into Finals Right Edge
   if (semi2Pos) {
-    paths.push({
-      id: `path-finals-semi2`,
-      d: `M ${semi2Pos.x} ${semi2Pos.centerY} H ${centerX + config.matchWidth}`,
-      sourceMatchIds: [semi2Pos.matchId],
-      targetMatchId: finalsMatch.id,
-    });
+    const semi2OutX = semi2Pos.x;
+    const semi2OutY = semi2Pos.centerY;
+    const finalsRightEdge = centerX + config.matchWidth;
+    if (Math.abs(semi2OutY - finalsCenterY) < 2) {
+      paths.push({
+        id: `path-finals-semi2`,
+        d: `M ${semi2OutX} ${semi2OutY} H ${finalsRightEdge}`,
+        sourceMatchIds: [semi2Pos.matchId],
+        targetMatchId: finalsMatch.id,
+      });
+    } else {
+      const midRightX = Math.round(finalsRightEdge + (semi2OutX - finalsRightEdge) / 2);
+      paths.push({
+        id: `path-finals-semi2`,
+        d: `M ${semi2OutX} ${semi2OutY} H ${midRightX} V ${finalsCenterY} H ${finalsRightEdge}`,
+        sourceMatchIds: [semi2Pos.matchId],
+        targetMatchId: finalsMatch.id,
+      });
+    }
   }
 
   // Champion Path: Finals bottom center stem to Champion plaque top

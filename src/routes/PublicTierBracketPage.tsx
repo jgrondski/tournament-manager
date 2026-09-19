@@ -127,7 +127,12 @@ export const PublicTierBracketPage: React.FC = () => {
       tournament={tournament}
       activeTier={tier}
       activeView="bracket"
-      contentStyle={{ background: tierBg, minHeight: '100vh' }}
+      contentStyle={{
+        background: tierBg,
+        minHeight: '100vh',
+        height: localViewMode === 'fit' ? '100vh' : undefined,
+        overflow: localViewMode === 'fit' ? 'hidden' : undefined,
+      }}
     >
       <BracketTierBar
         tournament={tournament}
@@ -136,7 +141,16 @@ export const PublicTierBracketPage: React.FC = () => {
         onChangeViewMode={setLocalViewMode}
         canManage={true}
       />
-      <main style={{ flex: 1, padding: 0, minHeight: 0 }}>
+      <main
+        style={{
+          flex: 1,
+          padding: 0,
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: localViewMode === 'fit' ? 'hidden' : 'visible',
+        }}
+      >
         <BracketVisualizer
           tournament={tournament}
           tier={tier}

@@ -173,4 +173,75 @@ describe('bracketLayout calculation engine', () => {
     const rightWingM = layout.matchPositions[lastR1Match.id];
     expect(rightWingM.x).toBeGreaterThan(finalsPos.x);
   });
+
+  it('correctly calculates layout coordinates for deep 48-player brackets with byes', () => {
+    const players = Array.from({ length: 48 }, (_, i) => ({
+      id: `p${i + 1}`,
+      name: `Player ${i + 1}`,
+      seed: i + 1,
+    }));
+    const bracket = generateTraditionalBracket(players, { tierId: 'gold' });
+    const layout = calculateBracketLayout(bracket);
+
+    expect(layout.roundHeaders).toHaveLength(6);
+    // All round headers should start at paddingTop
+    layout.roundHeaders.forEach(h => {
+      expect(h.y).toBe(8);
+      expect(h.width).toBe(260);
+    });
+
+    // Matches should all start below the round header (paddingTop + headerHeight = 74)
+    Object.values(layout.matchPositions).forEach(pos => {
+      expect(pos.y).toBeGreaterThanOrEqual(56);
+    });
+
+    expect(layout.totalWidth).toBeGreaterThan(1500);
+    expect(layout.totalHeight).toBeGreaterThan(1400);
+  });
+
+  it('guarantees the gap from round headers to top matches matches the distance between matches', () => {
+    const players = Array.from({ length: 16 }, (_, i) => ({
+      id: `p${i + 1}`,
+      name: `Player ${i + 1}`,
+      seed: i + 1,
+    }));
+    const bracket = generateTraditionalBracket(players, { tierId: 'gold' });
+    const layout = calculateBracketLayout(bracket);
+
+    const m1 = layout.matchPositions[bracket.rounds[0].matches[0].id];
+    const m2 = layout.matchPositions[bracket.rounds[0].matches[1].id];
+    const header = layout.roundHeaders[0];
+
+    const interMatchGap = m2.y - (m1.y + m1.height);
+    // 34px is standard header badge capsule height
+    const headerToMatchGap = m1.y - (header.y + 34);
+
+    expect(headerToMatchGap).toBe(interMatchGap);
+    expect(interMatchGap).toBe(32); // 112 baseRowHeight - 80 matchHeight
+  });
+
+  it('generates connector lines for single-feeder matches in Split Wings layout (e.g. 48-player tournament)', () => {
+    const players = Array.from({ length: 48 }, (_, i) => ({
+      id: `p${i + 1}`,
+      name: `Player ${i + 1}`,
+      seed: i + 1,
+    }));
+    const bracket = generateTraditionalBracket(players, { tierId: 'gold' });
+    const layout = calculateBracketLayout(bracket, undefined, 'split');
+
+    expect(layout.viewMode).toBe('split');
+
+    // In a 48-player bracket, Round 2 (rounds[1]) matches have byes/direct seeds for seeds 1-16
+    // and single feeders from Round 1 (rounds[0]) matches.
+    const r2Matches = bracket.rounds[1].matches;
+    expect(r2Matches).toHaveLength(16);
+
+    // Every single Round 2 match MUST have a connector path in layout.paths
+    r2Matches.forEach(match => {
+      const path = layout.paths.find(p => p.targetMatchId === match.id);
+      expect(path).toBeDefined();
+      expect(path?.d).toBeDefined();
+      expect(path?.d.length).toBeGreaterThan(0);
+    });
+  });
 });

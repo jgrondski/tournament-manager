@@ -2,14 +2,12 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tournament, TournamentTier, PlayerProfile, Playstyle } from '../types';
 import { calculateGlobalStandings, GlobalStandingRow } from '../standings';
-import { colorWithAlpha } from '../../bracket/colorUtils';
+import { colorWithAlpha, getContrastingTextColor, getAlternateShade } from '../../bracket/colorUtils';
 import { PlayerDetailDrawer } from '../../qualifiers/components/PlayerDetailDrawer';
 import { CountryFlag } from '../../players/flagUtils';
 import { PlaystyleChip } from '../../players/components/PlaystyleChip';
 import {
   Trophy,
-  Medal,
-  Award,
   User,
   Layers,
   Search,
@@ -698,9 +696,7 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
                   {section.rows.map((row, idx) => {
                     const isOverallChamp = row.finalRank === 1;
                     const isRunnerUp = row.finalRank === 2;
-                    const isThird = row.finalRank === 3;
                     const isTierChamp = !isOverallChamp && row.eliminationRound === 'Champion';
-
                     const tierColor = row.tier?.primaryColor || section.color || '#f59e0b';
 
                     // Rank Delta formatting
@@ -708,17 +704,13 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
                     const isPositiveDelta = typeof delta === 'number' && delta > 0;
                     const isNegativeDelta = typeof delta === 'number' && delta < 0;
 
-                    let rowBg = idx % 2 === 0 ? 'var(--color-bg-surface)' : 'var(--color-bg-surface-elevated)';
-                    if (isOverallChamp) {
-                      rowBg = 'rgba(245, 158, 11, 0.16)';
-                    } else if (row.isDisqualified) {
+                    // Row background with tier cardColor and zebra striping
+                    const baseCard = row.tier?.cardColor || 'var(--color-bg-surface)';
+                    let rowBg = idx % 2 === 0 ? baseCard : getAlternateShade(baseCard, 6);
+                    if (row.isDisqualified) {
                       rowBg = 'rgba(239, 68, 68, 0.06)';
                     } else if (row.isDNQ) {
                       rowBg = idx % 2 === 0 ? 'var(--color-bg-surface)' : 'var(--color-bg-surface-elevated)';
-                    } else if (tierColor) {
-                      rowBg = isTierChamp || isRunnerUp
-                        ? colorWithAlpha(tierColor, 0.12, `${tierColor}18`)
-                        : `${tierColor}0d`; // Matching quals row tint
                     }
 
                     return (
@@ -726,29 +718,16 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
                         key={row.player.id}
                         style={{
                           background: rowBg,
-                          borderBottom: '1px solid rgba(0, 0, 0, 0.65)',
+                          borderBottom: row.tier
+                            ? `1px solid ${row.tier.secondaryColor || 'rgba(255, 255, 255, 0.08)'}`
+                            : '1px solid rgba(0, 0, 0, 0.65)',
                           borderLeft: row.tier ? `4px solid ${tierColor}` : '4px solid transparent',
                           transition: 'background 0.15s ease',
                         }}
                       >
                         {/* 1. Final Placement / Rank */}
                         <td style={{ ...tdStyle, textAlign: 'center' }}>
-                          {isOverallChamp ? (
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: 'var(--color-gold-bright)', fontWeight: 800, fontSize: '0.95rem' }}>
-                              <Trophy size={18} />
-                              <span>1st</span>
-                            </div>
-                          ) : isRunnerUp ? (
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: '#38bdf8', fontWeight: 700, fontSize: '0.9rem' }}>
-                              <Medal size={18} />
-                              <span>2nd</span>
-                            </div>
-                          ) : isThird ? (
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: '#f59e0b', fontWeight: 700, fontSize: '0.88rem' }}>
-                              <Award size={17} />
-                              <span>3rd</span>
-                            </div>
-                          ) : row.isDisqualified ? (
+                          {row.isDisqualified ? (
                             <span
                               style={{
                                 display: 'inline-block',
@@ -762,35 +741,38 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
                             >
                               DQ
                             </span>
-                          ) : row.isDNQ ? (
-                            <span className="tabular-nums" style={{ fontWeight: 600, color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
-                              #{row.finalRank}
-                            </span>
                           ) : (
-                            <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-                              <span className="tabular-nums" style={{ fontWeight: 700, color: isTierChamp ? tierColor : 'var(--color-text-secondary)', fontSize: '0.9rem' }}>
-                                #{row.finalRank}
-                              </span>
-                              {isTierChamp && (
-                                <span
-                                  style={{
-                                    fontSize: '0.68rem',
-                                    color: tierColor,
-                                    fontWeight: 700,
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.04em',
-                                  }}
-                                >
-                                  Winner
-                                </span>
-                              )}
-                            </div>
+                            <span
+                              className="tabular-nums"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '26px',
+                                height: '26px',
+                                borderRadius: '50%',
+                                background: row.tier
+                                  ? tierColor
+                                  : typeof row.finalRank === 'number' && row.finalRank <= 3
+                                  ? 'var(--color-gold-bg)'
+                                  : 'rgba(255,255,255,0.05)',
+                                color: row.tier
+                                  ? getContrastingTextColor(tierColor)
+                                  : typeof row.finalRank === 'number' && row.finalRank <= 3
+                                  ? 'var(--color-gold-bright)'
+                                  : 'var(--color-text-secondary)',
+                                fontSize: '0.8rem',
+                                fontWeight: 700,
+                              }}
+                            >
+                              {row.finalRank}
+                            </span>
                           )}
                         </td>
 
                         {/* 2. Competitor Info */}
                         <td style={tdStyle}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
                               <CountryFlag country={row.player.country} />
                               <button
@@ -802,20 +784,20 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
                                   padding: 0,
                                   cursor: 'pointer',
                                   textAlign: 'left',
-                                  fontWeight: isOverallChamp ? 800 : isRunnerUp || isTierChamp ? 700 : 600,
-                                  color: isOverallChamp ? 'var(--color-gold-bright)' : '#ffffff',
-                                  fontSize: isOverallChamp ? '0.98rem' : '0.9rem',
+                                  fontWeight: 600,
+                                  color: '#ffffff',
+                                  fontSize: '0.88rem',
                                   textDecoration: 'none',
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   transition: 'color 0.15s ease',
                                 }}
                                 onMouseEnter={e => {
-                                  e.currentTarget.style.color = 'var(--color-gold-bright)';
+                                  e.currentTarget.style.color = tierColor;
                                   e.currentTarget.style.textDecoration = 'underline';
                                 }}
                                 onMouseLeave={e => {
-                                  e.currentTarget.style.color = isOverallChamp ? 'var(--color-gold-bright)' : '#ffffff';
+                                  e.currentTarget.style.color = '#ffffff';
                                   e.currentTarget.style.textDecoration = 'none';
                                 }}
                                 title="View player tournament profile"
@@ -825,6 +807,41 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
 
                               {row.player.playstyle && (
                                 <PlaystyleChip style={row.player.playstyle} />
+                              )}
+
+                              {isOverallChamp && (
+                                <span
+                                  style={{
+                                    fontSize: '0.68rem',
+                                    fontWeight: 700,
+                                    padding: '0.1rem 0.4rem',
+                                    borderRadius: 'var(--radius-sm)',
+                                    background: 'rgba(255, 210, 0, 0.18)',
+                                    color: 'var(--color-gold-bright)',
+                                    border: '1px solid rgba(255, 210, 0, 0.4)',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.2rem',
+                                  }}
+                                >
+                                  <Trophy size={11} /> Champ
+                                </span>
+                              )}
+
+                              {isTierChamp && (
+                                <span
+                                  style={{
+                                    fontSize: '0.68rem',
+                                    fontWeight: 700,
+                                    padding: '0.1rem 0.4rem',
+                                    borderRadius: 'var(--radius-sm)',
+                                    background: `${tierColor}22`,
+                                    color: tierColor,
+                                    border: `1px solid ${tierColor}55`,
+                                  }}
+                                >
+                                  {row.tier?.name} Winner
+                                </span>
                               )}
                             </div>
 
@@ -1063,7 +1080,7 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
 };
 
 const thStyle: React.CSSProperties = {
-  padding: '0.75rem 1rem',
+  padding: '0.55rem 0.75rem',
   color: 'var(--color-text-secondary)',
   fontWeight: 600,
   fontSize: '0.78rem',
@@ -1072,5 +1089,5 @@ const thStyle: React.CSSProperties = {
 };
 
 const tdStyle: React.CSSProperties = {
-  padding: '0.75rem 1rem',
+  padding: '0.45rem 0.75rem',
 };

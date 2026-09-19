@@ -97,7 +97,9 @@ export const BestOfSelect: React.FC<BestOfSelectProps> = ({
         position: 'relative',
         display: 'inline-block',
         width: compact ? '140px' : '100%',
-        minWidth: compact ? '130px' : '200px',
+        minWidth: 0,
+        maxWidth: '100%',
+        boxSizing: 'border-box',
       }}
     >
       {label && (
