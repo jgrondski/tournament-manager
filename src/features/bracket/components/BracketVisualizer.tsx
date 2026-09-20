@@ -377,7 +377,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   borderBottom: isComplete
-                    ? `1.5px solid ${p1Won ? primaryColor : secondaryColor}`
+                    ? `1.5px solid ${primaryColor}`
                     : `1.5px solid ${secondaryColor}`,
                   boxSizing: 'border-box',
                   lineHeight: '20px',

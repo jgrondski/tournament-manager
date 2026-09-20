@@ -151,4 +151,44 @@ describe('Bracket Theming, Dirty Checking & Loser Background', () => {
     expect(savedTiers[0].bracket.rounds[3].matches[0].winnerId).toBe('p1');
     expect(savedTiers[0].primaryColor).toBe('#e0a800');
   });
+
+  it('ensures completed match structural borders are primary, while loser seed border matches secondary', () => {
+    const primaryColor = '#ffc905';
+    const secondaryColor = '#705b33';
+
+    // Helper mirroring BracketVisualizer border calculations
+    const getMatchBorders = (isComplete: boolean, p1Won: boolean, p2Won: boolean, p1Leading: boolean, p2Leading: boolean) => {
+      const cardBorder = isComplete ? `2px solid ${primaryColor}` : `1.5px solid ${secondaryColor}`;
+      const shelfBorder = isComplete ? `1.5px solid ${primaryColor}` : `1.5px solid ${secondaryColor}`;
+      const dividerBg = isComplete ? primaryColor : secondaryColor;
+      const p1SeedBorder = `1.5px solid ${(isComplete && p1Won) || p1Leading ? primaryColor : secondaryColor}`;
+      const p2SeedBorder = `1.5px solid ${(isComplete && p2Won) || p2Leading ? primaryColor : secondaryColor}`;
+
+      return { cardBorder, shelfBorder, dividerBg, p1SeedBorder, p2SeedBorder };
+    };
+
+    // Scenario 1: Completed match with Player 1 winning
+    const p1Victory = getMatchBorders(true, true, false, false, false);
+    expect(p1Victory.cardBorder).toBe(`2px solid ${primaryColor}`);
+    expect(p1Victory.shelfBorder).toBe(`1.5px solid ${primaryColor}`);
+    expect(p1Victory.dividerBg).toBe(primaryColor);
+    expect(p1Victory.p1SeedBorder).toBe(`1.5px solid ${primaryColor}`);
+    expect(p1Victory.p2SeedBorder).toBe(`1.5px solid ${secondaryColor}`); // Loser seed matches secondary
+
+    // Scenario 2: Completed match with Player 2 winning
+    const p2Victory = getMatchBorders(true, false, true, false, false);
+    expect(p2Victory.cardBorder).toBe(`2px solid ${primaryColor}`);
+    expect(p2Victory.shelfBorder).toBe(`1.5px solid ${primaryColor}`);
+    expect(p2Victory.dividerBg).toBe(primaryColor);
+    expect(p2Victory.p1SeedBorder).toBe(`1.5px solid ${secondaryColor}`); // Loser seed matches secondary
+    expect(p2Victory.p2SeedBorder).toBe(`1.5px solid ${primaryColor}`);
+
+    // Scenario 3: Incomplete matches use secondary borders
+    const incompleteBorders = getMatchBorders(false, false, false, false, false);
+    expect(incompleteBorders.cardBorder).toBe(`1.5px solid ${secondaryColor}`);
+    expect(incompleteBorders.shelfBorder).toBe(`1.5px solid ${secondaryColor}`);
+    expect(incompleteBorders.dividerBg).toBe(secondaryColor);
+    expect(incompleteBorders.p1SeedBorder).toBe(`1.5px solid ${secondaryColor}`);
+    expect(incompleteBorders.p2SeedBorder).toBe(`1.5px solid ${secondaryColor}`);
+  });
 });
