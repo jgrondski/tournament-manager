@@ -9,6 +9,7 @@ import {
   getTierCardBackground,
   getAlternateShade,
   getTextScale,
+  getDefaultTierColors,
 } from '../colorUtils';
 import { calculateBracketLayout, BracketViewMode } from '../bracketLayout';
 import { Trophy } from 'lucide-react';
@@ -96,11 +97,12 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
 
   const bracket: BracketStructure = tier.bracket;
   const rounds = bracket?.rounds || [];
-  const primaryColor = tier.primaryColor || '#ffc905';
-  const secondaryColor = tier.secondaryColor || '#705b33';
-  const cardColor = tier.cardColor || '#1b1c1d';
-  const backgroundColor = tier.backgroundColor || '#020203';
-  const textColor = tier.textColor || '#94A3B8';
+  const tierDefaults = getDefaultTierColors(tier);
+  const primaryColor = tier.primaryColor || tierDefaults.primaryColor;
+  const secondaryColor = tier.secondaryColor || tierDefaults.secondaryColor;
+  const cardColor = tier.cardColor || tierDefaults.cardColor;
+  const backgroundColor = tier.backgroundColor || tierDefaults.backgroundColor;
+  const textColor = tier.textColor || tierDefaults.textColor;
   const textScale = getTextScale(tier.textSize);
 
   // Dynamic text scaling derived from smaller baseline:
@@ -396,7 +398,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '0 0.55rem',
-                  background: isComplete && p1Won ? secondaryColor : p1ZebraBg,
+                  background: isComplete ? (p1Won ? secondaryColor : effectiveCardBg) : p1ZebraBg,
                   opacity: 1,
                   boxSizing: 'border-box',
                 }}

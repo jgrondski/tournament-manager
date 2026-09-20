@@ -121,3 +121,54 @@ export function getTextScale(textSize?: string | number): number {
   }
 }
 
+export interface TierThemeColors {
+  primaryColor: string;
+  secondaryColor: string;
+  cardColor: string;
+  textColor: string;
+  backgroundColor: string;
+}
+
+/**
+ * Returns default theme colors for a tier based on its id, slug, or priority.
+ */
+export function getDefaultTierColors(tier: { id?: string; slug?: string; priority?: number }): TierThemeColors {
+  const isGold = tier.id === 'gold' || tier.slug === 'gold' || tier.priority === 1;
+  const isSilver = tier.id === 'silver' || tier.slug === 'silver' || tier.priority === 2;
+  const isBronze = tier.id === 'bronze' || tier.slug === 'bronze' || tier.priority === 3;
+
+  if (isGold) {
+    return {
+      primaryColor: '#ffc905',
+      secondaryColor: '#705b33',
+      cardColor: '#1b1c1d',
+      textColor: '#94A3B8',
+      backgroundColor: '#020203',
+    };
+  }
+  if (isSilver) {
+    return {
+      primaryColor: '#CBD5E1',
+      secondaryColor: '#3d4652',
+      cardColor: '#0E1420',
+      textColor: '#4f5c6d',
+      backgroundColor: '#0B0E14',
+    };
+  }
+  if (isBronze) {
+    return {
+      primaryColor: '#db5f00',
+      secondaryColor: '#4e310e',
+      cardColor: '#181410',
+      textColor: '#5e6f87',
+      backgroundColor: '#0B0E14',
+    };
+  }
+  return {
+    primaryColor: '#eab308',
+    secondaryColor: '#ca8a04',
+    cardColor: '#161922',
+    textColor: '#94A3B8',
+    backgroundColor: '#0B0E14',
+  };
+}

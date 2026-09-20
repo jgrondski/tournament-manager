@@ -24,7 +24,7 @@ import {
   Type,
 } from 'lucide-react';
 import { generateTraditionalBracket, generateFlatBracket, getValidFlatWidths } from '../../bracket/math';
-import { getAlternateShade, getTextScale } from '../../bracket/colorUtils';
+import { getAlternateShade, getTextScale, getDefaultTierColors, TierThemeColors } from '../../bracket/colorUtils';
 import { generateDraftBracketsForTournament } from '../../qualifiers/scoring';
 import { BestOfSelect } from '../../bracket/components/BestOfSelect';
 import { getAvailableRoundsForTier, pruneInvalidRoundOverrides } from '../roundOverrides';
@@ -460,15 +460,38 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
       m.games?.some(g => g.player1Points !== null || g.player2Points !== null)
   ).length;
 
+  // Helper to normalize colors for dirty comparison
+  const normColor = (
+    tier: TournamentTier,
+    field: keyof TierThemeColors
+  ): string => {
+    const val = tier[field];
+    if (val && typeof val === 'string' && val.trim()) {
+      return val.trim().toLowerCase();
+    }
+    const defaults = getDefaultTierColors(tier);
+    return defaults[field].toLowerCase();
+  };
+
   // Track dirty state
   const isDirty = useMemo(() => {
-    if (name !== (tournament.name || '')) return true;
-    if (slug !== (tournament.slug || '')) return true;
-    if (date !== (tournament.date || '')) return true;
-    if (location !== (tournament.location || '')) return true;
+    if (name.trim() !== (tournament.name || '').trim()) return true;
+    if (slug.trim() !== (tournament.slug || '').trim()) return true;
+    if (date.trim() !== (tournament.date || '').trim()) return true;
+    if (location.trim() !== (tournament.location || '').trim()) return true;
     if (qualFormat !== tournament.qualFormat) return true;
     if (qualAverageCount !== (tournament.qualAverageCount || 2)) return true;
-    if (JSON.stringify(pointsConfig) !== JSON.stringify(tournament.pointsConfig || [])) return true;
+
+    // Points config
+    if (qualFormat === 'POINTS') {
+      const initialPoints =
+        tournament.pointsConfig && tournament.pointsConfig.length > 0
+          ? tournament.pointsConfig
+          : DEFAULT_POINTS_THRESHOLDS;
+      if (JSON.stringify(pointsConfig) !== JSON.stringify(initialPoints)) return true;
+    } else if (tournament.pointsConfig && tournament.pointsConfig.length > 0) {
+      if (JSON.stringify(pointsConfig) !== JSON.stringify(tournament.pointsConfig)) return true;
+    }
 
     // Tiers
     const initialTiers = tournament.tiers || [];
@@ -479,17 +502,19 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
       if (!b) return true;
       if (
         a.id !== b.id ||
-        a.slug !== b.slug ||
-        a.name !== b.name ||
+        (a.slug || '').trim() !== (b.slug || '').trim() ||
+        (a.name || '').trim() !== (b.name || '').trim() ||
         a.priority !== b.priority ||
         a.bracketType !== b.bracketType ||
         a.playerCount !== b.playerCount ||
         a.bestOf !== b.bestOf ||
-        a.primaryColor !== b.primaryColor ||
-        a.secondaryColor !== b.secondaryColor ||
-        a.cardColor !== b.cardColor ||
-        a.backgroundColor !== b.backgroundColor ||
-        a.flatWidth !== b.flatWidth ||
+        (a.flatWidth || 0) !== (b.flatWidth || 0) ||
+        normColor(a, 'primaryColor') !== normColor(b, 'primaryColor') ||
+        normColor(a, 'secondaryColor') !== normColor(b, 'secondaryColor') ||
+        normColor(a, 'cardColor') !== normColor(b, 'cardColor') ||
+        normColor(a, 'textColor') !== normColor(b, 'textColor') ||
+        normColor(a, 'backgroundColor') !== normColor(b, 'backgroundColor') ||
+        (a.textSize || 'normal') !== (b.textSize || 'normal') ||
         JSON.stringify(a.roundBestOfOverrides || {}) !== JSON.stringify(b.roundBestOfOverrides || {})
       ) {
         return true;
@@ -672,11 +697,12 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
       if (updates.name && !updates.slug) {
         target.slug = updates.name.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-');
       }
-      if (
+      const structuralChange =
         updates.playerCount !== undefined ||
         updates.bracketType !== undefined ||
-        updates.flatWidth !== undefined
-      ) {
+        updates.flatWidth !== undefined;
+
+      if (structuralChange) {
         if (target.bracketType === 'FLAT') {
           const validWidths = getValidFlatWidths(target.playerCount);
           if (!validWidths.includes(target.flatWidth || 0)) {
@@ -686,7 +712,11 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
         target = pruneInvalidRoundOverrides(target);
       }
       next[index] = target;
-      return generateDraftBracketsForTournament({ ...tournament, tiers: next });
+
+      if (!tournament.isLocked && structuralChange) {
+        return generateDraftBracketsForTournament({ ...tournament, tiers: next });
+      }
+      return next;
     });
   };
 
@@ -701,45 +731,60 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
       next[index] = next[swapIndex];
       next[swapIndex] = temp;
       const reordered = next.map((t, idx) => ({ ...t, priority: idx + 1 }));
-      return generateDraftBracketsForTournament({ ...tournament, tiers: reordered });
+      if (!tournament.isLocked) {
+        return generateDraftBracketsForTournament({ ...tournament, tiers: reordered });
+      }
+      return reordered;
     });
   };
 
   const deleteTier = (index: number) => {
     setTiers(prev => {
       const next = prev.filter((_, i) => i !== index).map((t, idx) => ({ ...t, priority: idx + 1 }));
-      return generateDraftBracketsForTournament({ ...tournament, tiers: next });
+      if (!tournament.isLocked) {
+        return generateDraftBracketsForTournament({ ...tournament, tiers: next });
+      }
+      return next;
     });
   };
 
   const saveCurrentConfig = () => {
-    const baseTiers = tiers.map(tier => {
-      const dummyPlayers = Array.from({ length: tier.playerCount }, (_, i) => ({
-        id: `dummy_${i + 1}`,
-        name: `Seed ${i + 1}`,
-        seed: i + 1,
-      }));
-
-      const newBracket =
-        tier.bracketType === 'FLAT'
-          ? generateFlatBracket(dummyPlayers, tier.flatWidth || 4, {
-              tierId: tier.id,
-              bestOf: tier.bestOf,
-              roundBestOfOverrides: tier.roundBestOfOverrides,
-            })
-          : generateTraditionalBracket(dummyPlayers, {
-              tierId: tier.id,
-              bestOf: tier.bestOf,
-              roundBestOfOverrides: tier.roundBestOfOverrides,
-            });
-
-      return {
+    let updatedTiers: TournamentTier[];
+    if (tournament.isLocked) {
+      // In locked match play mode, preserve existing active bracket matches, results, and player progression
+      updatedTiers = tiers.map(tier => ({
         ...tier,
-        bracket: newBracket,
-      };
-    });
+        bracket: tier.bracket,
+      }));
+    } else {
+      const baseTiers = tiers.map(tier => {
+        const dummyPlayers = Array.from({ length: tier.playerCount }, (_, i) => ({
+          id: `dummy_${i + 1}`,
+          name: `Seed ${i + 1}`,
+          seed: i + 1,
+        }));
 
-    const updatedTiers = generateDraftBracketsForTournament({ ...tournament, tiers: baseTiers });
+        const newBracket =
+          tier.bracketType === 'FLAT'
+            ? generateFlatBracket(dummyPlayers, tier.flatWidth || 4, {
+                tierId: tier.id,
+                bestOf: tier.bestOf,
+                roundBestOfOverrides: tier.roundBestOfOverrides,
+              })
+            : generateTraditionalBracket(dummyPlayers, {
+                tierId: tier.id,
+                bestOf: tier.bestOf,
+                roundBestOfOverrides: tier.roundBestOfOverrides,
+              });
+
+        return {
+          ...tier,
+          bracket: newBracket,
+        };
+      });
+
+      updatedTiers = generateDraftBracketsForTournament({ ...tournament, tiers: baseTiers });
+    }
 
     let parsedAvg = 2;
     if (qualFormat === 'AVERAGE_OF_X') {
@@ -1336,11 +1381,12 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
 
                 {/* Bracket Palette & Theming: Controls Above, 3-State Preview Below */}
                 {(() => {
-                  const priColor = tier.primaryColor || '#ffc905';
-                  const secColor = tier.secondaryColor || '#705b33';
-                  const cardBg = tier.cardColor || '#1b1c1d';
-                  const txtColor = tier.textColor || '#94A3B8';
-                  const canvasBg = tier.backgroundColor || '#020203';
+                  const defaults = getDefaultTierColors(tier);
+                  const priColor = tier.primaryColor || defaults.primaryColor;
+                  const secColor = tier.secondaryColor || defaults.secondaryColor;
+                  const cardBg = tier.cardColor || defaults.cardColor;
+                  const txtColor = tier.textColor || defaults.textColor;
+                  const canvasBg = tier.backgroundColor || defaults.backgroundColor;
                   const p1ZebraBg = getAlternateShade(cardBg, 7);
 
                   // Calculate dynamic text scaling for preview cards
@@ -1403,7 +1449,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
                               value={priColor}
                               onChange={e => updateTier(idx, { primaryColor: e.target.value })}
                               style={{ ...inputStyle, minWidth: 0, flex: 1, fontFamily: 'var(--font-mono)', fontSize: '0.8rem', padding: '0.35rem 0.45rem' }}
-                              placeholder="#ffd200"
+                              placeholder={priColor}
                             />
                           </div>
                         </div>
@@ -1426,7 +1472,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
                               value={secColor}
                               onChange={e => updateTier(idx, { secondaryColor: e.target.value })}
                               style={{ ...inputStyle, minWidth: 0, flex: 1, fontFamily: 'var(--font-mono)', fontSize: '0.8rem', padding: '0.35rem 0.45rem' }}
-                              placeholder="#644f2b"
+                              placeholder={secColor}
                             />
                           </div>
                         </div>
@@ -1449,7 +1495,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
                               value={cardBg}
                               onChange={e => updateTier(idx, { cardColor: e.target.value })}
                               style={{ ...inputStyle, minWidth: 0, flex: 1, fontFamily: 'var(--font-mono)', fontSize: '0.8rem', padding: '0.35rem 0.45rem' }}
-                              placeholder="#0E1420"
+                              placeholder={cardBg}
                             />
                           </div>
                         </div>
@@ -1472,7 +1518,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
                               value={txtColor}
                               onChange={e => updateTier(idx, { textColor: e.target.value })}
                               style={{ ...inputStyle, minWidth: 0, flex: 1, fontFamily: 'var(--font-mono)', fontSize: '0.8rem', padding: '0.35rem 0.45rem' }}
-                              placeholder="#94A3B8"
+                              placeholder={txtColor}
                             />
                           </div>
                         </div>
@@ -1495,7 +1541,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
                               value={canvasBg}
                               onChange={e => updateTier(idx, { backgroundColor: e.target.value })}
                               style={{ ...inputStyle, minWidth: 0, flex: 1, fontFamily: 'var(--font-mono)', fontSize: '0.8rem', padding: '0.35rem 0.45rem' }}
-                              placeholder="#0B0E14"
+                              placeholder={canvasBg}
                             />
                           </div>
                         </div>

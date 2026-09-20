@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { colorWithAlpha, getAlternateShade, getTextScale } from '../colorUtils';
+import { colorWithAlpha, getAlternateShade, getTextScale, getDefaultTierColors } from '../colorUtils';
 
 describe('colorWithAlpha', () => {
   it('correctly converts 6-digit hex to rgba string with custom alpha', () => {
@@ -67,6 +67,62 @@ describe('getTextScale', () => {
     expect(getTextScale(100)).toBe(1.0);
     expect(getTextScale(120)).toBe(1.2);
     expect(getTextScale(1.15)).toBe(1.15);
+  });
+});
+
+describe('getDefaultTierColors', () => {
+  it('returns exact gold defaults for gold tier by id, slug, or priority', () => {
+    const byId = getDefaultTierColors({ id: 'gold' });
+    const bySlug = getDefaultTierColors({ slug: 'gold' });
+    const byPriority = getDefaultTierColors({ priority: 1 });
+
+    expect(byId.primaryColor).toBe('#ffc905');
+    expect(byId.secondaryColor).toBe('#705b33');
+    expect(byId.cardColor).toBe('#1b1c1d');
+    expect(byId.textColor).toBe('#94A3B8');
+    expect(byId.backgroundColor).toBe('#020203');
+
+    expect(bySlug).toEqual(byId);
+    expect(byPriority).toEqual(byId);
+  });
+
+  it('returns exact silver defaults for silver tier by id, slug, or priority', () => {
+    const byId = getDefaultTierColors({ id: 'silver' });
+    const bySlug = getDefaultTierColors({ slug: 'silver' });
+    const byPriority = getDefaultTierColors({ priority: 2 });
+
+    expect(byId.primaryColor).toBe('#CBD5E1');
+    expect(byId.secondaryColor).toBe('#3d4652');
+    expect(byId.cardColor).toBe('#0E1420');
+    expect(byId.textColor).toBe('#4f5c6d');
+    expect(byId.backgroundColor).toBe('#0B0E14');
+
+    expect(bySlug).toEqual(byId);
+    expect(byPriority).toEqual(byId);
+  });
+
+  it('returns exact bronze defaults for bronze tier by id, slug, or priority', () => {
+    const byId = getDefaultTierColors({ id: 'bronze' });
+    const bySlug = getDefaultTierColors({ slug: 'bronze' });
+    const byPriority = getDefaultTierColors({ priority: 3 });
+
+    expect(byId.primaryColor).toBe('#db5f00');
+    expect(byId.secondaryColor).toBe('#4e310e');
+    expect(byId.cardColor).toBe('#181410');
+    expect(byId.textColor).toBe('#5e6f87');
+    expect(byId.backgroundColor).toBe('#0B0E14');
+
+    expect(bySlug).toEqual(byId);
+    expect(byPriority).toEqual(byId);
+  });
+
+  it('returns fallback defaults for unknown tier', () => {
+    const generic = getDefaultTierColors({ id: 'custom_tier', slug: 'custom', priority: 99 });
+    expect(generic.primaryColor).toBe('#eab308');
+    expect(generic.secondaryColor).toBe('#ca8a04');
+    expect(generic.cardColor).toBe('#161922');
+    expect(generic.textColor).toBe('#94A3B8');
+    expect(generic.backgroundColor).toBe('#0B0E14');
   });
 });
 
