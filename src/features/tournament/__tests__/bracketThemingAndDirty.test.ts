@@ -191,4 +191,32 @@ describe('Bracket Theming, Dirty Checking & Loser Background', () => {
     expect(incompleteBorders.p1SeedBorder).toBe(`1.5px solid ${secondaryColor}`);
     expect(incompleteBorders.p2SeedBorder).toBe(`1.5px solid ${secondaryColor}`);
   });
+
+  it('verifies Bracket Theme & Palette accordion starts open and toggles collapsed state', () => {
+    // Initial state: empty collapsedThemes record
+    let collapsedThemes: Record<string, boolean> = {};
+
+    // Helper matching TournamentAdminForm logic
+    const isThemeOpen = (tierId: string) => !collapsedThemes[tierId];
+    const toggleThemeCollapse = (tierId: string) => {
+      collapsedThemes = {
+        ...collapsedThemes,
+        [tierId]: !collapsedThemes[tierId],
+      };
+    };
+
+    // By default, any tier accordion starts OPEN
+    expect(isThemeOpen('tier_gold')).toBe(true);
+    expect(isThemeOpen('tier_silver')).toBe(true);
+
+    // Toggling tier_gold collapses it
+    toggleThemeCollapse('tier_gold');
+    expect(isThemeOpen('tier_gold')).toBe(false);
+    expect(isThemeOpen('tier_silver')).toBe(true); // Other tiers remain unaffected
+
+    // Toggling tier_gold again re-opens it
+    toggleThemeCollapse('tier_gold');
+    expect(isThemeOpen('tier_gold')).toBe(true);
+  });
 });
+

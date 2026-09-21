@@ -22,6 +22,7 @@ import {
   Check,
   Sliders,
   Type,
+  ChevronDown,
 } from 'lucide-react';
 import { generateTraditionalBracket, generateFlatBracket, getValidFlatWidths } from '../../bracket/math';
 import { getAlternateShade, getTextScale, getDefaultTierColors, TierThemeColors } from '../../bracket/colorUtils';
@@ -447,6 +448,14 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
   const [tierToDelete, setTierToDelete] = useState<{ index: number; tier: TournamentTier } | null>(null);
   const [dataActionToConfirm, setDataActionToConfirm] = useState<'MATCHES' | 'QUALS' | 'ALL' | null>(null);
   const [simFeedback, setSimFeedback] = useState<string | null>(null);
+  const [collapsedThemes, setCollapsedThemes] = useState<Record<string, boolean>>({});
+
+  const toggleThemeCollapse = (tierId: string) => {
+    setCollapsedThemes(prev => ({
+      ...prev,
+      [tierId]: !prev[tierId],
+    }));
+  };
 
   useEffect(() => {
     if (!simFeedback) return;
@@ -1379,6 +1388,13 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
                   </div>
                 </div>
 
+                {/* Round-Specific Best-of Overrides */}
+                <RoundOverridesEditor
+                  tier={tier}
+                  onChange={newOverrides => updateTier(idx, { roundBestOfOverrides: newOverrides })}
+                  inputStyle={inputStyle}
+                />
+
                 {/* Bracket Palette & Theming: Controls Above, 3-State Preview Below */}
                 {(() => {
                   const defaults = getDefaultTierColors(tier);
@@ -1400,28 +1416,108 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
                   const previewScoreMinW = Math.max(18, Math.round(20 * previewTextScale));
                   const previewScoreH = Math.max(18, Math.round(20 * previewTextScale));
 
+                  const isThemeOpen = !collapsedThemes[tier.id];
+
                   return (
                     <div
                       style={{
                         marginTop: '1.25rem',
-                        padding: '1.25rem',
                         borderRadius: 'var(--radius-md)',
                         background: 'var(--color-bg-surface)',
                         border: '1px solid var(--color-border-subtle)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '1.25rem',
+                        overflow: 'hidden',
+                        transition: 'all 0.2s ease',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-                        <label style={{ ...labelStyle, marginBottom: 0, display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
-                          <Palette size={14} color={priColor} />
-                          <span style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>Bracket Theme & Palette</span>
-                        </label>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                          Masterpiece 4-Color Architecture with OBS-Isolated Canvas Background
-                        </span>
-                      </div>
+                      {/* Accordion Header Toggle */}
+                      <button
+                        type="button"
+                        onClick={() => toggleThemeCollapse(tier.id)}
+                        style={{
+                          width: '100%',
+                          padding: '0.85rem 1.25rem',
+                          background: isThemeOpen ? 'var(--color-bg-surface)' : 'var(--color-bg-surface-elevated)',
+                          border: 'none',
+                          borderBottom: isThemeOpen ? '1px solid var(--color-border-subtle)' : 'none',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '0.75rem',
+                          textAlign: 'left',
+                          transition: 'background 0.15s ease',
+                        }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.backgroundColor = 'var(--color-bg-surface-elevated)';
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.backgroundColor = isThemeOpen ? 'var(--color-bg-surface)' : 'var(--color-bg-surface-elevated)';
+                        }}
+                        aria-expanded={isThemeOpen}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                            <Palette size={15} color={priColor} />
+                            <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--color-text-primary)' }}>
+                              Bracket Theme & Palette
+                            </span>
+                          </div>
+
+                          {/* Palette Color Swatches Preview */}
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              padding: '0.15rem 0.5rem',
+                              background: 'var(--color-bg-base)',
+                              borderRadius: 'var(--radius-full)',
+                              border: '1px solid var(--color-border-subtle)',
+                            }}
+                            title={`Current theme: Primary (${priColor}), Secondary (${secColor}), Card (${cardBg}), Text (${txtColor}), Canvas (${canvasBg})`}
+                          >
+                            <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: priColor, border: '1px solid rgba(0,0,0,0.3)', flexShrink: 0 }} />
+                            <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: secColor, border: '1px solid rgba(0,0,0,0.3)', flexShrink: 0 }} />
+                            <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: cardBg, border: '1px solid rgba(255,255,255,0.15)', flexShrink: 0 }} />
+                            <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: txtColor, border: '1px solid rgba(0,0,0,0.3)', flexShrink: 0 }} />
+                            <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: canvasBg, border: '1px solid rgba(255,255,255,0.15)', flexShrink: 0 }} />
+                            <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginLeft: '0.2rem', fontFamily: 'var(--font-mono)' }}>
+                              {tier.textSize ? `${tier.textSize}` : 'normal'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
+                            {isThemeOpen ? 'Click to collapse' : 'Click to customize colors & text size'}
+                          </span>
+                          <ChevronDown
+                            size={16}
+                            color="var(--color-text-muted)"
+                            style={{
+                              transform: isThemeOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                              transition: 'transform 0.2s ease',
+                            }}
+                          />
+                        </div>
+                      </button>
+
+                      {/* Accordion Content */}
+                      {isThemeOpen && (
+                        <div
+                          style={{
+                            padding: '1.25rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '1.25rem',
+                            animation: 'fadeIn 0.15s ease-out',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                              Masterpiece 4-Color Architecture with OBS-Isolated Canvas Background
+                            </span>
+                          </div>
 
                       {/* 1. Color Picker Controls (Full Row Above Previews, Zero Overlap) */}
                       <div
@@ -1770,15 +1866,10 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
                         </div>
                       </div>
                     </div>
-                  );
+                  )}
+                </div>
+              );
                 })()}
-
-                {/* Round-Specific Best-of Overrides */}
-                <RoundOverridesEditor
-                  tier={tier}
-                  onChange={newOverrides => updateTier(idx, { roundBestOfOverrides: newOverrides })}
-                  inputStyle={inputStyle}
-                />
               </div>
             );
           }))}
