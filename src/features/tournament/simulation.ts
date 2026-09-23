@@ -292,6 +292,7 @@ export function generateSimulatedQualifiers(
       submissions.push({
         id: `sub_sim_${player.id}_${attempt}`,
         tournamentId: tournament.id,
+        organizationId: tournament.organizationId,
         playerId: player.id,
         score,
         submittedAt: baseTime + pIdx * 60000 + attempt * 120000,
@@ -372,6 +373,7 @@ export function simulateTournamentMatches(
         matchScores[currentMatch.id] = {
           matchId: currentMatch.id,
           tierId: tier.id,
+          organizationId: tournament.organizationId,
           bestOf,
           player1Wins: p1Wins,
           player2Wins: p2Wins,

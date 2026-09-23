@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Tournament, TournamentTier } from '../features/tournament/types';
 import { useTournament } from '../features/tournament/store';
+import { useOrganization } from '../features/organizations/store';
 import { colorWithAlpha } from '../features/bracket/colorUtils';
 import { VerifyBracketModal } from '../features/tournament/components/VerifyBracketModal';
 import {
@@ -15,6 +16,10 @@ import {
   Copy,
   Check,
   Search,
+  Building2,
+  Sheet,
+  Scale,
+  GitBranch,
 } from 'lucide-react';
 
 interface TournamentNavbarProps {
@@ -31,6 +36,8 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
   onNavigate,
 }) => {
   const { tournaments, unlockBrackets } = useTournament();
+  const { getOrganizationById } = useOrganization();
+  const hostOrg = getOrganizationById(tournament.organizationId);
   const navigate = useNavigate();
   const [isTournamentMenuOpen, setIsTournamentMenuOpen] = useState(false);
   const [isObsMenuOpen, setIsObsMenuOpen] = useState(false);
@@ -195,6 +202,31 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
             )}
           </div>
 
+          {/* Host Organization Badge */}
+          {hostOrg && (
+            <Link
+              to={`/org/${hostOrg.slug}`}
+              className="badge"
+              style={{
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.3rem',
+                padding: '0.22rem 0.55rem',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                background: 'rgba(255, 255, 255, 0.06)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                color: hostOrg.branding?.themeColors?.primaryColor || 'var(--color-gold-bright)',
+                borderRadius: 'var(--radius-full)',
+              }}
+              title={`Parent Organization: ${hostOrg.name}`}
+            >
+              <Building2 size={11} />
+              <span>{hostOrg.shortName}</span>
+            </Link>
+          )}
+
           {/* Global Players Button (Directly next to Tournament Switcher dropdown) */}
           <Link
             to="/players"
@@ -277,9 +309,13 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
                 background: activeView === 'sheet' ? 'var(--color-bg-surface)' : 'transparent',
                 color: activeView === 'sheet' ? 'var(--color-gold-bright)' : 'var(--color-text-muted)',
                 fontWeight: activeView === 'sheet' ? 700 : 500,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
               }}
             >
-              📊 Sheet
+              <Sheet size={13} />
+              <span>Sheet</span>
             </Link>
 
             <Link
@@ -290,9 +326,13 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
                 background: activeView === 'judge' ? 'var(--color-bg-surface)' : 'transparent',
                 color: activeView === 'judge' ? 'var(--color-gold-bright)' : 'var(--color-text-muted)',
                 fontWeight: activeView === 'judge' ? 700 : 500,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
               }}
             >
-              📱 Floor Judge
+              <Scale size={13} />
+              <span>Floor Judge</span>
             </Link>
 
             <Link
@@ -303,9 +343,13 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
                 background: activeView === 'bracket' ? 'var(--color-bg-surface)' : 'transparent',
                 color: activeView === 'bracket' ? 'var(--color-gold-bright)' : 'var(--color-text-muted)',
                 fontWeight: activeView === 'bracket' ? 700 : 500,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
               }}
             >
-              🌲 Bracket
+              <GitBranch size={13} />
+              <span>Bracket</span>
             </Link>
           </div>
 

@@ -26,6 +26,7 @@ describe('Bracket Verification Lifecycle & Invariants', () => {
 
   const createTestTournament = (isLocked: boolean = false): Tournament => ({
     id: 'test-tournament',
+    organizationId: 'org_ctwc',
     slug: 'test-tournament',
     name: 'Verification Test Event',
     date: '2026-03-20',

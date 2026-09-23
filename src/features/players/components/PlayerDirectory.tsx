@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useTournament } from '../../tournament/store';
+import { useOrganization } from '../../organizations/store';
 import { PlayerProfile } from '../../tournament/types';
 import { GenerateFakePlayersModal } from './GenerateFakePlayersModal';
 import { PlayerEditModal } from './PlayerEditModal';
@@ -18,20 +19,24 @@ import {
   X,
   ArrowUpDown,
   Filter,
+  Building2,
 } from 'lucide-react';
 
 export const PlayerDirectory: React.FC = () => {
   const {
     globalPlayers,
+    tournaments,
     addGlobalPlayer,
     updateGlobalPlayer,
     deleteGlobalPlayer,
     clearAllGlobalPlayers,
     generateFakeGlobalPlayers,
   } = useTournament();
+  const { organizations } = useOrganization();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [playstyleFilter, setPlaystyleFilter] = useState<string>('ALL');
+  const [orgFilter, setOrgFilter] = useState<string>('ALL');
   const [sortBy, setSortBy] = useState<'NAME_ASC' | 'PB_DESC' | 'PB_ASC' | 'COUNTRY'>('PB_DESC');
 
   // Modals state
@@ -40,6 +45,26 @@ export const PlayerDirectory: React.FC = () => {
   const [editingPlayer, setEditingPlayer] = useState<PlayerProfile | null>(null);
   const [playerToDelete, setPlayerToDelete] = useState<PlayerProfile | null>(null);
   const [isClearAllConfirmOpen, setIsClearAllConfirmOpen] = useState(false);
+
+  // Set of players that competed in tournaments belonging to selected org
+  const orgPlayerIds = useMemo(() => {
+    if (orgFilter === 'ALL') return null;
+    const ids = new Set<string>();
+    tournaments
+      .filter(t => t.organizationId === orgFilter)
+      .forEach(t => {
+        (t.playersPool || []).forEach(p => ids.add(p.id));
+        (t.qualifiers || []).forEach(q => ids.add(q.id));
+        (t.qualifierSubmissions || []).forEach(s => ids.add(s.playerId));
+        (t.tiers || []).forEach(tier => {
+          Object.values(tier.bracket?.matchesById || {}).forEach(m => {
+            if (m.player1.player?.id) ids.add(m.player1.player.id);
+            if (m.player2.player?.id) ids.add(m.player2.player.id);
+          });
+        });
+      });
+    return ids;
+  }, [orgFilter, tournaments]);
 
   // Filtered & Sorted Players
   const filteredPlayers = useMemo(() => {
@@ -63,6 +88,11 @@ export const PlayerDirectory: React.FC = () => {
         }
         if (playstyleFilter !== 'ALL') {
           return p.playstyle === playstyleFilter;
+        }
+
+        // Organization circuit filter
+        if (orgPlayerIds && !orgPlayerIds.has(p.id)) {
+          return false;
         }
 
         return true;
@@ -427,26 +457,53 @@ export const PlayerDirectory: React.FC = () => {
           ))}
         </div>
 
-        {/* Sort Selector */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <ArrowUpDown size={14} color="var(--color-text-muted)" />
-          <select
-            value={sortBy}
-            onChange={e => setSortBy(e.target.value as 'NAME_ASC' | 'PB_DESC' | 'PB_ASC' | 'COUNTRY')}
-            style={{
-              padding: '0.45rem 0.75rem',
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--color-border)',
-              background: 'var(--color-bg-base)',
-              color: 'var(--color-text-primary)',
-              fontSize: '0.8rem',
-            }}
-          >
-            <option value="PB_DESC">Sort: PB High to Low</option>
-            <option value="PB_ASC">Sort: PB Low to High</option>
-            <option value="NAME_ASC">Sort: Name (A–Z)</option>
-            <option value="COUNTRY">Sort: Country</option>
-          </select>
+        {/* Filters Group: Org & Sort */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          {/* Organization Circuit Selector */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <Building2 size={14} color="var(--color-text-muted)" />
+            <select
+              value={orgFilter}
+              onChange={e => setOrgFilter(e.target.value)}
+              style={{
+                padding: '0.45rem 0.75rem',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--color-border)',
+                background: 'var(--color-bg-base)',
+                color: 'var(--color-text-primary)',
+                fontSize: '0.8rem',
+              }}
+            >
+              <option value="ALL">All Organizations</option>
+              {organizations.map(org => (
+                <option key={org.id} value={org.id}>
+                  {org.name} ({org.shortName || org.slug.toUpperCase()})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Sort Selector */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <ArrowUpDown size={14} color="var(--color-text-muted)" />
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value as 'NAME_ASC' | 'PB_DESC' | 'PB_ASC' | 'COUNTRY')}
+              style={{
+                padding: '0.45rem 0.75rem',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--color-border)',
+                background: 'var(--color-bg-base)',
+                color: 'var(--color-text-primary)',
+                fontSize: '0.8rem',
+              }}
+            >
+              <option value="PB_DESC">Sort: PB High to Low</option>
+              <option value="PB_ASC">Sort: PB Low to High</option>
+              <option value="NAME_ASC">Sort: Name (A–Z)</option>
+              <option value="COUNTRY">Sort: Country</option>
+            </select>
+          </div>
         </div>
       </div>
 

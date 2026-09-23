@@ -74,6 +74,7 @@ describe('Simulation Engine', () => {
 
     const mockTournament: Tournament = {
       id: 'tourney-test',
+      organizationId: 'org_ctwc',
       slug: 'test-tourney',
       name: 'Test Tournament',
       date: '2026-09-10',
@@ -204,6 +205,7 @@ describe('Simulation Engine', () => {
 
       const cleanTourney: Tournament = {
         id: 'tourney-sim',
+        organizationId: 'org_ctwc',
         slug: 'sim-tourney',
         name: 'Simulation Open',
         date: '2026-09-10',
@@ -271,6 +273,7 @@ describe('Simulation Engine', () => {
 
       const baseTourney: Tournament = {
         id: 'tourney-seeded',
+        organizationId: 'org_ctwc',
         slug: 'seeded-tourney',
         name: 'Seeded Tourney',
         date: '2026-09-10',
@@ -308,6 +311,7 @@ describe('Simulation Engine', () => {
       // 1. New tournament with zero tiers
       const zeroTierTourney: Tournament = {
         id: 'tourney-dynamic',
+        organizationId: 'org_ctwc',
         slug: 'dynamic-tourney',
         name: 'Dynamic Tourney',
         date: '2026-09-10',

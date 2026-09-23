@@ -1,4 +1,5 @@
 import { BracketStructure, BracketType } from '../bracket/types';
+import { TierThemeColors } from '../bracket/colorUtils';
 
 export type QualFormat = 'HIGH_SCORE' | 'AVERAGE_OF_X' | 'POINTS';
 
@@ -21,6 +22,44 @@ export const DEFAULT_POINTS_THRESHOLDS: PointsThreshold[] = [
   { minScore: 1999999, points: 13 },
 ];
 
+export interface OrgTierTheme {
+  id: string;
+  name: string;
+  themeColors: TierThemeColors;
+  textSize?: 'compact' | 'normal' | 'large';
+}
+
+export interface Organization {
+  id: string;
+  slug: string; // unique URL slug, e.g. 'ctwc', 'ctm'
+  name: string; // e.g. 'Classic Tetris World Championship'
+  shortName?: string; // e.g. 'CTWC', 'CTM'
+  description?: string;
+  logoUrl?: string;
+  bannerUrl?: string;
+  website?: string;
+  brandColor?: string; // primary accent color
+  themeColors?: TierThemeColors; // 5-color bracket theme palette
+  tierThemes?: OrgTierTheme[]; // multi-tier default themes (primary, secondary, etc.)
+  branding?: {
+    logoUrl?: string;
+    bannerUrl?: string;
+    themeColors?: TierThemeColors;
+    brandColor?: string;
+  };
+  discordWebhookUrl?: string; // inherited by tournaments if not overridden
+  defaultRules?: {
+    qualFormat?: QualFormat;
+    qualAverageCount?: number;
+    qualWindowMinutes?: number;
+    bestOf?: number;
+    primaryColor?: string;
+    secondaryColor?: string;
+    pointsConfig?: PointsThreshold[];
+  };
+  createdAt: number;
+}
+
 export interface GameScoreEntry {
   gameNumber: number; // 1, 2, 3, 4, 5...
   player1Points: number | null;
@@ -31,6 +70,7 @@ export interface GameScoreEntry {
 export interface MatchScoreRecord {
   matchId: string;
   tierId: string;
+  organizationId?: string;
   bestOf: number;
   player1Wins: number;
   player2Wins: number;
@@ -66,6 +106,7 @@ export interface TournamentTier {
 export interface QualifierSubmission {
   id: string;
   tournamentId: string;
+  organizationId?: string;
   playerId: string;
   score: number;
   submittedAt: number; // timestamp in ms
@@ -76,6 +117,7 @@ export type QualifierStatus = 'not started' | 'in progress' | 'verified' | 'awai
 export interface TournamentPlayer {
   playerId: string;
   tournamentId: string;
+  organizationId?: string;
   tierId?: string;
   seed?: number;
   qualsCompleted?: boolean;
@@ -111,6 +153,7 @@ export interface PlayerProfile {
 
 export interface Tournament {
   id: string;
+  organizationId: string; // required association to parent Organization
   slug: string; // e.g. 'kc-2026-open'
   name: string; // e.g. 'KC Regional 2026 Open'
   date: string;
@@ -125,4 +168,10 @@ export interface Tournament {
   qualifierSubmissions: QualifierSubmission[];
   tournamentPlayers: Record<string, TournamentPlayer>; // keyed by playerId
   qualifiers?: QualifierScore[]; // legacy fallback
+  useOrgBranding?: boolean; // default true: inherits 5 colors, logo, banner from org
+  logoUrl?: string; // tournament-specific logo override
+  bannerUrl?: string; // tournament-specific banner override
+  discordWebhookUrl?: string; // tournament-specific discord webhook override
+  themeColors?: TierThemeColors; // tournament-level 5-color palette override
 }
+

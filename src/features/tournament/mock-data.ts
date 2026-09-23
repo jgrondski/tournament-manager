@@ -70,7 +70,7 @@ export function buildMockQualifiers(): QualifierScore[] {
   ];
 }
 
-export function buildMockSubmissions(tournamentId: string): QualifierSubmission[] {
+export function buildMockSubmissions(tournamentId: string, organizationId: string = 'org_ctwc'): QualifierSubmission[] {
   const qualifiers = buildMockQualifiers();
   const submissions: QualifierSubmission[] = [];
   const baseTime = Date.now() - 1000 * 60 * 60 * 24; // 24h ago
@@ -79,6 +79,7 @@ export function buildMockSubmissions(tournamentId: string): QualifierSubmission[
     submissions.push({
       id: `sub_${tournamentId}_${q.playerId}_1`,
       tournamentId,
+      organizationId,
       playerId: q.playerId,
       score: q.game1,
       submittedAt: baseTime + idx * 1000 * 60 + 1000,
@@ -86,6 +87,7 @@ export function buildMockSubmissions(tournamentId: string): QualifierSubmission[
     submissions.push({
       id: `sub_${tournamentId}_${q.playerId}_2`,
       tournamentId,
+      organizationId,
       playerId: q.playerId,
       score: q.game2,
       submittedAt: baseTime + idx * 1000 * 60 + 2000,
@@ -94,6 +96,7 @@ export function buildMockSubmissions(tournamentId: string): QualifierSubmission[
       submissions.push({
         id: `sub_${tournamentId}_${q.playerId}_3`,
         tournamentId,
+        organizationId,
         playerId: q.playerId,
         score: q.game3,
         submittedAt: baseTime + idx * 1000 * 60 + 3000,
@@ -163,6 +166,7 @@ export function createInitialTournaments(): Tournament[] {
     matchScores[matchId] = {
       matchId,
       tierId,
+      organizationId: 'org_ctwc',
       bestOf: 5,
       player1Wins: p1Wins,
       player2Wins: p2Wins,
@@ -298,6 +302,7 @@ export function createInitialTournaments(): Tournament[] {
 
   const kc2026Open: Tournament = {
     id: 'kc-2026-open',
+    organizationId: 'org_ctwc',
     slug: 'kc-2026-open',
     name: 'KC Regional 2026 Open',
     date: 'March 21-22, 2026',
@@ -365,6 +370,7 @@ export function createInitialTournaments(): Tournament[] {
 
   const kc2026Das: Tournament = {
     id: 'kc-2026-das',
+    organizationId: 'org_ctwc',
     slug: 'kc-2026-das',
     name: 'KC Regional 2026 DAS',
     date: 'March 20, 2026',

@@ -156,6 +156,7 @@ describe('Qualifiers Scoring Engine', () => {
 
     const tournament: Tournament = {
       id: 't1',
+      organizationId: 'org_ctwc',
       slug: 't1-slug',
       name: 'Test Tournament',
       date: '2026-03-20',
@@ -270,6 +271,7 @@ describe('Qualifiers Scoring Engine', () => {
 
       const maxoutTournament: Tournament = {
         id: 't-max',
+        organizationId: 'org_ctwc',
         slug: 't-max',
         name: 'Maxout Championship',
         date: '2026-09-10',
@@ -388,6 +390,7 @@ describe('Qualifiers Scoring Engine', () => {
   describe('getPlayerQualifierStatus', () => {
     const baseTourney: Tournament = {
       id: 't-test',
+      organizationId: 'org_ctwc',
       slug: 't-test',
       name: 'Test Tournament',
       date: '2026-09-14',

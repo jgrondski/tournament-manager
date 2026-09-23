@@ -192,31 +192,47 @@ describe('Bracket Theming, Dirty Checking & Loser Background', () => {
     expect(incompleteBorders.p2SeedBorder).toBe(`1.5px solid ${secondaryColor}`);
   });
 
-  it('verifies Bracket Theme & Palette accordion starts open and toggles collapsed state', () => {
-    // Initial state: empty collapsedThemes record
-    let collapsedThemes: Record<string, boolean> = {};
+  it('verifies Bracket Theme & Palette accordion starts closed on initial load and opens on creation or toggle', () => {
+    // Initial state on page load / reload: empty openThemes record
+    let openThemes: Record<string, boolean> = {};
 
     // Helper matching TournamentAdminForm logic
-    const isThemeOpen = (tierId: string) => !collapsedThemes[tierId];
+    const isThemeOpen = (tierId: string) => Boolean(openThemes[tierId]);
     const toggleThemeCollapse = (tierId: string) => {
-      collapsedThemes = {
-        ...collapsedThemes,
-        [tierId]: !collapsedThemes[tierId],
+      openThemes = {
+        ...openThemes,
+        [tierId]: !openThemes[tierId],
+      };
+    };
+    const addTier = (newTierId: string) => {
+      openThemes = {
+        ...openThemes,
+        [newTierId]: true,
       };
     };
 
-    // By default, any tier accordion starts OPEN
-    expect(isThemeOpen('tier_gold')).toBe(true);
-    expect(isThemeOpen('tier_silver')).toBe(true);
+    // By default on initial page load or reload, all tier accordions start CLOSED
+    expect(isThemeOpen('tier_gold')).toBe(false);
+    expect(isThemeOpen('tier_silver')).toBe(false);
 
-    // Toggling tier_gold collapses it
+    // Toggling tier_gold opens it
+    toggleThemeCollapse('tier_gold');
+    expect(isThemeOpen('tier_gold')).toBe(true);
+    expect(isThemeOpen('tier_silver')).toBe(false); // Other tiers remain closed
+
+    // Toggling tier_gold again collapses it
     toggleThemeCollapse('tier_gold');
     expect(isThemeOpen('tier_gold')).toBe(false);
-    expect(isThemeOpen('tier_silver')).toBe(true); // Other tiers remain unaffected
 
-    // Toggling tier_gold again re-opens it
-    toggleThemeCollapse('tier_gold');
-    expect(isThemeOpen('tier_gold')).toBe(true);
+    // On creation of a new bracket tier, it should be open
+    const newTierId = 'tier_bronze_new';
+    addTier(newTierId);
+    expect(isThemeOpen(newTierId)).toBe(true);
+
+    // Reloading page resets state: all tiers start collapsed again
+    openThemes = {};
+    expect(isThemeOpen(newTierId)).toBe(false);
+    expect(isThemeOpen('tier_gold')).toBe(false);
   });
 });
 

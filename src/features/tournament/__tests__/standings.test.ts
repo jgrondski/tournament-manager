@@ -186,6 +186,7 @@ describe('Final Standings Rollup Engine', () => {
 
       const tournament: Tournament = {
         id: 't1',
+        organizationId: 'org_ctwc',
         slug: 't1',
         name: 'Championship',
         date: '2026-09-10',
@@ -297,6 +298,7 @@ describe('Final Standings Rollup Engine', () => {
 
       const tournament: Tournament = {
         id: 't1',
+        organizationId: 'org_ctwc',
         slug: 't1',
         name: 'Championship',
         date: '2026-09-10',
@@ -409,6 +411,7 @@ describe('Final Standings Rollup Engine', () => {
 
       const tournament: Tournament = {
         id: 't1',
+        organizationId: 'org_ctwc',
         slug: 't1',
         name: 'Championship',
         date: '2026-09-10',
@@ -514,6 +517,7 @@ describe('Final Standings Rollup Engine', () => {
 
       const tournament: Tournament = {
         id: 't1',
+        organizationId: 'org_ctwc',
         slug: 't1',
         name: 'Championship',
         date: '2026-09-10',
@@ -666,6 +670,7 @@ describe('Final Standings Rollup Engine', () => {
 
       const tournament: Tournament = {
         id: 't2',
+        organizationId: 'org_ctwc',
         slug: 't2',
         name: 'Two Tier Championship',
         date: '2026-09-10',
@@ -826,6 +831,7 @@ describe('Final Standings Rollup Engine', () => {
 
       const tournament: Tournament = {
         id: 't1',
+        organizationId: 'org_ctwc',
         slug: 't1',
         name: 'Cinderella Tournament',
         date: '2026-09-10',
@@ -939,6 +945,7 @@ describe('Final Standings Rollup Engine', () => {
 
       const tournament: Tournament = {
         id: 't-chips',
+        organizationId: 'org_ctwc',
         name: 'Chip Test Tournament',
         slug: 'chip-test',
         date: '2026-09-10',

@@ -1,34 +1,16 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
 import { useTournament } from '../features/tournament/store';
-import { colorWithAlpha } from '../features/bracket/colorUtils';
-import { Calendar, MapPin, Users, Layers, Plus, Settings, Trophy, ShieldCheck, AlertTriangle, X, Trash2 } from 'lucide-react';
-import { QualFormat, Tournament, DEFAULT_POINTS_THRESHOLDS } from '../features/tournament/types';
-import { ClearableNumberInput } from '../components/ClearableNumberInput';
+import { TopNavSwitcher } from '../components/TopNavSwitcher';
+import { Layers, Plus, Trophy, AlertTriangle } from 'lucide-react';
+import { Tournament } from '../features/tournament/types';
+import { TournamentCard } from '../features/tournament/components/TournamentCard';
+import { CreateTournamentModal } from '../features/tournament/components/CreateTournamentModal';
 
 export const TournamentSwitcherPage: React.FC = () => {
-  const { tournaments, createTournament, deleteTournament } = useTournament();
-  const navigate = useNavigate();
+  const { tournaments, deleteTournament } = useTournament();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [tournamentToDelete, setTournamentToDelete] = useState<Tournament | null>(null);
-  const [newTourneyName, setNewTourneyName] = useState('');
-  const [newTourneySlug, setNewTourneySlug] = useState('');
-  const [newTourneyDate, setNewTourneyDate] = useState('');
-  const [newTourneyLocation, setNewTourneyLocation] = useState('');
-  const [newTourneyFormat, setNewTourneyFormat] = useState<QualFormat>('AVERAGE_OF_X');
-  const [newTourneyAvgCount, setNewTourneyAvgCount] = useState<number | undefined>(2);
-  const [avgCountError, setAvgCountError] = useState<string | null>(null);
-
-  const hasRecordedScoresOrQuals = (t: Tournament): boolean => {
-    const hasQuals = (t.qualifierSubmissions && t.qualifierSubmissions.length > 0) ||
-      (t.qualifiers && t.qualifiers.length > 0);
-    const hasMatchScores = Object.values(t.matchScores || {}).some(
-      m => m.isComplete || m.player1Wins > 0 || m.player2Wins > 0 ||
-        m.games?.some(g => g.player1Points !== null || g.player2Points !== null)
-    );
-    return Boolean(hasQuals || hasMatchScores);
-  };
 
   const confirmDeleteTournament = () => {
     if (tournamentToDelete) {
@@ -37,46 +19,13 @@ export const TournamentSwitcherPage: React.FC = () => {
     }
   };
 
-  const handleNameChange = (name: string) => {
-    setNewTourneyName(name);
-    const slug = name.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-');
-    setNewTourneySlug(slug);
-  };
-
-  const handleCreateSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTourneyName.trim() || !newTourneySlug.trim()) return;
-
-    let parsedAvgCount = 2;
-    if (newTourneyFormat === 'AVERAGE_OF_X') {
-      if (newTourneyAvgCount === undefined || isNaN(newTourneyAvgCount) || newTourneyAvgCount < 1) {
-        setAvgCountError('Please enter a valid attempt count (minimum 1)');
-        return;
-      }
-      parsedAvgCount = newTourneyAvgCount;
-    }
-
-    const created = createTournament({
-      name: newTourneyName,
-      slug: newTourneySlug,
-      date: newTourneyDate || 'Upcoming',
-      location: newTourneyLocation || 'TBD',
-      qualFormat: newTourneyFormat,
-      qualAverageCount: parsedAvgCount,
-      pointsConfig: newTourneyFormat === 'POINTS' ? DEFAULT_POINTS_THRESHOLDS : undefined,
-      isLocked: false,
-      tiers: [],
-    });
-
-    setIsCreateModalOpen(false);
-    navigate(`/${created.slug}/manage/settings`);
-  };
-
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--color-bg-base)', padding: '2rem 1.5rem' }}>
-      <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--color-bg-base)', padding: '0 0 3rem' }}>
+      <TopNavSwitcher />
+
+      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '2rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         {/* Hero Section */}
-        <header style={{ textAlign: 'center', padding: '2rem 1rem' }}>
+        <header style={{ textAlign: 'center', padding: '1.5rem 1rem' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
             <div style={logoIconLargeStyle}>
               <Layers size={24} color="#090d16" />
@@ -101,15 +50,6 @@ export const TournamentSwitcherPage: React.FC = () => {
               <Plus size={18} />
               Create New Tournament
             </button>
-
-            <Link
-              to="/players"
-              className="btn btn-secondary"
-              style={{ padding: '0.65rem 1.25rem', fontSize: '0.95rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none' }}
-            >
-              <Users size={18} color="var(--color-gold-bright)" />
-              Global Player Pool
-            </Link>
           </div>
         </header>
 
@@ -162,360 +102,36 @@ export const TournamentSwitcherPage: React.FC = () => {
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(480px, 1fr))', gap: '1.5rem' }}>
-            {tournaments.map(tournament => {
-              const hasTiers = tournament.tiers.length > 0;
-              const defaultTier = hasTiers ? tournament.tiers[0] : undefined;
-              const totalPlayers = tournament.tiers.reduce((acc, t) => acc + t.playerCount, 0);
-
-              return (
-                <div
-                  key={tournament.id}
-                  style={{
-                    background: 'var(--color-bg-surface)',
-                    borderRadius: 'var(--radius-lg)',
-                    border: '1px solid var(--color-border)',
-                    padding: '1.75rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    gap: '1.5rem',
-                    boxShadow: 'var(--shadow-md)',
-                    transition: 'transform 0.15s ease, border-color 0.15s ease',
-                  }}
-                >
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        {!tournament.isLocked ? (
-                          <span className="badge badge-gold">
-                            <AlertTriangle size={12} /> Qualifiers Mode
-                          </span>
-                        ) : (
-                          <span className="badge badge-green">
-                            <ShieldCheck size={12} /> Match Play Mode
-                          </span>
-                        )}
-                        <span className="badge badge-muted">
-                          {tournament.qualFormat?.replace(/_/g, ' ') || 'Average'}
-                        </span>
-                      </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-                        ID: {tournament.slug}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setTournamentToDelete(tournament)}
-                        disabled={hasRecordedScoresOrQuals(tournament)}
-                        className="btn btn-secondary"
-                        style={{
-                          padding: '0.25rem 0.5rem',
-                          fontSize: '0.75rem',
-                          color: hasRecordedScoresOrQuals(tournament) ? 'var(--color-text-muted)' : 'var(--color-red)',
-                          borderColor: hasRecordedScoresOrQuals(tournament) ? 'var(--color-border)' : 'rgba(239, 68, 68, 0.4)',
-                          opacity: hasRecordedScoresOrQuals(tournament) ? 0.35 : 1,
-                          cursor: hasRecordedScoresOrQuals(tournament) ? 'not-allowed' : 'pointer',
-                        }}
-                        title={
-                          hasRecordedScoresOrQuals(tournament)
-                            ? "Cannot delete tournament with active match or qualifier scores. Clear data in Settings first."
-                            : `Delete "${tournament.name}"`
-                        }
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <h2 style={{ fontSize: '1.6rem', fontWeight: 700, color: '#ffffff', marginBottom: '0.5rem' }}>
-                    {tournament.name}
-                  </h2>
-
-                  <div style={{ display: 'flex', gap: '1.25rem', color: 'var(--color-text-secondary)', fontSize: '0.85rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <Calendar size={15} color="var(--color-gold-bright)" />
-                      {tournament.date}
-                    </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <MapPin size={15} color="var(--color-gold-bright)" />
-                      {tournament.location}
-                    </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <Users size={15} color="var(--color-gold-bright)" />
-                      {hasTiers
-                        ? `${totalPlayers} Players Seeded`
-                        : `${(tournament.playersPool || []).length} Competitors Registered`}
-                    </span>
-                  </div>
-
-                  {/* Tier Badges */}
-                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem', minHeight: '26px', alignItems: 'center' }}>
-                    {hasTiers ? (
-                      tournament.tiers.map(t => {
-                        const tColor = t.primaryColor || '#f59e0b';
-                        return (
-                          <Link
-                            key={t.id}
-                            to={`/${tournament.slug}/${t.slug}`}
-                            style={{
-                              textDecoration: 'none',
-                              padding: '0.35rem 0.75rem',
-                              background: colorWithAlpha(tColor, 0.08, 'var(--color-bg-surface-elevated)'),
-                              borderRadius: 'var(--radius-sm)',
-                              border: `1px solid ${colorWithAlpha(tColor, 0.35, 'var(--color-border)')}`,
-                              fontSize: '0.8rem',
-                              fontWeight: 600,
-                              color: 'var(--color-text-primary)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.45rem',
-                              transition: 'all 0.15s ease',
-                            }}
-                          >
-                            <span
-                              style={{
-                                width: '7px',
-                                height: '7px',
-                                borderRadius: '50%',
-                                background: tColor,
-                                flexShrink: 0,
-                              }}
-                            />
-                            <span style={{ color: tColor }}>{t.name}</span>
-                            <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>
-                              ({t.playerCount}p • {t.bracketType})
-                            </span>
-                          </Link>
-                        );
-                      })
-                    ) : (
-                      <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
-                        No bracket tiers configured (Qualifiers open)
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Quick Action Navigation Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.6rem' }}>
-                  <Link
-                    to={hasTiers ? `/${tournament.slug}/manage/sheet?tier=${defaultTier!.slug}` : `/${tournament.slug}/manage/sheet`}
-                    className={hasTiers ? 'btn btn-primary' : 'btn btn-secondary'}
-                    style={{ padding: '0.55rem 0.75rem', fontSize: '0.8rem', opacity: hasTiers ? 1 : 0.7 }}
-                    title={hasTiers ? 'Organizer Sheet' : 'No brackets yet'}
-                  >
-                    📊 Sheet
-                  </Link>
-
-                  <Link
-                    to={hasTiers ? `/${tournament.slug}/${defaultTier!.slug}` : `/${tournament.slug}/bracket`}
-                    className="btn btn-secondary"
-                    style={{ padding: '0.55rem 0.75rem', fontSize: '0.8rem', opacity: hasTiers ? 1 : 0.7 }}
-                    title={hasTiers ? 'Visual Bracket' : 'No brackets yet'}
-                  >
-                    🌲 Bracket
-                  </Link>
-
-                  <Link
-                    to={hasTiers ? `/${tournament.slug}/manage/judge?tier=${defaultTier!.slug}` : `/${tournament.slug}/manage/judge`}
-                    className="btn btn-secondary"
-                    style={{ padding: '0.55rem 0.75rem', fontSize: '0.8rem', opacity: hasTiers ? 1 : 0.7 }}
-                    title={hasTiers ? 'Floor Judge' : 'No brackets yet'}
-                  >
-                    📱 Floor Judge
-                  </Link>
-
-                  <Link
-                    to={`/${tournament.slug}/leaderboard`}
-                    className={!hasTiers ? 'btn btn-primary' : 'btn btn-secondary'}
-                    style={{ padding: '0.55rem 0.75rem', fontSize: '0.8rem' }}
-                  >
-                    🏆 Qualifiers
-                  </Link>
-
-                  <Link
-                    to={`/${tournament.slug}/standings`}
-                    className="btn btn-secondary"
-                    style={{ padding: '0.55rem 0.75rem', fontSize: '0.8rem' }}
-                  >
-                    <Trophy size={14} color="var(--color-gold-bright)" /> Standings
-                  </Link>
-
-                  <Link
-                    to={`/${tournament.slug}/manage/settings`}
-                    className="btn btn-secondary"
-                    style={{ padding: '0.55rem 0.75rem', fontSize: '0.8rem' }}
-                  >
-                    <Settings size={14} /> Settings
-                  </Link>
-                </div>
-                </div>
-              );
-            })}
+            {tournaments.map(tournament => (
+              <TournamentCard
+                key={tournament.id}
+                tournament={tournament}
+                onDeleteClick={setTournamentToDelete}
+                showOrgBadge={true}
+              />
+            ))}
           </div>
         )}
-
-        {/* Footer */}
-        <footer style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
-          Tournament Manager • LocalStorage Enabled • OBS Broadcast Ready
-        </footer>
       </div>
 
-      {/* Create Tournament Modal */}
-      {isCreateModalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.75)',
-            backdropFilter: 'blur(6px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: '1rem',
-          }}
-        >
-          <div
-            style={{
-              background: 'var(--color-bg-surface)',
-              borderRadius: 'var(--radius-lg)',
-              border: '1px solid var(--color-border)',
-              maxWidth: '500px',
-              width: '100%',
-              boxShadow: 'var(--shadow-lg)',
-              overflow: 'hidden',
-              animation: 'fadeIn 0.2s ease-out',
-            }}
-          >
-            <div
-              style={{
-                padding: '1.25rem 1.5rem',
-                background: 'var(--color-bg-surface-elevated)',
-                borderBottom: '1px solid var(--color-border)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#ffffff' }}>
-                Create New Tournament
-              </h3>
-              <button
-                onClick={() => setIsCreateModalOpen(false)}
-                style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
+      {/* Shared Create Tournament Modal */}
+      <CreateTournamentModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+      />
 
-            <form onSubmit={handleCreateSubmit} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={modalLabelStyle}>Tournament Name</label>
-                <input
-                  type="text"
-                  value={newTourneyName}
-                  onChange={e => handleNameChange(e.target.value)}
-                  placeholder="e.g. St. Louis Open 2026"
-                  required
-                  style={modalInputStyle}
-                />
-              </div>
-
-              <div>
-                <label style={modalLabelStyle}>URL Slug</label>
-                <input
-                  type="text"
-                  value={newTourneySlug}
-                  onChange={e => setNewTourneySlug(e.target.value)}
-                  required
-                  style={modalInputStyle}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={modalLabelStyle}>Event Date</label>
-                  <input
-                    type="text"
-                    value={newTourneyDate}
-                    onChange={e => setNewTourneyDate(e.target.value)}
-                    placeholder="e.g. April 12, 2026"
-                    style={modalInputStyle}
-                  />
-                </div>
-                <div>
-                  <label style={modalLabelStyle}>Location</label>
-                  <input
-                    type="text"
-                    value={newTourneyLocation}
-                    onChange={e => setNewTourneyLocation(e.target.value)}
-                    placeholder="e.g. St. Louis, MO"
-                    style={modalInputStyle}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={modalLabelStyle}>Qualifying Format</label>
-                <select
-                  value={newTourneyFormat}
-                  onChange={e => setNewTourneyFormat(e.target.value as QualFormat)}
-                  style={modalInputStyle}
-                >
-                  <option value="AVERAGE_OF_X">Average of X Attempts</option>
-                  <option value="HIGH_SCORE"># of Maxes</option>
-                  <option value="POINTS">Points Threshold System</option>
-                </select>
-              </div>
-
-              {newTourneyFormat === 'AVERAGE_OF_X' && (
-                <div>
-                  <label style={modalLabelStyle}>Target Attempt Count (X)</label>
-                  <ClearableNumberInput
-                    min={1}
-                    max={10}
-                    value={newTourneyAvgCount}
-                    onChange={val => {
-                      setNewTourneyAvgCount(val);
-                      if (avgCountError) setAvgCountError(null);
-                    }}
-                    error={avgCountError}
-                    onErrorChange={setAvgCountError}
-                    style={modalInputStyle}
-                  />
-                </div>
-              )}
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
-                <button
-                  type="button"
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="btn btn-secondary"
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Create &amp; Configure
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Speedbump Modal for Deleting Tournament */}
+      {/* Delete Confirmation Modal */}
       {tournamentToDelete && (
         <div
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.75)',
-            backdropFilter: 'blur(6px)',
+            background: 'rgba(0,0,0,0.75)',
+            backdropFilter: 'blur(4px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 9999,
+            zIndex: 1000,
             padding: '1rem',
           }}
         >
@@ -523,44 +139,35 @@ export const TournamentSwitcherPage: React.FC = () => {
             style={{
               background: 'var(--color-bg-surface)',
               borderRadius: 'var(--radius-lg)',
-              border: '1px solid var(--color-red)',
-              maxWidth: '480px',
+              border: '1px solid rgba(239, 68, 68, 0.4)',
               width: '100%',
-              boxShadow: 'var(--shadow-lg)',
+              maxWidth: '480px',
               overflow: 'hidden',
-              animation: 'fadeIn 0.2s ease-out',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
             }}
           >
             <div
               style={{
                 padding: '1.25rem 1.5rem',
-                background: 'var(--color-bg-surface-elevated)',
                 borderBottom: '1px solid var(--color-border)',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
+                gap: '0.75rem',
+                background: 'rgba(239, 68, 68, 0.08)',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--color-red)' }}>
-                <Trash2 size={20} />
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                  Delete Tournament
-                </h3>
-              </div>
-              <button
-                onClick={() => setTournamentToDelete(null)}
-                style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '0.25rem' }}
-              >
-                <X size={18} />
-              </button>
+              <AlertTriangle size={22} color="#ef4444" />
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#ffffff' }}>
+                Delete Tournament
+              </h3>
             </div>
 
             <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <p style={{ fontSize: '0.9rem', color: 'var(--color-text-primary)', lineHeight: 1.5 }}>
-                Are you sure you want to permanently delete <strong>{tournamentToDelete.name}</strong>?
+              <p style={{ fontSize: '0.95rem', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+                Are you sure you want to delete <strong style={{ color: '#ffffff' }}>{tournamentToDelete.name}</strong>?
               </p>
-              <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', lineHeight: 1.4 }}>
-                This will destroy this tournament record and its bracket configurations. This action cannot be undone.
+              <p style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', lineHeight: 1.4 }}>
+                This tournament has no recorded matches or qualifiers and will be permanently removed. This action cannot be undone.
               </p>
             </div>
 
@@ -596,26 +203,6 @@ export const TournamentSwitcherPage: React.FC = () => {
       )}
     </div>
   );
-};
-
-const modalLabelStyle: React.CSSProperties = {
-  display: 'block',
-  fontSize: '0.8rem',
-  fontWeight: 600,
-  color: 'var(--color-text-secondary)',
-  marginBottom: '0.35rem',
-  textTransform: 'uppercase',
-  letterSpacing: '0.04em',
-};
-
-const modalInputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '0.6rem 0.85rem',
-  borderRadius: 'var(--radius-sm)',
-  border: '1px solid var(--color-border)',
-  backgroundColor: 'var(--color-bg-base)',
-  color: 'var(--color-text-primary)',
-  fontSize: '0.875rem',
 };
 
 const logoIconLargeStyle: React.CSSProperties = {

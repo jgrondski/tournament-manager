@@ -1,17 +1,14 @@
 import React from 'react';
 import { PlayerDirectory } from '../features/players/components/PlayerDirectory';
-import { TournamentLayout } from '../components/TournamentLayout';
-import { useTournament } from '../features/tournament/store';
+import { TopNavSwitcher } from '../components/TopNavSwitcher';
 
 export const PlayerDirectoryPage: React.FC = () => {
-  const { tournaments } = useTournament();
-  const activeTournament = tournaments[0];
-
   return (
-    <TournamentLayout tournament={activeTournament} activeView="globalPlayers">
-      <main style={{ flex: 1, padding: '2rem 1.5rem', maxWidth: '1200px', width: '100%', margin: '0 auto' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--color-bg-base)', padding: '0 0 4rem' }}>
+      <TopNavSwitcher />
+      <main style={{ maxWidth: '1200px', width: '100%', margin: '0 auto', padding: '2rem 1.5rem' }}>
         <PlayerDirectory />
       </main>
-    </TournamentLayout>
+    </div>
   );
 };

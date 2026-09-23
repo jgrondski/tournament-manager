@@ -23,7 +23,11 @@ import {
   Sliders,
   Type,
   ChevronDown,
+  Building2,
+  Send,
+  ExternalLink,
 } from 'lucide-react';
+import { useOrganization } from '../../organizations/store';
 import { generateTraditionalBracket, generateFlatBracket, getValidFlatWidths } from '../../bracket/math';
 import { getAlternateShade, getTextScale, getDefaultTierColors, TierThemeColors } from '../../bracket/colorUtils';
 import { generateDraftBracketsForTournament } from '../../qualifiers/scoring';
@@ -425,9 +429,30 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
     unlockBrackets,
   } = useTournament();
 
+  const { organizations, getOrganizationById } = useOrganization();
+
   // Tournament Fields State
   const [name, setName] = useState(tournament.name);
   const [slug, setSlug] = useState(tournament.slug);
+  const [organizationId, setOrganizationId] = useState<string>(
+    tournament.organizationId || organizations[0]?.id || 'org_ctwc'
+  );
+  const [useOrgBranding, setUseOrgBranding] = useState<boolean>(
+    tournament.useOrgBranding ?? true
+  );
+  const [discordWebhookUrl, setDiscordWebhookUrl] = useState<string>(
+    tournament.discordWebhookUrl || ''
+  );
+  const [logoUrl, setLogoUrl] = useState<string>(
+    tournament.logoUrl || ''
+  );
+  const [bannerUrl, setBannerUrl] = useState<string>(
+    tournament.bannerUrl || ''
+  );
+  const [webhookTestStatus, setWebhookTestStatus] = useState<string | null>(null);
+
+  const selectedOrg = getOrganizationById(organizationId);
+
   const [date, setDate] = useState(tournament.date);
   const [location, setLocation] = useState(tournament.location || '');
   const [qualFormat, setQualFormat] = useState<QualFormat>(tournament.qualFormat || 'AVERAGE_OF_X');
@@ -442,16 +467,50 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
   const [isSettingsVerifyModalOpen, setIsSettingsVerifyModalOpen] = useState(false);
   const [settingsUnlockError, setSettingsUnlockError] = useState<string | null>(null);
 
+  const handleApplyOrgColorsToTiers = () => {
+    const orgPalette = selectedOrg?.themeColors || selectedOrg?.branding?.themeColors;
+    if (!orgPalette) return;
+    const tierThemesList = selectedOrg?.tierThemes || [];
+
+    setTiers(prev =>
+      prev.map((t, idx) => {
+        const palette =
+          idx > 0 && tierThemesList[idx - 1]?.themeColors
+            ? tierThemesList[idx - 1].themeColors
+            : orgPalette;
+        return {
+          ...t,
+          primaryColor: palette.primaryColor,
+          secondaryColor: palette.secondaryColor,
+          cardColor: palette.cardColor,
+          textColor: palette.textColor,
+          backgroundColor: palette.backgroundColor,
+        };
+      })
+    );
+  };
+
+  const handleTestDiscordWebhook = () => {
+    const targetUrl = discordWebhookUrl.trim() || selectedOrg?.discordWebhookUrl?.trim();
+    if (!targetUrl) {
+      setWebhookTestStatus('No webhook URL configured (either tournament or organization)');
+      setTimeout(() => setWebhookTestStatus(null), 3000);
+      return;
+    }
+    setWebhookTestStatus('Ping simulated: Discord webhook target resolved successfully!');
+    setTimeout(() => setWebhookTestStatus(null), 4000);
+  };
+
   // Tiers State
   const [tiers, setTiers] = useState<TournamentTier[]>(tournament.tiers || []);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [tierToDelete, setTierToDelete] = useState<{ index: number; tier: TournamentTier } | null>(null);
   const [dataActionToConfirm, setDataActionToConfirm] = useState<'MATCHES' | 'QUALS' | 'ALL' | null>(null);
   const [simFeedback, setSimFeedback] = useState<string | null>(null);
-  const [collapsedThemes, setCollapsedThemes] = useState<Record<string, boolean>>({});
+  const [openThemes, setOpenThemes] = useState<Record<string, boolean>>({});
 
   const toggleThemeCollapse = (tierId: string) => {
-    setCollapsedThemes(prev => ({
+    setOpenThemes(prev => ({
       ...prev,
       [tierId]: !prev[tierId],
     }));
@@ -486,6 +545,11 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
   const isDirty = useMemo(() => {
     if (name.trim() !== (tournament.name || '').trim()) return true;
     if (slug.trim() !== (tournament.slug || '').trim()) return true;
+    if (organizationId !== (tournament.organizationId || 'org_ctwc')) return true;
+    if (useOrgBranding !== (tournament.useOrgBranding ?? true)) return true;
+    if ((discordWebhookUrl || '').trim() !== (tournament.discordWebhookUrl || '').trim()) return true;
+    if ((logoUrl || '').trim() !== (tournament.logoUrl || '').trim()) return true;
+    if ((bannerUrl || '').trim() !== (tournament.bannerUrl || '').trim()) return true;
     if (date.trim() !== (tournament.date || '').trim()) return true;
     if (location.trim() !== (tournament.location || '').trim()) return true;
     if (qualFormat !== tournament.qualFormat) return true;
@@ -531,7 +595,22 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
     }
 
     return false;
-  }, [name, slug, date, location, qualFormat, qualAverageCount, pointsConfig, tiers, tournament]);
+  }, [
+    name,
+    slug,
+    date,
+    location,
+    qualFormat,
+    qualAverageCount,
+    pointsConfig,
+    tiers,
+    tournament,
+    organizationId,
+    useOrgBranding,
+    discordWebhookUrl,
+    logoUrl,
+    bannerUrl,
+  ]);
 
   // Notify parent of dirty state changes
   useEffect(() => {
@@ -555,6 +634,11 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
     if (!isDirty) {
       setName(tournament.name || '');
       setSlug(tournament.slug || '');
+      setOrganizationId(tournament.organizationId || 'org_ctwc');
+      setUseOrgBranding(tournament.useOrgBranding ?? true);
+      setDiscordWebhookUrl(tournament.discordWebhookUrl || '');
+      setLogoUrl(tournament.logoUrl || '');
+      setBannerUrl(tournament.bannerUrl || '');
       setDate(tournament.date || '');
       setLocation(tournament.location || '');
       setQualFormat(tournament.qualFormat || 'AVERAGE_OF_X');
@@ -572,6 +656,11 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
   const handleDiscardChanges = () => {
     setName(tournament.name || '');
     setSlug(tournament.slug || '');
+    setOrganizationId(tournament.organizationId || 'org_ctwc');
+    setUseOrgBranding(tournament.useOrgBranding ?? true);
+    setDiscordWebhookUrl(tournament.discordWebhookUrl || '');
+    setLogoUrl(tournament.logoUrl || '');
+    setBannerUrl(tournament.bannerUrl || '');
     setDate(tournament.date || '');
     setLocation(tournament.location || '');
     setQualFormat(tournament.qualFormat || 'AVERAGE_OF_X');
@@ -583,6 +672,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
         : DEFAULT_POINTS_THRESHOLDS
     );
     setTiers(tournament.tiers || []);
+    setOpenThemes({});
   };
 
   // Helper to auto-derive slug from name
@@ -697,6 +787,10 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
     const nextTiers = [...tiers, newTier];
     const draftTiers = generateDraftBracketsForTournament({ ...tournament, tiers: nextTiers });
     setTiers(draftTiers);
+    setOpenThemes(prev => ({
+      ...prev,
+      [tierId]: true,
+    }));
   };
 
   const updateTier = (index: number, updates: Partial<TournamentTier>) => {
@@ -748,6 +842,14 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
   };
 
   const deleteTier = (index: number) => {
+    const tier = tiers[index];
+    if (tier) {
+      setOpenThemes(prev => {
+        const next = { ...prev };
+        delete next[tier.id];
+        return next;
+      });
+    }
     setTiers(prev => {
       const next = prev.filter((_, i) => i !== index).map((t, idx) => ({ ...t, priority: idx + 1 }));
       if (!tournament.isLocked) {
@@ -807,6 +909,11 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
     updateTournament(tournament.id, {
       name,
       slug,
+      organizationId,
+      useOrgBranding,
+      discordWebhookUrl,
+      logoUrl,
+      bannerUrl,
       date,
       location,
       qualFormat,
@@ -1160,6 +1267,206 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
         </div>
       </section>
 
+      {/* Section: Organization & Brand Palette */}
+      <section
+        style={{
+          background: 'var(--color-bg-surface)',
+          borderRadius: 'var(--radius-lg)',
+          border: '1px solid var(--color-border)',
+          padding: '1.25rem 1.5rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1.25rem',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.65rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Building2 size={18} color="var(--color-gold-bright)" />
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+              Host Organization &amp; Branding
+            </h2>
+          </div>
+          {selectedOrg && (
+            <Link
+              to={`/org/${selectedOrg.slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                fontSize: '0.78rem',
+                color: 'var(--color-gold-bright)',
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                fontWeight: 600,
+              }}
+            >
+              <span>View {selectedOrg.shortName} Dashboard</span>
+              <ExternalLink size={12} />
+            </Link>
+          )}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+          {/* Left Column: Organization Selection & Palette */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div>
+              <label style={labelStyle}>Parent Organization Circuit</label>
+              <select
+                value={organizationId}
+                onChange={e => setOrganizationId(e.target.value)}
+                style={inputStyle}
+              >
+                {organizations.map(org => (
+                  <option key={org.id} value={org.id}>
+                    {org.name} ({org.shortName})
+                  </option>
+                ))}
+              </select>
+              <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '0.25rem', display: 'block' }}>
+                All match scores, career metrics, and qualifying leaderboards roll up to this organization.
+              </span>
+            </div>
+
+            <div style={{ background: 'var(--color-bg-surface-elevated)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border-subtle)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={useOrgBranding}
+                  onChange={e => setUseOrgBranding(e.target.checked)}
+                  style={{ width: '16px', height: '16px', accentColor: 'var(--color-gold-bright)', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                  Inherit Organization Theme &amp; 5-Color Bracket Palette
+                </span>
+              </label>
+
+              {useOrgBranding && (selectedOrg?.themeColors || selectedOrg?.branding?.themeColors) && (
+                (() => {
+                  const colors = selectedOrg.themeColors || selectedOrg.branding?.themeColors;
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', paddingTop: '0.25rem' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>
+                        Circuit 5-Color Theme:
+                      </span>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        {[
+                          { label: 'Pri', color: colors?.primaryColor },
+                          { label: 'Sec', color: colors?.secondaryColor },
+                          { label: 'Card', color: colors?.cardColor },
+                          { label: 'Text', color: colors?.textColor },
+                          { label: 'Bg', color: colors?.backgroundColor },
+                        ].map(swatch => (
+                          <div key={swatch.label} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'rgba(0,0,0,0.3)', padding: '0.2rem 0.45rem', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                            <span style={{ width: '12px', height: '12px', borderRadius: '2px', background: swatch.color, border: '1px solid rgba(255,255,255,0.2)' }} />
+                            <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>{swatch.label}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleApplyOrgColorsToTiers}
+                        className="btn btn-secondary"
+                        style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', alignSelf: 'flex-start', marginTop: '0.25rem', gap: '0.4rem' }}
+                        title="Copy these 5 colors to all tiers in this tournament"
+                      >
+                        <Palette size={13} color="var(--color-gold-bright)" />
+                        Apply Circuit Palettes to All Tiers
+                      </button>
+                    </div>
+                  );
+                })()
+              )}
+
+              {!useOrgBranding && (
+                <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', margin: 0 }}>
+                  Custom regional mode: Each tier in this tournament will use its own custom colors and media independent of {selectedOrg?.shortName || 'the organization'}.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Right Column: Logo/Banner Overrides & Discord Webhooks */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div>
+                <label style={labelStyle}>Tournament Logo URL</label>
+                <input
+                  type="text"
+                  value={logoUrl}
+                  onChange={e => setLogoUrl(e.target.value)}
+                  placeholder={selectedOrg?.branding?.logoUrl || 'https://.../logo.png'}
+                  style={inputStyle}
+                />
+                <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
+                  {logoUrl ? 'Custom tournament logo' : `Default: ${selectedOrg?.shortName || 'Org'} logo`}
+                </span>
+              </div>
+              <div>
+                <label style={labelStyle}>Tournament Banner URL</label>
+                <input
+                  type="text"
+                  value={bannerUrl}
+                  onChange={e => setBannerUrl(e.target.value)}
+                  placeholder={selectedOrg?.branding?.bannerUrl || 'https://.../banner.png'}
+                  style={inputStyle}
+                />
+                <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
+                  {bannerUrl ? 'Custom tournament banner' : `Default: ${selectedOrg?.shortName || 'Org'} banner`}
+                </span>
+              </div>
+            </div>
+
+            {/* Discord Webhook Field (Groundwork) */}
+            <div style={{ background: 'var(--color-bg-surface-elevated)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border-subtle)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label style={{ ...labelStyle, margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <span>Discord Webhook URL</span>
+                  <span style={{ fontSize: '0.65rem', padding: '0.1rem 0.4rem', borderRadius: '4px', background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', fontWeight: 600 }}>
+                    Groundwork
+                  </span>
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input
+                  type="text"
+                  value={discordWebhookUrl}
+                  onChange={e => setDiscordWebhookUrl(e.target.value)}
+                  placeholder={selectedOrg?.discordWebhookUrl ? `Fallback: ${selectedOrg.shortName} Webhook` : 'https://discord.com/api/webhooks/...'}
+                  style={{ ...inputStyle, flex: 1 }}
+                />
+                <button
+                  type="button"
+                  onClick={handleTestDiscordWebhook}
+                  className="btn btn-secondary"
+                  style={{ padding: '0.4rem 0.75rem', fontSize: '0.78rem', whiteSpace: 'nowrap', gap: '0.35rem' }}
+                  title="Test resolve tournament or fallback organization webhook"
+                >
+                  <Send size={13} />
+                  Test
+                </button>
+              </div>
+
+              <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
+                {discordWebhookUrl.trim()
+                  ? 'Active tournament-specific webhook override.'
+                  : selectedOrg?.discordWebhookUrl
+                  ? `Inherited from ${selectedOrg.name} (${selectedOrg.discordWebhookUrl.slice(0, 32)}...)`
+                  : 'No webhook configured. Circuit announcements disabled.'}
+              </span>
+
+              {webhookTestStatus && (
+                <div style={{ fontSize: '0.75rem', color: webhookTestStatus.includes('resolved') ? '#34d399' : '#f87171', fontWeight: 600 }}>
+                  {webhookTestStatus}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Section 2: Tier Management */}
       <section
         style={{
@@ -1416,7 +1723,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
                   const previewScoreMinW = Math.max(18, Math.round(20 * previewTextScale));
                   const previewScoreH = Math.max(18, Math.round(20 * previewTextScale));
 
-                  const isThemeOpen = !collapsedThemes[tier.id];
+                  const isThemeOpen = Boolean(openThemes[tier.id]);
 
                   return (
                     <div

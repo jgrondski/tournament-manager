@@ -96,8 +96,8 @@ interface TournamentContextType {
   ) => { success: boolean; error?: string };
 }
 
-const STORAGE_KEY = 'tournament_manager_tournaments_v3';
-const LEGACY_STORAGE_KEY = 'ctwc_tournaments_v3';
+const STORAGE_KEY = 'tournament_manager_tournaments_v4';
+const LEGACY_STORAGE_KEY = 'tournament_manager_tournaments_v3';
 const GLOBAL_PLAYERS_STORAGE_KEY = 'classic_tetris_global_players';
 
 const TournamentContext = createContext<TournamentContextType | null>(null);
@@ -117,6 +117,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             const { isVerified: _iv, qualsClosed: _qc, ...rest } = t;
             return {
               ...rest,
+              organizationId: rest.organizationId || 'org_ctwc',
               isLocked,
             };
           });
@@ -181,6 +182,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const newTourney: Tournament = {
       ...data,
       id,
+      organizationId: data.organizationId || 'org_ctwc',
       slug: data.slug || id,
       matchScores: {},
       playersPool: [],
@@ -188,6 +190,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       tournamentPlayers: {},
       isLocked: Boolean(data.isLocked),
       tiers: data.tiers || [],
+      useOrgBranding: data.useOrgBranding !== undefined ? data.useOrgBranding : true,
     };
 
     // Calculate initial draft brackets if tiers exist
@@ -247,7 +250,17 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (t.id !== tournamentId) return t;
         const currentPool = t.playersPool || [];
         const updatedPool = [...currentPool, newPlayer];
-        const updated = { ...t, playersPool: updatedPool };
+        const currentTournamentPlayers = { ...(t.tournamentPlayers || {}) };
+        currentTournamentPlayers[newPlayer.id] = {
+          playerId: newPlayer.id,
+          tournamentId,
+          organizationId: t.organizationId,
+        };
+        const updated = {
+          ...t,
+          playersPool: updatedPool,
+          tournamentPlayers: currentTournamentPlayers,
+        };
         if (!updated.isLocked) {
           updated.tiers = generateDraftBracketsForTournament(updated);
         }
@@ -286,6 +299,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const newSubmission: QualifierSubmission = {
           id: `sub_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
           tournamentId,
+          organizationId: t.organizationId,
           playerId,
           score,
           submittedAt: Date.now(),
@@ -349,6 +363,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const existing = currentPlayers[playerId] || {
           playerId,
           tournamentId,
+          organizationId: t.organizationId,
         };
         const updatedPlayers = {
           ...currentPlayers,
@@ -375,6 +390,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const existing = currentPlayers[playerId] || {
           playerId,
           tournamentId,
+          organizationId: t.organizationId,
         };
         const newVerified = isVerified !== undefined ? isVerified : !existing.isVerified;
         const updatedPlayers = {
@@ -483,6 +499,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const currentRecord = tournament.matchScores[matchId] || {
           matchId,
           tierId,
+          organizationId: tournament.organizationId,
           bestOf: targetMatch.bestOf || tier.bestOf,
           player1Wins: 0,
           player2Wins: 0,
@@ -615,6 +632,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const currentRecord = tournament.matchScores[matchId] || {
           matchId,
           tierId,
+          organizationId: tournament.organizationId,
           bestOf: targetMatch.bestOf || tier.bestOf || 5,
           player1Wins: 0,
           player2Wins: 0,
@@ -734,6 +752,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const currentRecord = tournament.matchScores[matchId] || {
           matchId,
           tierId,
+          organizationId: tournament.organizationId,
           bestOf,
           player1Wins: 0,
           player2Wins: 0,
@@ -840,6 +859,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const currentRecord = tournament.matchScores[matchId] || {
           matchId,
           tierId,
+          organizationId: tournament.organizationId,
           bestOf: targetMatch.bestOf || tier.bestOf,
           player1Wins: 0,
           player2Wins: 0,
@@ -905,6 +925,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const newSub: QualifierSubmission = {
           id: `sub_${Date.now()}`,
           tournamentId,
+          organizationId: tournament.organizationId,
           playerId: entry.playerId,
           score: entry.game1,
           submittedAt: Date.now(),
@@ -1097,7 +1118,22 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
         if (toAdd.length === 0) return t;
 
-        const updated = { ...t, playersPool: [...existingPool, ...toAdd] };
+        const updatedTournamentPlayers = { ...(t.tournamentPlayers || {}) };
+        toAdd.forEach(p => {
+          if (!updatedTournamentPlayers[p.id]) {
+            updatedTournamentPlayers[p.id] = {
+              playerId: p.id,
+              tournamentId,
+              organizationId: t.organizationId,
+            };
+          }
+        });
+
+        const updated = {
+          ...t,
+          playersPool: [...existingPool, ...toAdd],
+          tournamentPlayers: updatedTournamentPlayers,
+        };
         if (!updated.isLocked) {
           updated.tiers = generateDraftBracketsForTournament(updated);
         }

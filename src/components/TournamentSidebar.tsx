@@ -21,6 +21,7 @@ import {
   AlertTriangle,
   Plus,
   Check,
+  Building2,
 } from 'lucide-react';
 
 export type SidebarNavView =
@@ -32,7 +33,9 @@ export type SidebarNavView =
   | 'obs'
   | 'players'
   | 'settings'
-  | 'globalPlayers';
+  | 'globalPlayers'
+  | 'organizations'
+  | 'tournaments';
 
 interface TournamentSidebarProps {
   tournament?: Tournament;
@@ -118,14 +121,14 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
     {
       key: 'leaderboard' as const,
       label: 'Qualifiers',
-      icon: Trophy,
+      icon: BarChart3,
       to: slug ? `/${slug}/leaderboard` : '/',
       badge: null,
     },
     {
       key: 'standings' as const,
       label: 'Standings',
-      icon: BarChart3,
+      icon: Trophy,
       to: slug ? `/${slug}/standings` : '/',
       badge: null,
     },
@@ -155,7 +158,7 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
       label: 'OBS Hub',
       icon: Video,
       to: slug ? `/${slug}/obs` : '/',
-      badge: 'Live',
+      badge: null,
     },
     {
       key: 'players' as const,
@@ -499,8 +502,8 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
                       fontWeight: 700,
                       padding: '0.1rem 0.4rem',
                       borderRadius: 'var(--radius-full)',
-                      background: item.key === 'obs' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.08)',
-                      color: item.key === 'obs' ? '#f87171' : 'var(--color-text-muted)',
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      color: 'var(--color-text-muted)',
                     }}
                   >
                     {item.badge}
@@ -528,6 +531,64 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
             </div>
           )}
 
+          {/* All Tournaments */}
+          <Link
+            to="/"
+            onClick={e => handleLinkClick(e, '/')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.65rem',
+              padding: isCollapsed ? '0.55rem 0' : '0.45rem 0.75rem',
+              justifyContent: isCollapsed ? 'center' : 'flex-start',
+              borderRadius: 'var(--radius-sm)',
+              fontSize: '0.8rem',
+              fontWeight: activeView === 'tournaments' ? 700 : 500,
+              color: activeView === 'tournaments' ? 'var(--color-gold-bright)' : 'var(--color-text-secondary)',
+              background: activeView === 'tournaments' ? 'var(--color-gold-bg)' : 'transparent',
+              borderLeft: activeView === 'tournaments' ? '3px solid var(--color-gold-bright)' : '3px solid transparent',
+              textDecoration: 'none',
+              transition: 'background 0.12s ease, color 0.12s ease',
+            }}
+            title="All Tournaments"
+          >
+            <Trophy size={16} style={{ flexShrink: 0 }} />
+            {!isCollapsed && (
+              <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                Tournaments
+              </span>
+            )}
+          </Link>
+
+          {/* Organizations Directory */}
+          <Link
+            to="/organizations"
+            onClick={e => handleLinkClick(e, '/organizations')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.65rem',
+              padding: isCollapsed ? '0.55rem 0' : '0.45rem 0.75rem',
+              justifyContent: isCollapsed ? 'center' : 'flex-start',
+              borderRadius: 'var(--radius-sm)',
+              fontSize: '0.8rem',
+              fontWeight: activeView === 'organizations' ? 700 : 500,
+              color: activeView === 'organizations' ? 'var(--color-gold-bright)' : 'var(--color-text-secondary)',
+              background: activeView === 'organizations' ? 'var(--color-gold-bg)' : 'transparent',
+              borderLeft: activeView === 'organizations' ? '3px solid var(--color-gold-bright)' : '3px solid transparent',
+              textDecoration: 'none',
+              transition: 'background 0.12s ease, color 0.12s ease',
+            }}
+            title="Organizations Directory"
+          >
+            <Building2 size={16} style={{ flexShrink: 0 }} />
+            {!isCollapsed && (
+              <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                Organizations
+              </span>
+            )}
+          </Link>
+
           {/* Global Player Pool */}
           <Link
             to="/players"
@@ -536,7 +597,7 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '0.65rem',
-              padding: isCollapsed ? '0.55rem 0' : '0.5rem 0.75rem',
+              padding: isCollapsed ? '0.55rem 0' : '0.45rem 0.75rem',
               justifyContent: isCollapsed ? 'center' : 'flex-start',
               borderRadius: 'var(--radius-sm)',
               fontSize: '0.8rem',
@@ -552,7 +613,7 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
             <Globe2 size={16} style={{ flexShrink: 0 }} />
             {!isCollapsed && (
               <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                Global Player Pool
+                Global Players
               </span>
             )}
           </Link>

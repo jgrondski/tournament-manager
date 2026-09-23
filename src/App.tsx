@@ -1,7 +1,10 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { TournamentProvider } from './features/tournament/store';
+import { OrganizationProvider } from './features/organizations/store';
 import { TournamentSwitcherPage } from './routes/TournamentSwitcherPage';
+import { OrganizationDirectoryPage } from './routes/OrganizationDirectoryPage';
+import { OrganizationDetailPage } from './routes/OrganizationDetailPage';
 import { PublicTierBracketPage } from './routes/PublicTierBracketPage';
 import { PublicLeaderboardPage } from './routes/PublicLeaderboardPage';
 import { ManageSheetPage } from './routes/ManageSheetPage';
@@ -15,14 +18,19 @@ import { OBSHubPage } from './routes/OBSHubPage';
 
 export const App: React.FC = () => {
   return (
-    <TournamentProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* Home: Tournaments Switcher */}
-          <Route path="/" element={<TournamentSwitcherPage />} />
+    <OrganizationProvider>
+      <TournamentProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* Home: Tournaments Switcher */}
+            <Route path="/" element={<TournamentSwitcherPage />} />
 
-          {/* Global Player Directory */}
-          <Route path="/players" element={<PlayerDirectoryPage />} />
+            {/* Organizations Directory & Dashboard */}
+            <Route path="/organizations" element={<OrganizationDirectoryPage />} />
+            <Route path="/org/:orgSlug" element={<OrganizationDetailPage />} />
+
+            {/* Global Player Directory */}
+            <Route path="/players" element={<PlayerDirectoryPage />} />
 
           {/* Tournament Shortlinks & Cutoffs */}
           <Route path="/:slug" element={<SlugRedirectPage />} />
@@ -55,5 +63,6 @@ export const App: React.FC = () => {
         </Routes>
       </BrowserRouter>
     </TournamentProvider>
+  </OrganizationProvider>
   );
 };

@@ -103,6 +103,7 @@ describe('Global Player Pool & Simulation', () => {
     it('safely handles competitor removal: allows unplayed, blocks match participants', () => {
       const sampleTournament: Tournament = {
         id: 'tourney-1',
+        organizationId: 'org_ctwc',
         slug: 'tourney-1',
         name: 'Test Tournament',
         date: '2026-09-10',
