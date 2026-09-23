@@ -47,8 +47,15 @@
   padding: 0;
 }
 
+html {
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) var(--color-bg-base);
+}
+
 html, body {
-  height: 100%;
+  min-height: 100%;
   font-family: var(--font-sans);
   background-color: var(--color-bg-base);
   color: var(--color-text-primary);
@@ -232,4 +239,10 @@ select {
 select:disabled {
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+@media (max-width: 860px) {
+  .top-nav-teleport-chip {
+    display: none !important;
+  }
 }

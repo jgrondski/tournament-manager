@@ -21,7 +21,6 @@ import {
   Lock,
   Check,
   Sliders,
-  Type,
   ChevronDown,
   Building2,
   Send,
@@ -29,9 +28,10 @@ import {
 } from 'lucide-react';
 import { useOrganization } from '../../organizations/store';
 import { generateTraditionalBracket, generateFlatBracket, getValidFlatWidths } from '../../bracket/math';
-import { getAlternateShade, getTextScale, getDefaultTierColors, TierThemeColors } from '../../bracket/colorUtils';
+import { getDefaultTierColors, TierThemeColors } from '../../bracket/colorUtils';
 import { generateDraftBracketsForTournament } from '../../qualifiers/scoring';
 import { BestOfSelect } from '../../bracket/components/BestOfSelect';
+import { BracketThemeEditor } from '../../bracket/components/BracketThemeEditor';
 import { getAvailableRoundsForTier, pruneInvalidRoundOverrides } from '../roundOverrides';
 import { ClearableNumberInput } from '../../../components/ClearableNumberInput';
 import { VerifyBracketModal } from './VerifyBracketModal';
@@ -1710,19 +1710,6 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
                   const cardBg = tier.cardColor || defaults.cardColor;
                   const txtColor = tier.textColor || defaults.textColor;
                   const canvasBg = tier.backgroundColor || defaults.backgroundColor;
-                  const p1ZebraBg = getAlternateShade(cardBg, 7);
-
-                  // Calculate dynamic text scaling for preview cards
-                  const previewTextScale = getTextScale(tier.textSize);
-                  const previewShelfFontSize = `${(0.64 * previewTextScale).toFixed(3)}rem`;
-                  const previewSeedDim = Math.max(16, Math.round(18 * previewTextScale));
-                  const previewSeedFontSize = `${(0.68 * previewTextScale).toFixed(3)}rem`;
-                  const previewFlagFontSize = `${(0.9 * previewTextScale).toFixed(3)}rem`;
-                  const previewNameFontSize = `${(0.84 * previewTextScale).toFixed(3)}rem`;
-                  const previewScoreFontSize = `${(0.88 * previewTextScale).toFixed(3)}rem`;
-                  const previewScoreMinW = Math.max(18, Math.round(20 * previewTextScale));
-                  const previewScoreH = Math.max(18, Math.round(20 * previewTextScale));
-
                   const isThemeOpen = Boolean(openThemes[tier.id]);
 
                   return (
@@ -1820,360 +1807,48 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
                             animation: 'fadeIn 0.15s ease-out',
                           }}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                              Masterpiece 4-Color Architecture with OBS-Isolated Canvas Background
-                            </span>
-                          </div>
-
-                      {/* 1. Color Picker Controls (Full Row Above Previews, Zero Overlap) */}
-                      <div
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-                          gap: '0.75rem',
-                        }}
-                      >
-                        {/* Primary Accent */}
-                        <div style={{ minWidth: 0 }}>
-                          <label style={{ ...labelStyle, fontSize: '0.72rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }} title="Primary Accent (Lines, Rings & Winner Glory)">
-                            Primary Accent
-                          </label>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                            <input
-                              type="color"
-                              value={priColor}
-                              onChange={e => updateTier(idx, { primaryColor: e.target.value })}
-                              style={{ width: '34px', height: '34px', borderRadius: '4px', border: 'none', cursor: 'pointer', background: 'transparent', flexShrink: 0 }}
-                              title="Choose primary accent color"
-                            />
-                            <input
-                              type="text"
-                              value={priColor}
-                              onChange={e => updateTier(idx, { primaryColor: e.target.value })}
-                              style={{ ...inputStyle, minWidth: 0, flex: 1, fontFamily: 'var(--font-mono)', fontSize: '0.8rem', padding: '0.35rem 0.45rem' }}
-                              placeholder={priColor}
-                            />
-                          </div>
+                          <BracketThemeEditor
+                            themeColors={{
+                              primaryColor: priColor,
+                              secondaryColor: secColor,
+                              cardColor: cardBg,
+                              textColor: txtColor,
+                              backgroundColor: canvasBg,
+                            }}
+                            textSize={
+                              tier.textSize === 'compact' || tier.textSize === 'small'
+                                ? 'compact'
+                                : tier.textSize === 'large' || tier.textSize === 'xlarge'
+                                ? 'large'
+                                : 'normal'
+                            }
+                            bestOf={tier.bestOf || 5}
+                            onThemeChange={colors => {
+                              updateTier(idx, {
+                                primaryColor: colors.primaryColor,
+                                secondaryColor: colors.secondaryColor,
+                                cardColor: colors.cardColor,
+                                textColor: colors.textColor,
+                                backgroundColor: colors.backgroundColor,
+                              });
+                            }}
+                            onTextSizeChange={size => {
+                              updateTier(idx, { textSize: size });
+                            }}
+                            onReset={() => {
+                              const def = getDefaultTierColors({ id: tier.id, slug: tier.slug, priority: tier.priority || (idx + 1) });
+                              updateTier(idx, {
+                                primaryColor: def.primaryColor,
+                                secondaryColor: def.secondaryColor,
+                                cardColor: def.cardColor,
+                                textColor: def.textColor,
+                                backgroundColor: def.backgroundColor,
+                                textSize: 'normal',
+                              });
+                            }}
+                          />
                         </div>
-
-                        {/* Secondary Accent */}
-                        <div style={{ minWidth: 0 }}>
-                          <label style={{ ...labelStyle, fontSize: '0.72rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }} title="Secondary Accent (Dividers & Winner Bg)">
-                            Secondary Accent
-                          </label>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                            <input
-                              type="color"
-                              value={secColor}
-                              onChange={e => updateTier(idx, { secondaryColor: e.target.value })}
-                              style={{ width: '34px', height: '34px', borderRadius: '4px', border: 'none', cursor: 'pointer', background: 'transparent', flexShrink: 0 }}
-                              title="Choose secondary accent color"
-                            />
-                            <input
-                              type="text"
-                              value={secColor}
-                              onChange={e => updateTier(idx, { secondaryColor: e.target.value })}
-                              style={{ ...inputStyle, minWidth: 0, flex: 1, fontFamily: 'var(--font-mono)', fontSize: '0.8rem', padding: '0.35rem 0.45rem' }}
-                              placeholder={secColor}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Match Card Background (Tertiary) */}
-                        <div style={{ minWidth: 0 }}>
-                          <label style={{ ...labelStyle, fontSize: '0.72rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }} title="Match Card Background (Tertiary Base)">
-                            Match Card Bg
-                          </label>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                            <input
-                              type="color"
-                              value={cardBg}
-                              onChange={e => updateTier(idx, { cardColor: e.target.value })}
-                              style={{ width: '34px', height: '34px', borderRadius: '4px', border: 'none', cursor: 'pointer', background: 'transparent', flexShrink: 0 }}
-                              title="Choose match card base background color"
-                            />
-                            <input
-                              type="text"
-                              value={cardBg}
-                              onChange={e => updateTier(idx, { cardColor: e.target.value })}
-                              style={{ ...inputStyle, minWidth: 0, flex: 1, fontFamily: 'var(--font-mono)', fontSize: '0.8rem', padding: '0.35rem 0.45rem' }}
-                              placeholder={cardBg}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Text Color */}
-                        <div style={{ minWidth: 0 }}>
-                          <label style={{ ...labelStyle, fontSize: '0.72rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }} title="Text & Neutral Elements Color">
-                            Text Color
-                          </label>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                            <input
-                              type="color"
-                              value={txtColor}
-                              onChange={e => updateTier(idx, { textColor: e.target.value })}
-                              style={{ width: '34px', height: '34px', borderRadius: '4px', border: 'none', cursor: 'pointer', background: 'transparent', flexShrink: 0 }}
-                              title="Choose standard text color"
-                            />
-                            <input
-                              type="text"
-                              value={txtColor}
-                              onChange={e => updateTier(idx, { textColor: e.target.value })}
-                              style={{ ...inputStyle, minWidth: 0, flex: 1, fontFamily: 'var(--font-mono)', fontSize: '0.8rem', padding: '0.35rem 0.45rem' }}
-                              placeholder={txtColor}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Canvas Background Color */}
-                        <div style={{ minWidth: 0 }}>
-                          <label style={{ ...labelStyle, fontSize: '0.72rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }} title="Overall Bracket Canvas Background (OBS Isolated)">
-                            Canvas Bg
-                          </label>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                            <input
-                              type="color"
-                              value={canvasBg}
-                              onChange={e => updateTier(idx, { backgroundColor: e.target.value })}
-                              style={{ width: '34px', height: '34px', borderRadius: '4px', border: 'none', cursor: 'pointer', background: 'transparent', flexShrink: 0 }}
-                              title="Choose overall bracket canvas background color"
-                            />
-                            <input
-                              type="text"
-                              value={canvasBg}
-                              onChange={e => updateTier(idx, { backgroundColor: e.target.value })}
-                              style={{ ...inputStyle, minWidth: 0, flex: 1, fontFamily: 'var(--font-mono)', fontSize: '0.8rem', padding: '0.35rem 0.45rem' }}
-                              placeholder={canvasBg}
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 2. Text Size Scaling Option */}
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          flexWrap: 'wrap',
-                          gap: '0.75rem',
-                          padding: '0.65rem 0.85rem',
-                          background: 'var(--color-bg-base)',
-                          borderRadius: 'var(--radius-sm)',
-                          border: '1px solid var(--color-border-subtle)',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <Type size={15} color={priColor} />
-                          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                            Bracket Match Text Size:
-                          </span>
-                          <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
-                            (Scale name, score, seed & flag within player rows)
-                          </span>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
-                          {[
-                            { id: 'small', label: 'Small (88%)', scale: 0.88 },
-                            { id: 'normal', label: 'Normal (Default 100%)', scale: 1.0 },
-                            { id: 'medium', label: 'Medium (110%)', scale: 1.1 },
-                            { id: 'large', label: 'Large (120%)', scale: 1.2 },
-                            { id: 'xlarge', label: 'X-Large (130%)', scale: 1.3 },
-                          ].map(opt => {
-                            const isSelected = Math.abs(previewTextScale - opt.scale) < 0.03 || (!tier.textSize && opt.id === 'normal');
-                            return (
-                              <button
-                                key={opt.id}
-                                type="button"
-                                onClick={() => updateTier(idx, { textSize: opt.id as any })}
-                                style={{
-                                  padding: '0.3rem 0.65rem',
-                                  fontSize: '0.75rem',
-                                  fontWeight: isSelected ? 700 : 500,
-                                  borderRadius: 'var(--radius-sm)',
-                                  border: isSelected ? `1.5px solid ${priColor}` : '1px solid var(--color-border)',
-                                  background: isSelected ? `${priColor}22` : 'var(--color-bg-surface)',
-                                  color: isSelected ? priColor : 'var(--color-text-secondary)',
-                                  cursor: 'pointer',
-                                  transition: 'all 0.15s ease',
-                                }}
-                              >
-                                {opt.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* 3. Live Theme Previews (Compact Row Below Controls Showing All 3 States) */}
-                      <div>
-                        <div style={{ marginBottom: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)', fontWeight: 800 }}>
-                            Live Theme Previews (All 3 Match States)
-                          </span>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
-                            Real Broadcast Scale: 260 × 80 px
-                          </span>
-                        </div>
-
-                        {/* Simulated Canvas Background */}
-                        <div
-                          style={{
-                            background: canvasBg,
-                            padding: '1.25rem',
-                            borderRadius: 'var(--radius-sm)',
-                            border: '1px solid rgba(255, 255, 255, 0.08)',
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                            gap: '1.25rem',
-                            alignItems: 'start',
-                          }}
-                        >
-                          {/* State 1: Inactive Match */}
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
-                            <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                              1. Inactive (Pre-Game)
-                            </span>
-                            <div
-                              style={{
-                                width: '260px',
-                                height: '80px',
-                                borderRadius: '5px',
-                                background: cardBg,
-                                border: `1.5px solid ${secColor}`,
-                                overflow: 'hidden',
-                                boxSizing: 'border-box',
-                                display: 'flex',
-                                flexDirection: 'column',
-                              }}
-                            >
-                              {/* Shelf */}
-                              <div style={{ height: '20px', minHeight: '20px', padding: '0 0.55rem', background: cardBg, fontSize: previewShelfFontSize, color: txtColor, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 500, borderBottom: `1.5px solid ${secColor}`, boxSizing: 'border-box', lineHeight: '20px' }}>
-                                <span>Match #1</span>
-                                <span>Bo{tier.bestOf || 5}</span>
-                              </div>
-                              {/* P1 */}
-                              <div style={{ height: '28px', minHeight: '28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 0.55rem', background: p1ZebraBg, boxSizing: 'border-box' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0 }}>
-                                  <span style={{ width: `${previewSeedDim}px`, height: `${previewSeedDim}px`, minWidth: `${previewSeedDim}px`, background: cardBg, border: `1.5px solid ${secColor}`, color: txtColor, fontWeight: 900, fontSize: previewSeedFontSize, fontFamily: 'monospace', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '3px' }}>1</span>
-                                  <span style={{ fontSize: previewFlagFontSize, lineHeight: 1, flexShrink: 0 }}>🇺🇸</span>
-                                  <span style={{ fontSize: previewNameFontSize, fontWeight: 700, color: txtColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Cheez</span>
-                                </div>
-                                <span style={{ width: `${previewScoreMinW}px`, height: `${previewScoreH}px`, minWidth: `${previewScoreMinW}px`, background: cardBg, border: `1.5px solid ${secColor}`, color: txtColor, fontSize: previewScoreFontSize, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '3px', lineHeight: 1 }}>-</span>
-                              </div>
-                              {/* Divider */}
-                              <div style={{ height: '1.5px', minHeight: '1.5px', background: secColor }} />
-                              {/* P2 */}
-                              <div style={{ height: '28px', minHeight: '28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 0.55rem', background: cardBg, boxSizing: 'border-box' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0 }}>
-                                  <span style={{ width: `${previewSeedDim}px`, height: `${previewSeedDim}px`, minWidth: `${previewSeedDim}px`, background: cardBg, border: `1.5px solid ${secColor}`, color: txtColor, fontWeight: 900, fontSize: previewSeedFontSize, fontFamily: 'monospace', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '3px' }}>4</span>
-                                  <span style={{ fontSize: previewFlagFontSize, lineHeight: 1, flexShrink: 0 }}>🇨🇦</span>
-                                  <span style={{ fontSize: previewNameFontSize, fontWeight: 700, color: txtColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Fractal</span>
-                                </div>
-                                <span style={{ width: `${previewScoreMinW}px`, height: `${previewScoreH}px`, minWidth: `${previewScoreMinW}px`, background: cardBg, border: `1.5px solid ${secColor}`, color: txtColor, fontSize: previewScoreFontSize, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '3px', lineHeight: 1 }}>-</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* State 2: Active Match */}
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
-                            <span style={{ fontSize: '0.68rem', fontWeight: 700, color: priColor, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                              2. Active (Live Ring)
-                            </span>
-                            <div
-                              style={{
-                                width: '260px',
-                                height: '80px',
-                                borderRadius: '5px',
-                                background: cardBg,
-                                border: `2px solid ${priColor}`,
-                                boxShadow: `0 0 16px ${priColor}55`,
-                                overflow: 'hidden',
-                                boxSizing: 'border-box',
-                                display: 'flex',
-                                flexDirection: 'column',
-                              }}
-                            >
-                              {/* Shelf */}
-                              <div style={{ height: '20px', minHeight: '20px', padding: '0 0.55rem', background: cardBg, fontSize: previewShelfFontSize, color: txtColor, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 500, borderBottom: `1.5px solid ${secColor}`, boxSizing: 'border-box', lineHeight: '20px' }}>
-                                <span>Match #1</span>
-                                <span>Bo{tier.bestOf || 5}</span>
-                              </div>
-                              {/* P1 (Leader) */}
-                              <div style={{ height: '28px', minHeight: '28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 0.55rem', background: p1ZebraBg, boxSizing: 'border-box' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0 }}>
-                                  <span style={{ width: `${previewSeedDim}px`, height: `${previewSeedDim}px`, minWidth: `${previewSeedDim}px`, background: cardBg, border: `1.5px solid ${priColor}`, color: priColor, fontWeight: 900, fontSize: previewSeedFontSize, fontFamily: 'monospace', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '3px' }}>1</span>
-                                  <span style={{ fontSize: previewFlagFontSize, lineHeight: 1, flexShrink: 0 }}>🇺🇸</span>
-                                  <span style={{ fontSize: previewNameFontSize, fontWeight: 900, color: priColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Cheez</span>
-                                </div>
-                                <span style={{ width: `${previewScoreMinW}px`, height: `${previewScoreH}px`, minWidth: `${previewScoreMinW}px`, background: priColor, border: 'none', color: cardBg, fontSize: previewScoreFontSize, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '3px', lineHeight: 1 }}>2</span>
-                              </div>
-                              {/* Divider */}
-                              <div style={{ height: '1.5px', minHeight: '1.5px', background: secColor }} />
-                              {/* P2 (Trailer) */}
-                              <div style={{ height: '28px', minHeight: '28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 0.55rem', background: cardBg, boxSizing: 'border-box' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0 }}>
-                                  <span style={{ width: `${previewSeedDim}px`, height: `${previewSeedDim}px`, minWidth: `${previewSeedDim}px`, background: cardBg, border: `1.5px solid ${secColor}`, color: txtColor, fontWeight: 900, fontSize: previewSeedFontSize, fontFamily: 'monospace', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '3px' }}>4</span>
-                                  <span style={{ fontSize: previewFlagFontSize, lineHeight: 1, flexShrink: 0 }}>🇨🇦</span>
-                                  <span style={{ fontSize: previewNameFontSize, fontWeight: 700, color: txtColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Fractal</span>
-                                </div>
-                                <span style={{ width: `${previewScoreMinW}px`, height: `${previewScoreH}px`, minWidth: `${previewScoreMinW}px`, background: 'transparent', border: 'none', color: txtColor, fontSize: previewScoreFontSize, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '3px', lineHeight: 1 }}>1</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* State 3: Finished Match */}
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
-                            <span style={{ fontSize: '0.68rem', fontWeight: 700, color: priColor, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                              3. Finished (Final Result)
-                            </span>
-                            <div
-                              style={{
-                                width: '260px',
-                                height: '80px',
-                                borderRadius: '5px',
-                                background: cardBg,
-                                border: `2px solid ${priColor}`,
-                                boxShadow: `0 0 16px ${priColor}55`,
-                                overflow: 'hidden',
-                                boxSizing: 'border-box',
-                                display: 'flex',
-                                flexDirection: 'column',
-                              }}
-                            >
-                              {/* Shelf (Divider swaps to Primary) */}
-                              <div style={{ height: '20px', minHeight: '20px', padding: '0 0.55rem', background: cardBg, fontSize: previewShelfFontSize, color: txtColor, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 500, borderBottom: `1.5px solid ${priColor}`, boxSizing: 'border-box', lineHeight: '20px' }}>
-                                <span>Match #1</span>
-                                <span>Bo{tier.bestOf || 5}</span>
-                              </div>
-                              {/* P1 (Winner: Secondary background) */}
-                              <div style={{ height: '28px', minHeight: '28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 0.55rem', background: secColor, boxSizing: 'border-box' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0 }}>
-                                  <span style={{ width: `${previewSeedDim}px`, height: `${previewSeedDim}px`, minWidth: `${previewSeedDim}px`, background: cardBg, border: `1.5px solid ${priColor}`, color: priColor, fontWeight: 900, fontSize: previewSeedFontSize, fontFamily: 'monospace', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '3px' }}>1</span>
-                                  <span style={{ fontSize: previewFlagFontSize, lineHeight: 1, flexShrink: 0 }}>🇺🇸</span>
-                                  <span style={{ fontSize: previewNameFontSize, fontWeight: 900, color: priColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Cheez</span>
-                                </div>
-                                <span style={{ width: `${previewScoreMinW}px`, height: `${previewScoreH}px`, minWidth: `${previewScoreMinW}px`, background: priColor, border: 'none', color: cardBg, fontSize: previewScoreFontSize, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '3px', lineHeight: 1 }}>3</span>
-                              </div>
-                              {/* Divider (Swaps to Primary) */}
-                              <div style={{ height: '1.5px', minHeight: '1.5px', background: priColor }} />
-                              {/* P2 (Loser) */}
-                              <div style={{ height: '28px', minHeight: '28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 0.55rem', background: cardBg, boxSizing: 'border-box' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0 }}>
-                                  <span style={{ width: `${previewSeedDim}px`, height: `${previewSeedDim}px`, minWidth: `${previewSeedDim}px`, background: cardBg, border: `1.5px solid ${secColor}`, color: txtColor, fontWeight: 900, fontSize: previewSeedFontSize, fontFamily: 'monospace', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '3px' }}>4</span>
-                                  <span style={{ fontSize: previewFlagFontSize, lineHeight: 1, flexShrink: 0 }}>🇨🇦</span>
-                                  <span style={{ fontSize: previewNameFontSize, fontWeight: 700, color: txtColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Fractal</span>
-                                </div>
-                                <span style={{ width: `${previewScoreMinW}px`, height: `${previewScoreH}px`, minWidth: `${previewScoreMinW}px`, background: 'transparent', border: 'none', color: txtColor, fontSize: previewScoreFontSize, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '3px', lineHeight: 1 }}>1</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                      )}
                 </div>
               );
                 })()}

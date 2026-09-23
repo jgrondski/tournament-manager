@@ -106,14 +106,10 @@ export const OrganizationDirectory: React.FC = () => {
   });
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--color-bg-base, #0c0d12)', padding: '2rem 1.5rem' }}>
-      <div style={{ maxWidth: '1180px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-        
-        {/* Top Global Navigation Bar */}
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <TopNavSwitcher />
-        </div>
+    <div style={{ minHeight: '100vh', background: 'var(--color-bg-base)', padding: '0 0 4rem' }}>
+      <TopNavSwitcher />
 
+      <div style={{ maxWidth: '1180px', width: '100%', margin: '0 auto', padding: '2rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '2rem', boxSizing: 'border-box' }}>
         {/* Header Hero */}
         <header style={{ textAlign: 'center', padding: '1.5rem 1rem 0' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>

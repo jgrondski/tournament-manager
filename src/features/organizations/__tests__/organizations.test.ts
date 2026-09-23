@@ -19,6 +19,13 @@ describe('Organizations Core Engine & Metrics', () => {
     expect(ctwc?.themeColors?.backgroundColor).toBe('#020203');
     expect(ctwc?.defaultRules?.qualFormat).toBe('AVERAGE_OF_X');
     expect(ctwc?.defaultRules?.bestOf).toBe(5);
+
+    // Verify CTWC default tier themes
+    expect(ctwc?.tierThemes).toHaveLength(2);
+    expect(ctwc?.tierThemes?.[0].name).toBe('Silver');
+    expect(ctwc?.tierThemes?.[0].themeColors.primaryColor).toBe('#CBD5E1');
+    expect(ctwc?.tierThemes?.[1].name).toBe('Bronze');
+    expect(ctwc?.tierThemes?.[1].themeColors.primaryColor).toBe('#db5f00');
   });
 
   it('computes accurate organization metrics from hosted tournaments', () => {

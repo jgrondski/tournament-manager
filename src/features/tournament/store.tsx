@@ -19,6 +19,9 @@ import {
 interface TournamentContextType {
   tournaments: Tournament[];
   globalPlayers: PlayerProfile[];
+  activeTournamentId: string | null;
+  activeTournament?: Tournament;
+  setActiveTournamentId: (id: string | null) => void;
   getTournamentBySlug: (slug: string) => Tournament | undefined;
   getTierBySlug: (
     tournamentSlug: string,
@@ -143,6 +146,32 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
     return [];
   });
+
+  const LAST_ACTIVE_TOURNAMENT_KEY = 'tm_last_active_tournament_id';
+  const [activeTournamentId, setActiveTournamentIdState] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(LAST_ACTIVE_TOURNAMENT_KEY);
+    } catch {
+      return null;
+    }
+  });
+
+  const setActiveTournamentId = (id: string | null) => {
+    setActiveTournamentIdState(id);
+    try {
+      if (id) {
+        localStorage.setItem(LAST_ACTIVE_TOURNAMENT_KEY, id);
+      } else {
+        localStorage.removeItem(LAST_ACTIVE_TOURNAMENT_KEY);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const activeTournament = tournaments.find(
+    t => t.id === activeTournamentId || t.slug === activeTournamentId
+  );
 
   useEffect(() => {
     try {
@@ -1057,6 +1086,9 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const deleteTournament = (tournamentId: string) => {
     setTournaments(prev => prev.filter(t => t.id !== tournamentId && t.slug !== tournamentId));
+    if (activeTournamentId === tournamentId || activeTournament?.slug === tournamentId) {
+      setActiveTournamentId(null);
+    }
   };
 
   const addGlobalPlayer = (player: Omit<PlayerProfile, 'id'>): PlayerProfile => {
@@ -1193,6 +1225,9 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       value={{
         tournaments,
         globalPlayers,
+        activeTournamentId,
+        activeTournament,
+        setActiveTournamentId,
         getTournamentBySlug,
         getTierBySlug,
         createTournament,

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Tournament, TournamentTier } from '../features/tournament/types';
 import { useTournament } from '../features/tournament/store';
+import { useOrganization } from '../features/organizations/store';
 import { VerifyBracketModal } from '../features/tournament/components/VerifyBracketModal';
 import {
   Layers,
@@ -19,7 +20,6 @@ import {
   ChevronRight,
   ShieldCheck,
   AlertTriangle,
-  Plus,
   Check,
   Building2,
 } from 'lucide-react';
@@ -54,7 +54,8 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
   isCollapsed: controlledIsCollapsed,
   onToggleCollapse,
 }) => {
-  const { tournaments, unlockBrackets } = useTournament();
+  const { tournaments, unlockBrackets, setActiveTournamentId } = useTournament();
+  const { getOrganizationById } = useOrganization();
   const navigate = useNavigate();
 
   // Internal collapse state with localStorage persistence if not controlled externally
@@ -80,6 +81,13 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
 
   const activeTourney = tournament || tournaments[0];
   const currentTierSlug = activeTier?.slug || activeTourney?.tiers[0]?.slug;
+  const currentOrg = activeTourney?.organizationId ? getOrganizationById(activeTourney.organizationId) : undefined;
+
+  useEffect(() => {
+    if (activeTourney?.id) {
+      setActiveTournamentId(activeTourney.id);
+    }
+  }, [activeTourney?.id, setActiveTournamentId]);
 
   const handleLinkClick = (e: React.MouseEvent, url: string) => {
     if (onNavigate) {
@@ -261,6 +269,50 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
             }}
             data-tournament-menu
           >
+            {/* Circuit Context Tag (Option B) */}
+            {currentOrg && !isCollapsed && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: '0.35rem',
+                  padding: '0 0.15rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', minWidth: 0 }}>
+                  <Building2 size={11} color="var(--color-gold-bright, #ffc905)" />
+                  <span
+                    style={{
+                      fontSize: '0.66rem',
+                      fontWeight: 700,
+                      color: 'var(--color-gold-bright, #ffc905)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                    title={`Tournament circuit: ${currentOrg.name}`}
+                  >
+                    {currentOrg.shortName || currentOrg.name} Circuit
+                  </span>
+                </div>
+                <Link
+                  to={`/org/${currentOrg.slug}`}
+                  style={{
+                    fontSize: '0.65rem',
+                    color: 'var(--color-text-muted, #64748b)',
+                    textDecoration: 'none',
+                    fontWeight: 600,
+                  }}
+                  title="View Organization Dashboard"
+                >
+                  Org Hub ↗
+                </Link>
+              </div>
+            )}
+
             {/* Tournament Selector Dropdown Button */}
             <button
               type="button"
@@ -302,27 +354,82 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
               )}
             </button>
 
-            {/* Dropdown Menu */}
+            {/* Upgraded Workspace & Context Dropdown Menu */}
             {isTournamentMenuOpen && (
               <div
                 style={{
                   position: 'absolute',
                   top: '100%',
                   left: isCollapsed ? '60px' : '0.75rem',
-                  width: '240px',
-                  background: 'var(--color-bg-surface-elevated)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: 'var(--radius-md)',
-                  boxShadow: 'var(--shadow-xl)',
+                  width: '260px',
+                  background: 'var(--color-bg-surface-elevated, #161922)',
+                  border: '1px solid var(--color-border, rgba(255,255,255,0.12))',
+                  borderRadius: 'var(--radius-md, 8px)',
+                  boxShadow: '0 12px 30px rgba(0, 0, 0, 0.65)',
                   zIndex: 200,
                   overflow: 'hidden',
-                  marginTop: '0.25rem',
+                  marginTop: '0.35rem',
                 }}
               >
-                <div style={{ padding: '0.45rem 0.75rem', fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid var(--color-border-subtle)' }}>
-                  Switch Tournament
+                {/* 1. Circuit / Org Header */}
+                {currentOrg && (
+                  <div
+                    style={{
+                      padding: '0.6rem 0.85rem',
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      borderBottom: '1px solid var(--color-border-subtle, rgba(255,255,255,0.06))',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '0.5rem',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0 }}>
+                      <Building2 size={13} color="var(--color-gold-bright, #ffc905)" style={{ flexShrink: 0 }} />
+                      <span
+                        style={{
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          color: '#ffffff',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {currentOrg.name}
+                      </span>
+                    </div>
+                    <Link
+                      to={`/org/${currentOrg.slug}`}
+                      onClick={() => setIsTournamentMenuOpen(false)}
+                      style={{
+                        fontSize: '0.68rem',
+                        color: 'var(--color-gold-bright, #ffc905)',
+                        textDecoration: 'none',
+                        fontWeight: 600,
+                        flexShrink: 0,
+                      }}
+                      title="Open Organization Dashboard"
+                    >
+                      Org Hub →
+                    </Link>
+                  </div>
+                )}
+
+                {/* 2. Switch Tournament List */}
+                <div
+                  style={{
+                    padding: '0.45rem 0.85rem 0.25rem',
+                    fontSize: '0.66rem',
+                    fontWeight: 800,
+                    color: 'var(--color-text-muted, #64748b)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}
+                >
+                  Tournaments ({tournaments.length})
                 </div>
-                <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                <div style={{ maxHeight: '180px', overflowY: 'auto' }}>
                   {tournaments.map(t => {
                     const isSelected = t.id === activeTourney.id;
                     return (
@@ -338,42 +445,102 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          padding: '0.5rem 0.75rem',
-                          fontSize: '0.8rem',
-                          color: isSelected ? 'var(--color-gold-bright)' : 'var(--color-text-primary)',
-                          background: isSelected ? 'var(--color-gold-bg)' : 'transparent',
+                          padding: '0.45rem 0.85rem',
+                          fontSize: '0.78rem',
+                          color: isSelected ? 'var(--color-gold-bright, #ffc905)' : 'var(--color-text-primary, #ffffff)',
+                          background: isSelected ? 'rgba(255, 201, 5, 0.1)' : 'transparent',
                           border: 'none',
                           cursor: 'pointer',
                           textAlign: 'left',
                           fontWeight: isSelected ? 700 : 500,
+                          transition: 'background 0.12s ease',
                         }}
                       >
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {t.name}
                         </span>
-                        {isSelected && <Check size={13} color="var(--color-gold-bright)" style={{ flexShrink: 0 }} />}
+                        {isSelected && <Check size={13} color="var(--color-gold-bright, #ffc905)" style={{ flexShrink: 0 }} />}
                       </button>
                     );
                   })}
                 </div>
-                <div style={{ borderTop: '1px solid var(--color-border-subtle)', padding: '0.35rem' }}>
+
+                {/* 3. Global Views Quick-Hop */}
+                <div
+                  style={{
+                    borderTop: '1px solid var(--color-border-subtle, rgba(255,255,255,0.06))',
+                    background: 'rgba(0, 0, 0, 0.15)',
+                    padding: '0.35rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.15rem',
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: '0.25rem 0.55rem',
+                      fontSize: '0.64rem',
+                      fontWeight: 800,
+                      color: 'var(--color-text-muted, #64748b)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    Global Navigation
+                  </div>
                   <Link
                     to="/"
                     onClick={() => setIsTournamentMenuOpen(false)}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.4rem',
-                      padding: '0.4rem 0.55rem',
-                      borderRadius: 'var(--radius-sm)',
-                      fontSize: '0.75rem',
-                      color: 'var(--color-text-secondary)',
+                      gap: '0.5rem',
+                      padding: '0.35rem 0.55rem',
+                      borderRadius: 'var(--radius-sm, 6px)',
+                      fontSize: '0.74rem',
+                      color: 'var(--color-text-secondary, #94a3b8)',
                       textDecoration: 'none',
                       fontWeight: 600,
                     }}
                   >
-                    <Plus size={13} />
+                    <Trophy size={13} />
                     <span>All Tournaments</span>
+                  </Link>
+                  <Link
+                    to="/organizations"
+                    onClick={() => setIsTournamentMenuOpen(false)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.35rem 0.55rem',
+                      borderRadius: 'var(--radius-sm, 6px)',
+                      fontSize: '0.74rem',
+                      color: 'var(--color-text-secondary, #94a3b8)',
+                      textDecoration: 'none',
+                      fontWeight: 600,
+                    }}
+                  >
+                    <Building2 size={13} />
+                    <span>Organizations Directory</span>
+                  </Link>
+                  <Link
+                    to="/players"
+                    onClick={() => setIsTournamentMenuOpen(false)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.35rem 0.55rem',
+                      borderRadius: 'var(--radius-sm, 6px)',
+                      fontSize: '0.74rem',
+                      color: 'var(--color-text-secondary, #94a3b8)',
+                      textDecoration: 'none',
+                      fontWeight: 600,
+                    }}
+                  >
+                    <Users size={13} />
+                    <span>Global Player Directory</span>
                   </Link>
                 </div>
               </div>

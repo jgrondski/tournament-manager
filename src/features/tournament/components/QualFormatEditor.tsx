@@ -54,7 +54,7 @@ export const QualFormatEditor: React.FC<QualFormatEditorProps> = ({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem', alignItems: 'center' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem', alignItems: 'flex-start' }}>
         <div>
           <label style={labelStyle}>Qualifying Format</label>
           <select

@@ -5,7 +5,7 @@ import { useTournament } from '../../tournament/store';
 import { computeOrganizationMetrics } from '../metrics';
 import { TopNavSwitcher } from '../../../components/TopNavSwitcher';
 import { TierThemeColors } from '../../bracket/colorUtils';
-import { QualFormat, PointsThreshold, DEFAULT_POINTS_THRESHOLDS, OrgTierTheme } from '../../tournament/types';
+import { QualFormat, PointsThreshold, DEFAULT_POINTS_THRESHOLDS, OrgTierTheme, Tournament } from '../../tournament/types';
 import { BracketThemeEditor } from '../../bracket/components/BracketThemeEditor';
 import { QualFormatEditor } from '../../tournament/components/QualFormatEditor';
 import { TournamentCard } from '../../tournament/components/TournamentCard';
@@ -27,12 +27,13 @@ import {
   Trash2,
   Search,
   Layers,
+  AlertTriangle,
 } from 'lucide-react';
 
 export const OrganizationDashboard: React.FC = () => {
   const { orgSlug } = useParams<{ orgSlug: string }>();
   const { updateOrganization, deleteOrganization, getOrganizationBySlug } = useOrganization();
-  const { tournaments } = useTournament();
+  const { tournaments, deleteTournament } = useTournament();
   const navigate = useNavigate();
 
   const org = getOrganizationBySlug(orgSlug || '');
@@ -44,6 +45,14 @@ export const OrganizationDashboard: React.FC = () => {
   const [saveToast, setSaveToast] = useState<string | null>(null);
   const [webhookTestStatus, setWebhookTestStatus] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [tournamentToDelete, setTournamentToDelete] = useState<Tournament | null>(null);
+
+  const confirmDeleteTournament = () => {
+    if (tournamentToDelete) {
+      deleteTournament(tournamentToDelete.id);
+      setTournamentToDelete(null);
+    }
+  };
 
   // Metadata form state
   const [editName, setEditName] = useState(org?.name || '');
@@ -599,6 +608,7 @@ export const OrganizationDashboard: React.FC = () => {
                     key={t.id}
                     tournament={t}
                     showOrgBadge={false}
+                    onDeleteClick={setTournamentToDelete}
                   />
                 ))}
               </div>
@@ -630,7 +640,7 @@ export const OrganizationDashboard: React.FC = () => {
             <div style={{ background: 'var(--color-bg-surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)', padding: '1.5rem' }}>
               <div style={{ marginBottom: '1.25rem' }}>
                 <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#ffffff', margin: '0 0 0.25rem' }}>
-                  Primary Championship Bracket Theme
+                  Primary Theme Colors
                 </h3>
                 <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', margin: 0 }}>
                   Default 5-color architecture for premier Gold championship brackets across all circuit events.
@@ -1068,6 +1078,88 @@ export const OrganizationDashboard: React.FC = () => {
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Tournament Confirmation Modal */}
+      {tournamentToDelete && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.75)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1rem',
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--color-bg-surface)',
+              borderRadius: 'var(--radius-lg)',
+              border: '1px solid rgba(239, 68, 68, 0.4)',
+              width: '100%',
+              maxWidth: '480px',
+              overflow: 'hidden',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            }}
+          >
+            <div
+              style={{
+                padding: '1.25rem 1.5rem',
+                borderBottom: '1px solid var(--color-border)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                background: 'rgba(239, 68, 68, 0.08)',
+              }}
+            >
+              <AlertTriangle size={22} color="#ef4444" />
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#ffffff', margin: 0 }}>
+                Delete Tournament
+              </h3>
+            </div>
+
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <p style={{ fontSize: '0.95rem', color: 'var(--color-text-secondary)', lineHeight: 1.5, margin: 0 }}>
+                Are you sure you want to delete <strong style={{ color: '#ffffff' }}>{tournamentToDelete.name}</strong>?
+              </p>
+              <p style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', lineHeight: 1.4, margin: 0 }}>
+                This tournament has no recorded matches or qualifiers and will be permanently removed. This action cannot be undone.
+              </p>
+            </div>
+
+            <div
+              style={{
+                padding: '1rem 1.5rem',
+                background: 'var(--color-bg-surface-elevated)',
+                borderTop: '1px solid var(--color-border)',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '0.75rem',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setTournamentToDelete(null)}
+                className="btn btn-secondary"
+                style={{ padding: '0.5rem 1rem' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteTournament}
+                className="btn btn-danger"
+                style={{ padding: '0.5rem 1.25rem' }}
+              >
+                Delete Tournament
+              </button>
+            </div>
           </div>
         </div>
       )}

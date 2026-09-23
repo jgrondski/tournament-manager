@@ -97,7 +97,7 @@ export interface TournamentTier {
   cardColor?: string; // Background for match cards / player names
   textColor?: string; // Standard text and neutral elements color
   backgroundColor?: string; // Overall background for the entire bracket canvas
-  textSize?: 'small' | 'normal' | 'medium' | 'large' | 'xlarge' | number; // Bracket text size scaling
+  textSize?: 'compact' | 'normal' | 'large' | 'small' | 'medium' | 'xlarge' | number; // Bracket text size scaling
   bracket: BracketStructure;
   isLocked: boolean;
   roundBestOfOverrides?: Record<number, number>; // Key: roundNumber (1, 2, ...), Value: bestOf (1..99)

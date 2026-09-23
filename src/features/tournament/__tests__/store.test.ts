@@ -49,4 +49,18 @@ describe('Tournament Data Store & Mock State', () => {
 
     expect(updatedBracket.matchesById[r1Match1.id].winnerId).toBe(p1.id);
   });
+
+  it('resolves active tournament by id or slug correctly', () => {
+    const tournaments = createInitialTournaments();
+    const target = tournaments[0];
+
+    const activeById = tournaments.find(t => t.id === target.id || t.slug === target.id);
+    expect(activeById?.id).toBe(target.id);
+
+    const activeBySlug = tournaments.find(t => t.id === target.slug || t.slug === target.slug);
+    expect(activeBySlug?.id).toBe(target.id);
+
+    const nonExistent = tournaments.find(t => t.id === 'invalid-id' || t.slug === 'invalid-id');
+    expect(nonExistent).toBeUndefined();
+  });
 });

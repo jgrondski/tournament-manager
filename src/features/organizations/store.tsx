@@ -22,25 +22,25 @@ export const DEFAULT_ORGANIZATIONS: Organization[] = [
     },
     tierThemes: [
       {
-        id: 'theme_ctwc_gold',
-        name: 'Primary Tier (Gold Championship)',
+        id: 'theme_ctwc_silver',
+        name: 'Silver',
         themeColors: {
-          primaryColor: '#ffc905',
-          secondaryColor: '#705b33',
-          cardColor: '#1b1c1d',
-          textColor: '#94A3B8',
-          backgroundColor: '#020203',
+          primaryColor: '#CBD5E1',
+          secondaryColor: '#3d4652',
+          cardColor: '#0E1420',
+          textColor: '#4f5c6d',
+          backgroundColor: '#0B0E14',
         },
       },
       {
-        id: 'theme_ctwc_silver',
-        name: 'Secondary Tier (Silver Bracket)',
+        id: 'theme_ctwc_bronze',
+        name: 'Bronze',
         themeColors: {
-          primaryColor: '#94a3b8',
-          secondaryColor: '#475569',
-          cardColor: '#181920',
-          textColor: '#cbd5e1',
-          backgroundColor: '#08090d',
+          primaryColor: '#db5f00',
+          secondaryColor: '#4e310e',
+          cardColor: '#181410',
+          textColor: '#5e6f87',
+          backgroundColor: '#0B0E14',
         },
       },
     ],
@@ -148,19 +148,21 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             .map((o: any) => ({
               ...o,
               shortName: o.shortName || (o.slug ? o.slug.toUpperCase() : o.name),
-              tierThemes: o.tierThemes && o.tierThemes.length > 0 ? o.tierThemes : [
-                {
-                  id: `theme_${o.id}_primary`,
-                  name: 'Primary Tier',
-                  themeColors: o.themeColors || o.branding?.themeColors || {
-                    primaryColor: o.brandColor || '#ffc905',
-                    secondaryColor: '#705b33',
-                    cardColor: '#1b1c1d',
-                    textColor: '#94A3B8',
-                    backgroundColor: '#020203',
-                  },
-                },
-              ],
+              tierThemes: (o.id === 'org_ctwc' && (o.tierThemes?.some((t: any) => t.id === 'theme_ctwc_gold') || !o.tierThemes?.some((t: any) => t.name === 'Bronze')))
+                ? DEFAULT_ORGANIZATIONS[0].tierThemes
+                : (o.tierThemes && o.tierThemes.length > 0 ? o.tierThemes : [
+                    {
+                      id: `theme_${o.id}_primary`,
+                      name: 'Primary Tier',
+                      themeColors: o.themeColors || o.branding?.themeColors || {
+                        primaryColor: o.brandColor || '#ffc905',
+                        secondaryColor: '#705b33',
+                        cardColor: '#1b1c1d',
+                        textColor: '#94A3B8',
+                        backgroundColor: '#020203',
+                      },
+                    },
+                  ]),
               branding: o.branding || {
                 logoUrl: o.logoUrl,
                 bannerUrl: o.bannerUrl,
