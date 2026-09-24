@@ -24,7 +24,7 @@ The system prioritizes human readability, deterministic rules, minimal runtime o
     * **Adaptive Qual Board:** Automatically toggles between a clean, pure qual board (no seed column, neutral styling) when 0 tiers exist, and full tiered bracket preview with tier cutoff dividers and rank tinting once tiers are added.
     * **3-State Qualifier Status Engine:** Tracks competitors across `'not started'` (0 attempts), `'in progress'` (1+ attempts), and `'verified'` (judge-verified), with verification toggles in the leaderboard and profile drawer, and auto-verification on bracket lock.
     * **Navigation & Visual Polish:** Top navbar aligned with bracket operations on the left and tournament management on the right; dedicated sub-bar for tier tabs; 1080p zero-scroll auto-fit and split-wings OBS broadcast overlays with chroma key presets (`/:slug/obs`); and dynamic SVG orthogonal bracket connector lines.
-* **Phase 4: Tournament Organizations (Active Goal - Highest Priority)**
+* **Phase 4: Tournament Organizations (Complete)**
   * Full organization management layer:
     * Required organization association for all tournaments (every tournament must belong to an organization).
     * Dedicated Organization Directory (`/organizations`) and Organization Detail/Settings page (`/org/:orgSlug`).
@@ -33,7 +33,7 @@ The system prioritizes human readability, deterministic rules, minimal runtime o
     * Org-level branding and default rules inheritance with per-tournament override toggles.
     * Org-level Discord webhook configuration with per-tournament fallback.
     * Raw multi-entity metric indexing: every score submission, match record, and tournament roster entry explicitly associates `(organizationId, playerId, tournamentId)`.
-* **Phase 5: Double Elimination Bracket Engine (3rd Highest Priority)**
+* **Phase 5: Double Elimination Bracket Engine (Active Goal - Highest Priority)**
   * Comprehensive double-elimination routing:
     * Retain `bracketType: 'TRADITIONAL' | 'FLAT'`; introduce independent `eliminationType: 'SINGLE' | 'DOUBLE'`.
     * Standard cascading loser drop routing across both Traditional and Flat brackets (Winners R1/R2 losers feed Losers ladder).
@@ -205,7 +205,7 @@ The system prioritizes human readability, deterministic rules, minimal runtime o
 
 ---
 
-## 6. Phase 4 Detailed Specifications: Tournament Organizations (Active Goal)
+## 6. Phase 4 Detailed Specifications: Tournament Organizations (Complete)
 
 ### 6.1 Core Entity & Store Architecture
 * **Entity Definition:**
@@ -254,7 +254,7 @@ The system prioritizes human readability, deterministic rules, minimal runtime o
 
 ---
 
-## 7. Phase 5 Detailed Specifications: Double Elimination Bracket Engine
+## 7. Phase 5 Detailed Specifications: Double Elimination Bracket Engine (Active Goal)
 
 ### 7.1 Tier Configuration & Types
 * `TournamentTier` model updated with independent elimination style:
