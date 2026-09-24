@@ -35,7 +35,7 @@ export const TournamentSwitcherPage: React.FC = () => {
             </span>
           </div>
           <h1 style={{ fontSize: '2.5rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.03em', marginBottom: '0.75rem' }}>
-            Live Regional Tournament Portal
+            Tournaments
           </h1>
           <p style={{ fontSize: '1.1rem', color: 'var(--color-text-secondary)', maxWidth: '650px', margin: '0 auto 1.5rem' }}>
             Organizer command center, public broadcast brackets, and mobile floor judge portal for competitive gaming tournaments.

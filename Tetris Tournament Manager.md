@@ -56,6 +56,9 @@ The system prioritizes human readability, deterministic rules, minimal runtime o
 * **Phase 8: Production Deployment, PIN Security & Polish (Upcoming)**
   * Shared Passphrase (PIN) gating all `/manage/*` routes.
   * Vercel edge deployment and custom domain routing.
+* **Future Polish & Mobile View Backlog (Detailed in Section 11):**
+  * Publicly-accessible, mobile-friendly read-only bracket view with multi-view toggles (`Full Bracket`, `Mobile Bracket`, `Split Bracket`) and sharing links.
+  * Mobile-responsive overhauls for the 4 data-dense views (Qualifiers, Standings, Roster, Global Players) and compact 360×800 global navigation & breadcrumbs.
 
 ---
 
@@ -368,3 +371,40 @@ All entities include `id` (UUID) and `created_at` (timestamp).
 * **OBS Broadcast Displays (Complete in Phase 3):** Clean 16:9 transparent canvases with chroma key presets, auto-fit, and split wings.
 * **Bracket Visuals (Complete in Phase 3):** Dynamic SVG orthogonal connector lines connecting feeder matches to downstream round nodes.
 * **Hosting:** Vercel edge deployment and custom domain setup.
+
+---
+
+## 11. Implementation Details & Backlog to Revisit Later
+
+### 11.1 Public-Facing, Mobile-Friendly Read-Only Bracket & Multi-View Display
+* **Spectator & Floor Read-Only Bracket View:**
+  * Publicly accessible, mobile-friendly read-only bracket view designed for sharing with competitors, spectators, and stream viewers.
+  * Mirrored after the Floor Judge view: displays full bracket trees, real-time match statuses, game scores, intentional topouts, and participant stats, but strictly with **no edit permissions** (no score editing inputs or administrative modals).
+  * All items remain interactive and clickable: clicking any competitor opens their `PlayerDetailDrawer` or match history; clicking a match node opens full game-by-game telemetry.
+* **Multi-View Display Toggle:**
+  * Dedicated switcher button allowing users and spectators to toggle dynamically between 3 layout modes:
+    1. **Full Bracket:** Panoramic pan/zoom SVG visualizer for desktop displays and large tablets.
+    2. **Mobile Bracket:** Vertically-stacked, responsive card-based progression feed optimized for handheld smartphone viewports.
+    3. **Split Bracket:** Divided wings layout (e.g. upper/lower or left/right halves converging on the finals node) tailored for medium screens, tablet viewports, and broadcast split scenes.
+* **Streamlined Shareability:**
+  * Prominent "Share Bracket" button generating clean, direct URLs (e.g. `/:slug/bracket` or `/:slug/view`) with copy-to-clipboard shortcut and optional QR code generation for venue spectators.
+
+### 11.2 Mobile-Friendly Responsive Overhaul (Target: 360×800 Viewport)
+* **High-Priority Data-Dense Views (Prevent Information Truncation):**
+  * Several desktop tables conceal vital competitive data on small phone viewports. Dedicated mobile-first card/accordion layouts are needed for:
+    1. **Qualifiers Leaderboard (`/tournaments/:slug/qualifiers`):**
+       * Replace wide multi-column table overflow with compact competitor cards.
+       * Guarantee Rank, Player Name, Playstyle, Status indicator, and Scores (High Score, Maxout count, Kicker, or Average of X attempt chips) remain fully visible without horizontal clipping.
+    2. **Final Standings (`/tournaments/:slug/standings`):**
+       * Mobile card rows preserving Final Rank, Competitor info, Qual Seed + Delta badge, Stage Reached, and Game Score Average.
+    3. **Tournament Competitor Roster (`/tournaments/:slug/manage/players`):**
+       * Handheld list layout keeping player name, playstyle, PB, seed/tier assignment, and action buttons cleanly stacked.
+    4. **Global Players Directory (`/players`):**
+       * Responsive competitor cards displaying Personal Best (PB), playstyle, active tournament participation, and search/filter controls without squished table headers.
+    5. **Other Pages:** General responsive polish across remaining admin, organization, and settings pages.
+* **Global Navigation & Breadcrumb Mobile Adaptability:**
+  * The global header (`Tournaments` | `Organizations` | `Players`), active tournament teleport chip, and breadcrumb trail currently exceed 360px width, causing wrap overflow and layout displacement on standard mobile devices (e.g., 360×800).
+  * **Planned Responsive Solutions:**
+    * Implement a compact hamburger menu or mobile tab bar when viewport width $< 768\text{px}$.
+    * Collapse breadcrumbs into an icon-only or single-tier `← Back` link on small screens.
+    * Dynamically truncate or iconify the active tournament return chip on mobile viewports.

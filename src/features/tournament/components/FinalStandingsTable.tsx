@@ -57,6 +57,7 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
   // Derive summary metrics
   const totalCompetitors = globalRows.length;
   const championRow = globalRows.find(r => r.finalRank === 1);
+  const champThemeColor = championRow?.tier?.primaryColor || tournament.tiers[0]?.primaryColor || 'var(--color-gold-bright)';
   const completedMatchesCount = useMemo(() => {
     return Object.values(tournament.matchScores || {}).filter(m => m.isComplete).length;
   }, [tournament.matchScores]);
@@ -298,15 +299,15 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
         <div
           style={{
             background: championRow
-              ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.16) 0%, rgba(245, 158, 11, 0.04) 100%)'
+              ? `linear-gradient(135deg, ${colorWithAlpha(champThemeColor, 0.16, 'rgba(245, 158, 11, 0.16)')} 0%, ${colorWithAlpha(champThemeColor, 0.04, 'rgba(245, 158, 11, 0.04)')} 100%)`
               : 'var(--color-bg-surface)',
-            border: championRow ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid var(--color-border)',
+            border: championRow ? `1px solid ${colorWithAlpha(champThemeColor, 0.4, 'rgba(245, 158, 11, 0.4)')}` : '1px solid var(--color-border)',
             borderRadius: 'var(--radius-lg)',
             padding: '1.1rem 1.25rem',
             display: 'flex',
             alignItems: 'center',
             gap: '1rem',
-            boxShadow: championRow ? '0 0 15px rgba(245, 158, 11, 0.12)' : 'none',
+            boxShadow: championRow ? `0 0 15px ${colorWithAlpha(champThemeColor, 0.12, 'rgba(245, 158, 11, 0.12)')}` : 'none',
           }}
         >
           <div
@@ -314,11 +315,11 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
               width: '44px',
               height: '44px',
               borderRadius: '50%',
-              background: championRow ? 'rgba(245, 158, 11, 0.2)' : 'var(--color-bg-surface-elevated)',
+              background: championRow ? colorWithAlpha(champThemeColor, 0.2, 'rgba(245, 158, 11, 0.2)') : 'var(--color-bg-surface-elevated)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: championRow ? 'var(--color-gold-bright)' : 'var(--color-text-muted)',
+              color: championRow ? champThemeColor : 'var(--color-text-muted)',
               flexShrink: 0,
             }}
           >
@@ -332,7 +333,7 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
               style={{
                 fontSize: '1.1rem',
                 fontWeight: 800,
-                color: championRow ? 'var(--color-gold-bright)' : 'var(--color-text-secondary)',
+                color: championRow ? champThemeColor : 'var(--color-text-secondary)',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
@@ -695,7 +696,6 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
                   {/* Competitor Rows */}
                   {section.rows.map((row, idx) => {
                     const isOverallChamp = row.finalRank === 1;
-                    const isRunnerUp = row.finalRank === 2;
                     const isTierChamp = !isOverallChamp && row.eliminationRound === 'Champion';
                     const tierColor = row.tier?.primaryColor || section.color || '#f59e0b';
 
@@ -816,15 +816,15 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
                                     fontWeight: 700,
                                     padding: '0.1rem 0.4rem',
                                     borderRadius: 'var(--radius-sm)',
-                                    background: 'rgba(255, 210, 0, 0.18)',
-                                    color: 'var(--color-gold-bright)',
-                                    border: '1px solid rgba(255, 210, 0, 0.4)',
+                                    background: colorWithAlpha(tierColor, 0.18, 'rgba(255, 255, 255, 0.08)'),
+                                    color: tierColor,
+                                    border: `1px solid ${colorWithAlpha(tierColor, 0.4, 'rgba(255, 255, 255, 0.2)')}`,
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '0.2rem',
                                   }}
                                 >
-                                  <Trophy size={11} /> Champ
+                                  <Trophy size={11} /> Champion
                                 </span>
                               )}
 
@@ -835,12 +835,15 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
                                     fontWeight: 700,
                                     padding: '0.1rem 0.4rem',
                                     borderRadius: 'var(--radius-sm)',
-                                    background: `${tierColor}22`,
+                                    background: colorWithAlpha(tierColor, 0.18, 'rgba(255, 255, 255, 0.08)'),
                                     color: tierColor,
-                                    border: `1px solid ${tierColor}55`,
+                                    border: `1px solid ${colorWithAlpha(tierColor, 0.4, 'rgba(255, 255, 255, 0.2)')}`,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.2rem',
                                   }}
                                 >
-                                  {row.tier?.name} Winner
+                                  <Trophy size={11} /> {row.tier?.name} Winner
                                 </span>
                               )}
                             </div>
@@ -908,7 +911,7 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
                             </div>
 
                             {row.qualScore !== undefined && (
-                              <span className="tabular-nums" style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
+                              <span className="tabular-nums" style={{ fontSize: '0.72rem', color: row.tier ? tierColor : 'var(--color-text-muted)' }}>
                                 {row.qualScore.toLocaleString()} pts
                               </span>
                             )}
@@ -924,24 +927,19 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
                               borderRadius: 'var(--radius-sm)',
                               fontSize: '0.75rem',
                               fontWeight: 700,
-                              background: isOverallChamp
-                                ? 'rgba(245, 158, 11, 0.2)'
-                                : isRunnerUp
-                                ? 'rgba(56, 189, 248, 0.15)'
-                                : isTierChamp
-                                ? colorWithAlpha(tierColor, 0.2, 'rgba(245, 158, 11, 0.15)')
+                              background: row.tier
+                                ? colorWithAlpha(tierColor, 0.16, 'rgba(255, 255, 255, 0.06)')
                                 : row.isDisqualified
                                 ? 'rgba(239, 68, 68, 0.15)'
                                 : 'rgba(255, 255, 255, 0.06)',
-                              color: isOverallChamp
-                                ? 'var(--color-gold-bright)'
-                                : isRunnerUp
-                                ? '#38bdf8'
-                                : isTierChamp
+                              color: row.tier
                                 ? tierColor
                                 : row.isDisqualified
                                 ? '#fca5a5'
                                 : 'var(--color-text-secondary)',
+                              border: row.tier
+                                ? `1px solid ${colorWithAlpha(tierColor, 0.32, 'rgba(255, 255, 255, 0.1)')}`
+                                : '1px solid transparent',
                             }}
                           >
                             {row.eliminationRound || 'Participant'}
@@ -953,16 +951,13 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
                           {row.exitDetails ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                {isOverallChamp ? (
-                                  <span style={{ fontSize: '0.82rem', color: 'var(--color-gold-bright)', fontWeight: 700 }}>
-                                    👑 {row.exitDetails.scoreDisplay}
-                                  </span>
-                                ) : isTierChamp ? (
-                                  <span style={{ fontSize: '0.82rem', color: tierColor, fontWeight: 700 }}>
-                                    🏆 {row.exitDetails.scoreDisplay}
+                                {isOverallChamp || isTierChamp ? (
+                                  <span style={{ fontSize: '0.82rem', color: tierColor, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                                    <Trophy size={12} />
+                                    {row.exitDetails.scoreDisplay}
                                   </span>
                                 ) : (
-                                  <span className="tabular-nums" style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                                  <span className="tabular-nums" style={{ fontWeight: 700, color: row.tier ? tierColor : 'var(--color-text-primary)' }}>
                                     {row.exitDetails.scoreDisplay}
                                   </span>
                                 )}
@@ -985,18 +980,18 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
                                 )}
                               </div>
                               <div className="tabular-nums" style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
-                                Loss Avg: <strong style={{ color: 'var(--color-text-secondary)' }}>
+                                Loss Avg: <strong style={{ color: row.tier ? tierColor : 'var(--color-text-secondary)' }}>
                                   {row.exitDetails.avgLossScore > 0 ? row.exitDetails.avgLossScore.toLocaleString() : '—'}
                                 </strong>
                               </div>
                             </div>
                           ) : isOverallChamp ? (
-                            <div style={{ fontSize: '0.82rem', color: 'var(--color-gold-bright)', fontWeight: 600 }}>
-                              👑 Undefeated Champion
+                            <div style={{ fontSize: '0.82rem', color: tierColor, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                              <Trophy size={13} /> Undefeated Champion
                             </div>
                           ) : isTierChamp ? (
-                            <div style={{ fontSize: '0.82rem', color: tierColor, fontWeight: 600 }}>
-                              Bracket Champion
+                            <div style={{ fontSize: '0.82rem', color: tierColor, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                              <Trophy size={13} /> Bracket Champion
                             </div>
                           ) : row.isDNQ ? (
                             <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
@@ -1043,7 +1038,7 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
                         <td style={{ ...tdStyle, textAlign: 'right', paddingRight: '1.25rem' }}>
                           {row.stats.overallGameAvg > 0 ? (
                             <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                              <span className="tabular-nums" style={{ fontWeight: 700, color: 'var(--color-text-primary)', fontSize: '0.88rem' }}>
+                              <span className="tabular-nums" style={{ fontWeight: 700, color: row.tier ? tierColor : 'var(--color-gold-bright)', fontSize: '0.95rem' }}>
                                 {row.stats.overallGameAvg.toLocaleString()}
                               </span>
                               <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>

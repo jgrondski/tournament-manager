@@ -10,6 +10,7 @@ interface PlayerEditModalProps {
   onSave: (player: Omit<PlayerProfile, 'id'>) => void;
   initialPlayer?: PlayerProfile | null;
   existingNames: string[];
+  allowDisqualify?: boolean;
 }
 
 export const PlayerEditModal: React.FC<PlayerEditModalProps> = ({
@@ -18,6 +19,7 @@ export const PlayerEditModal: React.FC<PlayerEditModalProps> = ({
   onSave,
   initialPlayer,
   existingNames,
+  allowDisqualify = false,
 }) => {
   const [name, setName] = useState('');
   const [country, setCountry] = useState('');
@@ -75,7 +77,7 @@ export const PlayerEditModal: React.FC<PlayerEditModalProps> = ({
       personalBest: pbNum,
       playstyle,
       notes: notes.trim() || undefined,
-      isDisqualified,
+      isDisqualified: allowDisqualify ? isDisqualified : false,
     });
     onClose();
   };
@@ -324,35 +326,37 @@ export const PlayerEditModal: React.FC<PlayerEditModalProps> = ({
               />
             </div>
 
-            {/* Disqualification Flag */}
-            <div
-              style={{
-                padding: '0.75rem 1rem',
-                background: isDisqualified ? 'rgba(239, 68, 68, 0.1)' : 'var(--color-bg-base)',
-                border: isDisqualified ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid var(--color-border-subtle)',
-                borderRadius: 'var(--radius-sm)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                cursor: 'pointer',
-              }}
-              onClick={() => setIsDisqualified(!isDisqualified)}
-            >
-              <input
-                type="checkbox"
-                id="is-dq-checkbox"
-                checked={isDisqualified}
-                onChange={e => setIsDisqualified(e.target.checked)}
-                style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-              />
-              <label
-                htmlFor="is-dq-checkbox"
-                onClick={e => e.stopPropagation()}
-                style={{ fontSize: '0.85rem', color: isDisqualified ? '#f87171' : 'var(--color-text-secondary)', cursor: 'pointer' }}
+            {/* Disqualification Flag - only enabled for tournament view */}
+            {allowDisqualify && (
+              <div
+                style={{
+                  padding: '0.75rem 1rem',
+                  background: isDisqualified ? 'rgba(239, 68, 68, 0.1)' : 'var(--color-bg-base)',
+                  border: isDisqualified ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid var(--color-border-subtle)',
+                  borderRadius: 'var(--radius-sm)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  cursor: 'pointer',
+                }}
+                onClick={() => setIsDisqualified(!isDisqualified)}
               >
-                <strong>Mark Competitor as Disqualified</strong> (moves competitor to bottom of tournament standings)
-              </label>
-            </div>
+                <input
+                  type="checkbox"
+                  id="is-dq-checkbox"
+                  checked={isDisqualified}
+                  onChange={e => setIsDisqualified(e.target.checked)}
+                  style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                />
+                <label
+                  htmlFor="is-dq-checkbox"
+                  onClick={e => e.stopPropagation()}
+                  style={{ fontSize: '0.85rem', color: isDisqualified ? '#f87171' : 'var(--color-text-secondary)', cursor: 'pointer' }}
+                >
+                  <strong>Mark Competitor as Disqualified</strong> (moves competitor to bottom of tournament standings)
+                </label>
+              </div>
+            )}
           </div>
 
           {/* Footer */}

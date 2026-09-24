@@ -269,7 +269,7 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
             }}
             data-tournament-menu
           >
-            {/* Circuit Context Tag (Option B) */}
+            {/* Org Shortcut Chip */}
             {currentOrg && !isCollapsed && (
               <div
                 style={{
@@ -280,11 +280,21 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
                   padding: '0 0.15rem',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', minWidth: 0 }}>
+                <Link
+                  to={`/org/${currentOrg.slug}`}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    minWidth: 0,
+                    textDecoration: 'none',
+                  }}
+                  title={`View Organization: ${currentOrg.name}`}
+                >
                   <Building2 size={11} color="var(--color-gold-bright, #ffc905)" />
                   <span
                     style={{
-                      fontSize: '0.66rem',
+                      fontSize: '0.68rem',
                       fontWeight: 700,
                       color: 'var(--color-gold-bright, #ffc905)',
                       textTransform: 'uppercase',
@@ -293,11 +303,10 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
                     }}
-                    title={`Tournament circuit: ${currentOrg.name}`}
                   >
-                    {currentOrg.shortName || currentOrg.name} Circuit
+                    {currentOrg.shortName || currentOrg.slug.toUpperCase()}
                   </span>
-                </div>
+                </Link>
                 <Link
                   to={`/org/${currentOrg.slug}`}
                   style={{
@@ -306,7 +315,7 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
                     textDecoration: 'none',
                     fontWeight: 600,
                   }}
-                  title="View Organization Dashboard"
+                  title={`View ${currentOrg.name} Dashboard`}
                 >
                   Org Hub ↗
                 </Link>

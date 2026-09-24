@@ -14,7 +14,6 @@ import {
   Trash2,
   Edit2,
   Trophy,
-  AlertOctagon,
   AlertTriangle,
   X,
   ArrowUpDown,
@@ -82,10 +81,7 @@ export const PlayerDirectory: React.FC = () => {
           }
         }
 
-        // Playstyle / Status filter
-        if (playstyleFilter === 'DQ') {
-          return Boolean(p.isDisqualified);
-        }
+        // Playstyle filter
         if (playstyleFilter !== 'ALL') {
           return p.playstyle === playstyleFilter;
         }
@@ -120,7 +116,6 @@ export const PlayerDirectory: React.FC = () => {
     let rollingCount = 0;
     let dasCount = 0;
     let hypertapCount = 0;
-    let dqCount = 0;
     let maxPb = 0;
     let maxPbPlayer = '';
     let pbSum = 0;
@@ -129,8 +124,6 @@ export const PlayerDirectory: React.FC = () => {
       if (p.playstyle === 'Rolling') rollingCount++;
       else if (p.playstyle === 'DAS') dasCount++;
       else if (p.playstyle === 'Hypertap') hypertapCount++;
-
-      if (p.isDisqualified) dqCount++;
 
       const pb = p.personalBest || 0;
       pbSum += pb;
@@ -147,7 +140,6 @@ export const PlayerDirectory: React.FC = () => {
       rollingCount,
       dasCount,
       hypertapCount,
-      dqCount,
       maxPb,
       maxPbPlayer,
       avgPb,
@@ -219,7 +211,7 @@ export const PlayerDirectory: React.FC = () => {
             </h1>
           </div>
           <p style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', marginTop: '0.35rem' }}>
-            Master directory of competitive players, manual personal bests, playstyles, and metadata stored in <code style={{ color: 'var(--color-gold-bright)', background: 'rgba(245, 158, 11, 0.1)', padding: '0.15rem 0.35rem', borderRadius: '4px' }}>classic_tetris_global_players</code>.
+            Master directory of competitive players, manual personal bests, and playstyles.
           </p>
         </div>
 
@@ -361,8 +353,8 @@ export const PlayerDirectory: React.FC = () => {
           <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--color-text-primary)', fontFamily: 'monospace' }}>
             {stats.avgPb > 0 ? stats.avgPb.toLocaleString() : '—'}
           </div>
-          <div style={{ fontSize: '0.75rem', color: stats.dqCount > 0 ? '#f87171' : 'var(--color-text-muted)' }}>
-            {stats.dqCount > 0 ? `${stats.dqCount} player(s) currently disqualified` : 'All players in good standing'}
+          <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+            Across {stats.total} registered competitors
           </div>
         </div>
       </div>
@@ -434,7 +426,6 @@ export const PlayerDirectory: React.FC = () => {
             { key: 'Rolling', label: 'Rolling' },
             { key: 'DAS', label: 'DAS' },
             { key: 'Hypertap', label: 'Hypertap' },
-            { key: 'DQ', label: 'Disqualified' },
           ].map(f => (
             <button
               key={f.key}
@@ -597,7 +588,7 @@ export const PlayerDirectory: React.FC = () => {
                       key={player.id}
                       style={{
                         borderBottom: '1px solid var(--color-border-subtle)',
-                        background: player.isDisqualified ? 'rgba(239, 68, 68, 0.05)' : 'transparent',
+                        background: 'transparent',
                         transition: 'background 0.15s ease',
                       }}
                     >
@@ -705,38 +696,19 @@ export const PlayerDirectory: React.FC = () => {
 
                       {/* Status */}
                       <td style={{ padding: '0.75rem 1rem' }}>
-                        {player.isDisqualified ? (
-                          <span
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.25rem',
-                              padding: '0.2rem 0.5rem',
-                              borderRadius: 'var(--radius-sm)',
-                              fontSize: '0.7rem',
-                              fontWeight: 700,
-                              background: 'rgba(239, 68, 68, 0.15)',
-                              color: '#f87171',
-                              border: '1px solid rgba(239, 68, 68, 0.4)',
-                            }}
-                          >
-                            <AlertOctagon size={12} /> Disqualified
-                          </span>
-                        ) : (
-                          <span
-                            style={{
-                              display: 'inline-block',
-                              padding: '0.2rem 0.5rem',
-                              borderRadius: 'var(--radius-sm)',
-                              fontSize: '0.7rem',
-                              fontWeight: 600,
-                              background: 'rgba(34, 197, 94, 0.1)',
-                              color: '#4ade80',
-                            }}
-                          >
-                            Active
-                          </span>
-                        )}
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            padding: '0.2rem 0.5rem',
+                            borderRadius: 'var(--radius-sm)',
+                            fontSize: '0.7rem',
+                            fontWeight: 600,
+                            background: 'rgba(34, 197, 94, 0.1)',
+                            color: '#4ade80',
+                          }}
+                        >
+                          Active
+                        </span>
                       </td>
 
                       {/* Notes */}
@@ -805,6 +777,7 @@ export const PlayerDirectory: React.FC = () => {
         onSave={handleSavePlayer}
         initialPlayer={editingPlayer}
         existingNames={existingNames}
+        allowDisqualify={false}
       />
 
       {/* Delete Single Player Speedbump Modal */}

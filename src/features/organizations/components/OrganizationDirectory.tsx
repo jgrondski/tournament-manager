@@ -131,7 +131,7 @@ export const OrganizationDirectory: React.FC = () => {
             </span>
           </div>
           <h1 style={{ fontSize: '2.4rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.03em', marginBottom: '0.75rem' }}>
-            Competitive Leagues & Tournament Circuits
+            Organizations
           </h1>
           <p style={{ fontSize: '1.05rem', color: 'var(--color-text-secondary, #94a3b8)', maxWidth: '650px', margin: '0 auto 1.5rem' }}>
             Multi-tier organization management, shared 5-color bracket theme palettes, raw multi-entity metric indexing, and default rules inheritance.
