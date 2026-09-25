@@ -7,7 +7,7 @@ import {
   QualifierStatus,
 } from '../tournament/types';
 import { SeededPlayer } from '../bracket/types';
-import { generateTraditionalBracket, generateFlatBracket } from '../bracket/math';
+import { generateTraditionalBracket, generateFlatBracket, generateDoubleEliminationBracket } from '../bracket/math';
 
 export const MAXOUT_THRESHOLD = 999999;
 
@@ -345,11 +345,16 @@ export function generateDraftBracketsForTournament(tournament: Tournament): Tour
         tierId: tier.id,
         bestOf: tier.bestOf,
         roundBestOfOverrides: tier.roundBestOfOverrides,
+        bracketRouting: tier.bracketRouting,
+        flatWidth: tier.flatWidth,
+        finalsCutoff: tier.finalsCutoff,
       };
       const newBracket =
-        tier.bracketType === 'FLAT'
-          ? generateFlatBracket(seededPlayers, tier.flatWidth || 4, options)
-          : generateTraditionalBracket(seededPlayers, options);
+        tier.eliminationType === 'DOUBLE'
+          ? generateDoubleEliminationBracket(seededPlayers, options)
+          : tier.bracketType === 'FLAT'
+            ? generateFlatBracket(seededPlayers, tier.flatWidth || 4, options)
+            : generateTraditionalBracket(seededPlayers, options);
 
       return {
         ...tier,

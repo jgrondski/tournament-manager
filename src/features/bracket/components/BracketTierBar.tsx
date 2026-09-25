@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Tournament, TournamentTier } from '../../tournament/types';
+import { setStoredTierSlug } from '../../tournament/tierStorage';
 import { getContrastingTextColor } from '../colorUtils';
 import { BracketViewMode } from '../bracketLayout';
 import {
@@ -33,6 +34,9 @@ export const BracketTierBar: React.FC<BracketTierBarProps> = ({
   return (
     <div
       style={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 40,
         padding: '0.65rem 1.25rem',
         background: 'var(--color-bg-surface)',
         borderBottom: '1px solid var(--color-border)',
@@ -70,6 +74,7 @@ export const BracketTierBar: React.FC<BracketTierBarProps> = ({
               type="button"
               onClick={() => {
                 if (!isActive) {
+                  setStoredTierSlug(tournament.slug, tier.slug);
                   navigate(`/${tournament.slug}/${tier.slug}`);
                 }
               }}

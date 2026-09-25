@@ -160,3 +160,80 @@ describe('retractMatchWinner', () => {
     expect(bracket.matchesById['r3-m1'].player1.player).toBeNull();
   });
 });
+
+describe('advanceMatchWinner and retractMatchWinner for Double Elimination', () => {
+  it('propagates losers into Losers bracket and handles Grand Finals Reset', async () => {
+    const { generateDoubleEliminationBracket } = await import('../double-elimination');
+    const players = createMockPlayers(4);
+    let bracket = generateDoubleEliminationBracket(players, { tierId: 'gold' });
+
+    // Initial matches: 2(4) - 2 = 6
+    expect(Object.keys(bracket.matchesById).length).toBe(6);
+
+    // 1. W1-M1: Player 1 beats Player 4
+    bracket = advanceMatchWinner(bracket, 'gold-w1-m1', 'player-1');
+    expect(bracket.matchesById['gold-w1-m1'].winnerId).toBe('player-1');
+    expect(bracket.matchesById['gold-w1-m1'].loserId).toBe('player-4');
+    // Player 1 advances to Winners Finals (W2-M1) Slot 1
+    expect(bracket.matchesById['gold-w2-m1'].player1.player?.id).toBe('player-1');
+    // Player 4 drops to Losers R1 (L1-M1) Slot 1
+    expect(bracket.matchesById['gold-l1-m1'].player1.player?.id).toBe('player-4');
+
+    // 2. W1-M2: Player 2 beats Player 3
+    bracket = advanceMatchWinner(bracket, 'gold-w1-m2', 'player-2');
+    expect(bracket.matchesById['gold-w2-m1'].player2.player?.id).toBe('player-2');
+    expect(bracket.matchesById['gold-l1-m1'].player2.player?.id).toBe('player-3');
+
+    // 3. L1-M1: Player 3 beats Player 4 (Player 4 eliminated with 2 losses)
+    bracket = advanceMatchWinner(bracket, 'gold-l1-m1', 'player-3');
+    // Player 3 advances to Losers Finals (L2-M1) Slot 1
+    expect(bracket.matchesById['gold-l2-m1'].player1.player?.id).toBe('player-3');
+
+    // 4. W2-M1 (Winners Finals): Player 1 beats Player 2
+    bracket = advanceMatchWinner(bracket, 'gold-w2-m1', 'player-1');
+    // Player 1 advances to Grand Finals (GF1) Slot 1
+    expect(bracket.matchesById['gold-gf1'].player1.player?.id).toBe('player-1');
+    // Player 2 drops to Losers Finals (L2-M1) Slot 2
+    expect(bracket.matchesById['gold-l2-m1'].player2.player?.id).toBe('player-2');
+
+    // 5. L2-M1 (Losers Finals): Player 2 beats Player 3 (Player 3 eliminated with 2 losses)
+    bracket = advanceMatchWinner(bracket, 'gold-l2-m1', 'player-2');
+    // Player 2 advances to Grand Finals (GF1) Slot 2
+    expect(bracket.matchesById['gold-gf1'].player2.player?.id).toBe('player-2');
+
+    // Grand Finals Match 1: Player 1 (WB Champ) vs Player 2 (LB Champ)
+    expect(bracket.matchesById['gold-gf1'].player1.player?.id).toBe('player-1');
+    expect(bracket.matchesById['gold-gf1'].player2.player?.id).toBe('player-2');
+
+    // Case A: WB Champion wins GF1 -> Tournament complete, NO reset match
+    let wbWinBracket = advanceMatchWinner(bracket, 'gold-gf1', 'player-1');
+    expect(wbWinBracket.matchesById['gold-gf1'].winnerId).toBe('player-1');
+    expect(wbWinBracket.grandFinalsResetMatchId).toBeUndefined();
+    expect(Object.keys(wbWinBracket.matchesById).length).toBe(6);
+
+    // Case B: LB Champion wins GF1 -> Instigate Grand Finals Reset (Match 2)
+    let lbWinBracket = advanceMatchWinner(bracket, 'gold-gf1', 'player-2');
+    expect(lbWinBracket.matchesById['gold-gf1'].winnerId).toBe('player-2');
+    expect(lbWinBracket.grandFinalsResetMatchId).toBe('gold-gf-reset');
+    // Match count increases to 2N - 1 = 7 matches
+    expect(Object.keys(lbWinBracket.matchesById).length).toBe(7);
+
+    const resetMatch = lbWinBracket.matchesById['gold-gf-reset'];
+    expect(resetMatch).toBeDefined();
+    expect(resetMatch.stage).toBe('GRAND_FINALS_RESET');
+    expect(resetMatch.roundIdentifier).toBe('GF_RESET');
+    expect(resetMatch.matchNumber).toBe(7);
+    expect(resetMatch.player1.player?.id).toBe('player-1');
+    expect(resetMatch.player2.player?.id).toBe('player-2');
+
+    // GF Reset can now be won
+    let gfResetWon = advanceMatchWinner(lbWinBracket, 'gold-gf-reset', 'player-2');
+    expect(gfResetWon.matchesById['gold-gf-reset'].winnerId).toBe('player-2');
+
+    // Retracting GF1 removes the GF Reset match
+    let retractedGf = retractMatchWinner(lbWinBracket, 'gold-gf1');
+    expect(retractedGf.grandFinalsResetMatchId).toBeUndefined();
+    expect(retractedGf.matchesById['gold-gf-reset']).toBeUndefined();
+    expect(Object.keys(retractedGf.matchesById).length).toBe(6);
+  });
+});

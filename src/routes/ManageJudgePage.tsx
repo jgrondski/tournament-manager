@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { useTournament } from '../features/tournament/store';
+import { getStoredTierSlug, setStoredTierSlug } from '../features/tournament/tierStorage';
 import { TournamentLayout } from '../components/TournamentLayout';
 import { MatchCardFeed } from '../features/bracket/components/MatchCardFeed';
 import { getContrastingTextColor } from '../features/bracket/colorUtils';
@@ -25,8 +26,18 @@ export const ManageJudgePage: React.FC = () => {
   }
 
   const sortedTiers = [...tournament.tiers].sort((a, b) => a.priority - b.priority);
-  const requestedTierSlug = searchParams.get('tier') || sortedTiers[0]?.slug;
+  const storedTier = getStoredTierSlug(slug);
+  const requestedTierSlug = searchParams.get('tier') || storedTier || sortedTiers[0]?.slug;
   const tier = sortedTiers.find(t => t.slug === requestedTierSlug || t.id === requestedTierSlug) || sortedTiers[0];
+
+  useEffect(() => {
+    if (tier && slug) {
+      setStoredTierSlug(slug, tier.slug);
+      if (searchParams.get('tier') !== tier.slug) {
+        setSearchParams({ tier: tier.slug }, { replace: true });
+      }
+    }
+  }, [tier?.slug, slug]);
 
   if (!tier) {
     return (
@@ -58,6 +69,9 @@ export const ManageJudgePage: React.FC = () => {
       {/* In-Page Tier Selector Bar */}
       <div
         style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 40,
           padding: '0.65rem 1.25rem',
           background: 'var(--color-bg-surface)',
           borderBottom: '1px solid var(--color-border)',
@@ -91,6 +105,7 @@ export const ManageJudgePage: React.FC = () => {
                 key={t.id}
                 type="button"
                 onClick={() => {
+                  setStoredTierSlug(slug, t.slug);
                   setSearchParams({ tier: t.slug });
                 }}
                 style={{

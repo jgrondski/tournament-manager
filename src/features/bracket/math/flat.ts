@@ -185,6 +185,17 @@ export function generateFlatBracket(
     }
   }
 
+  // Renumber all matches sequentially across all rounds
+  let globalMatchNum = 1;
+  for (const round of rounds) {
+    for (const match of round.matches) {
+      match.matchNumber = globalMatchNum++;
+      if (matchesById[match.id]) {
+        matchesById[match.id].matchNumber = match.matchNumber;
+      }
+    }
+  }
+
   return {
     tierId,
     type: 'FLAT',

@@ -13,6 +13,7 @@ interface MatchCardFeedProps {
 
 export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }) => {
   const [selectedRoundIdx, setSelectedRoundIdx] = useState<number>(0);
+  const [selectedStage, setSelectedStage] = useState<'ALL' | 'WINNERS' | 'LOSERS' | 'GRAND_FINALS'>('ALL');
   const [activeMatch, setActiveMatch] = useState<BracketMatch | null>(null);
   const [selectedPlayerForDrawer, setSelectedPlayerForDrawer] = useState<PlayerProfile | null>(null);
   const [isPlayerDrawerOpen, setIsPlayerDrawerOpen] = useState(false);
@@ -20,7 +21,21 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
   const [hoveredMatchId, setHoveredMatchId] = useState<string | null>(null);
 
   const rounds = tier.bracket.rounds;
-  const currentRound = rounds[selectedRoundIdx] || rounds[0];
+  const isDoubleElim = tier.eliminationType === 'DOUBLE';
+
+  const visibleRounds = React.useMemo(() => {
+    if (!isDoubleElim || selectedStage === 'ALL') {
+      return rounds;
+    }
+    return rounds.filter((r) => {
+      if (selectedStage === 'WINNERS') return r.stage === 'WINNERS' || r.roundIdentifier?.startsWith('W');
+      if (selectedStage === 'LOSERS') return r.stage === 'LOSERS' || r.roundIdentifier?.startsWith('L');
+      if (selectedStage === 'GRAND_FINALS') return r.stage === 'GRAND_FINALS' || r.roundIdentifier?.startsWith('GF');
+      return true;
+    });
+  }, [rounds, isDoubleElim, selectedStage]);
+
+  const currentRound = visibleRounds[selectedRoundIdx] || visibleRounds[0] || rounds[0];
   const primaryColor = tier.primaryColor || '#f59e0b';
 
   const handlePlayerClick = (pId: string, pName: string) => {
@@ -36,9 +51,38 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
 
   return (
     <div style={{ maxWidth: '680px', margin: '0 auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      {/* Stage Filter Tabs (Winners / Losers / Grand Finals) for Double Elimination */}
+      {isDoubleElim && (
+        <div style={{ display: 'flex', gap: '0.4rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem', overflowX: 'auto' }}>
+          {(['ALL', 'WINNERS', 'LOSERS', 'GRAND_FINALS'] as const).map((stage) => {
+            const label = stage === 'ALL' ? 'All Rounds' : stage === 'WINNERS' ? 'Winners' : stage === 'LOSERS' ? 'Losers' : 'Grand Finals';
+            const isSelected = selectedStage === stage;
+            return (
+              <button
+                key={stage}
+                onClick={() => {
+                  setSelectedStage(stage);
+                  setSelectedRoundIdx(0);
+                }}
+                className={`btn btn-sm ${isSelected ? 'btn-primary' : 'btn-secondary'}`}
+                style={{
+                  fontSize: '0.75rem',
+                  fontWeight: isSelected ? 800 : 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Round Selector Bar */}
       <div style={{ overflowX: 'auto', display: 'flex', gap: '0.5rem', paddingBottom: '0.5rem' }}>
-        {rounds.map((round, idx) => (
+        {visibleRounds.map((round, idx) => (
           <button
             key={round.roundNumber}
             onClick={() => setSelectedRoundIdx(idx)}
@@ -56,8 +100,17 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
           const record = tournament.matchScores[match.id];
           const p1 = match.player1.player;
           const p2 = match.player2.player;
-          const p1Name = p1?.name || (match.player1.sourceMatchId ? `Winner of Match #${tier.bracket.matchesById[match.player1.sourceMatchId]?.matchNumber || '?'}` : 'TBD');
-          const p2Name = p2?.name || (match.player2.sourceMatchId ? `Winner of Match #${tier.bracket.matchesById[match.player2.sourceMatchId]?.matchNumber || '?'}` : 'TBD');
+
+          const getSlotPlaceholder = (slot: typeof match.player1, fallbackNumber: number) => {
+            if (!slot.sourceMatchId) return 'TBD';
+            const src = tier.bracket.matchesById[slot.sourceMatchId];
+            if (!src) return 'TBD';
+            const isLoserDrop = match.stage === 'LOSERS' && src.stage === 'WINNERS';
+            return `${isLoserDrop ? 'Loser' : 'Winner'} of Match #${src.matchNumber || fallbackNumber}`;
+          };
+
+          const p1Name = p1?.name || getSlotPlaceholder(match.player1, 1);
+          const p2Name = p2?.name || getSlotPlaceholder(match.player2, 2);
 
           const p1Wins = record?.player1Wins || 0;
           const p2Wins = record?.player2Wins || 0;

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { generateTraditionalBracket, generateFlatBracket } from '../math';
+import { generateTraditionalBracket, generateFlatBracket, generateDoubleEliminationBracket } from '../math';
+import { advanceMatchWinner } from '../math/advance';
 import { calculateBracketLayout } from '../bracketLayout';
 
 describe('bracketLayout calculation engine', () => {
@@ -242,6 +243,305 @@ describe('bracketLayout calculation engine', () => {
       expect(path).toBeDefined();
       expect(path?.d).toBeDefined();
       expect(path?.d.length).toBeGreaterThan(0);
+    });
+  });
+
+  it('correctly calculates Double Elimination layout with Winners on top, Losers on bottom, and GF centered on the right', () => {
+    const players = Array.from({ length: 8 }, (_, i) => ({
+      id: `p${i + 1}`,
+      name: `Player ${i + 1}`,
+      seed: i + 1,
+    }));
+
+    const bracket = generateDoubleEliminationBracket(players, { tierId: 'gold' });
+    const layout = calculateBracketLayout(bracket);
+
+    expect(layout.stageHeaders).toBeDefined();
+    expect(layout.stageHeaders?.map(s => s.title)).toEqual([
+      'Winners Bracket',
+      'Losers Bracket',
+      'Grand Finals',
+    ]);
+
+    // Find matches by stage
+    const winnersMatches = bracket.rounds
+      .filter(r => r.stage === 'WINNERS')
+      .flatMap(r => r.matches);
+    const losersMatches = bracket.rounds
+      .filter(r => r.stage === 'LOSERS')
+      .flatMap(r => r.matches);
+    const gfMatch = bracket.rounds
+      .find(r => r.stage === 'GRAND_FINALS')
+      ?.matches[0];
+
+    expect(winnersMatches.length).toBeGreaterThan(0);
+    expect(losersMatches.length).toBeGreaterThan(0);
+    expect(gfMatch).toBeDefined();
+
+    // Winners matches are on top, Losers matches are on bottom
+    const winnersMaxY = Math.max(...winnersMatches.map(m => layout.matchPositions[m.id].y + layout.matchPositions[m.id].height));
+    const losersMinY = Math.min(...losersMatches.map(m => layout.matchPositions[m.id].y));
+
+    expect(losersMinY).toBeGreaterThan(winnersMaxY);
+
+    // Grand Finals match is placed to the right of all stage rounds
+    const gfPos = layout.matchPositions[gfMatch!.id];
+    winnersMatches.forEach(m => {
+      expect(gfPos.x).toBeGreaterThan(layout.matchPositions[m.id].x);
+    });
+    losersMatches.forEach(m => {
+      expect(gfPos.x).toBeGreaterThanOrEqual(layout.matchPositions[m.id].x);
+    });
+
+    // Grand Finals match is vertically centered between Winners Finals and Losers Finals
+    const wfMatch = bracket.rounds.find(r => r.roundIdentifier === 'W3')?.matches[0];
+    const lfMatch = bracket.rounds.find(r => r.roundIdentifier === 'L4')?.matches[0];
+    const wfPos = layout.matchPositions[wfMatch!.id];
+    const lfPos = layout.matchPositions[lfMatch!.id];
+
+    expect(gfPos.centerY).toBeCloseTo((wfPos.centerY + lfPos.centerY) / 2, 0);
+
+    // Champion plaque is positioned to the right of Grand Finals match
+    expect(layout.championPosition.x).toBeGreaterThan(gfPos.x);
+    expect(layout.championPosition.centerY).toBeCloseTo(gfPos.centerY);
+
+    // Connector paths exist into Grand Finals
+    const gfPath = layout.paths.find(p => p.targetMatchId === gfMatch!.id);
+    expect(gfPath).toBeDefined();
+    expect(gfPath?.sourceMatchIds).toContain(wfMatch!.id);
+    expect(gfPath?.sourceMatchIds).toContain(lfMatch!.id);
+
+    // Champion connector path exists
+    expect(layout.championPath).toBeDefined();
+    expect(layout.championPath?.finalsMatchId).toBe(gfMatch!.id);
+  });
+
+  it('correctly adapts layout when Grand Finals Reset match is instantiated', () => {
+    const players = Array.from({ length: 4 }, (_, i) => ({
+      id: `p${i + 1}`,
+      name: `Player ${i + 1}`,
+      seed: i + 1,
+    }));
+
+    let bracket = generateDoubleEliminationBracket(players, { tierId: 'silver' });
+
+    // Simulate WB Champ (p1) and LB Champ (p2) reaching Grand Finals
+    const gf1Match = bracket.rounds.find(r => r.stage === 'GRAND_FINALS')!.matches[0];
+    gf1Match.player1.player = players[0]; // Seed 1 (WB Champ)
+    gf1Match.player2.player = players[1]; // Seed 2 (LB Champ)
+
+    // Initial layout before reset: GF1 feeds directly to Champion
+    const initialLayout = calculateBracketLayout(bracket);
+    const initialGfPos = initialLayout.matchPositions[gf1Match.id];
+    expect(initialLayout.championPosition.x).toBeGreaterThan(initialGfPos.x);
+
+    // LB Champ (p2) wins GF1 -> triggers dynamic GF Reset match (Match 2)
+    bracket = advanceMatchWinner(bracket, gf1Match.id, players[1].id);
+
+    const resetLayout = calculateBracketLayout(bracket);
+    const resetMatch = Object.values(bracket.matchesById).find(m => m.roundIdentifier === 'GF_RESET');
+    expect(resetMatch).toBeDefined();
+
+    // Reset match is placed between GF1 and Champion Plaque
+    const gf1Pos = resetLayout.matchPositions[gf1Match.id];
+    const resetPos = resetLayout.matchPositions[resetMatch!.id];
+    expect(resetPos).toBeDefined();
+    expect(resetPos.x).toBeGreaterThan(gf1Pos.x);
+    expect(resetLayout.championPosition.x).toBeGreaterThan(resetPos.x);
+
+    // Both GF1 and GF Reset share the same centerY
+    expect(resetPos.centerY).toBeCloseTo(gf1Pos.centerY);
+    expect(resetLayout.championPosition.centerY).toBeCloseTo(gf1Pos.centerY);
+
+    // Connector path exists from GF1 to GF Reset
+    const gfResetPath = resetLayout.paths.find(p => p.targetMatchId === resetMatch!.id);
+    expect(gfResetPath).toBeDefined();
+    expect(gfResetPath?.sourceMatchIds).toContain(gf1Match.id);
+
+    // Champion path connects from GF Reset to Champion
+    expect(resetLayout.championPath).toBeDefined();
+    expect(resetLayout.championPath?.finalsMatchId).toBe(resetMatch!.id);
+  });
+
+  it('correctly calculates Accelerated Hybrid layout for 48-player tournament', () => {
+    const players = Array.from({ length: 48 }, (_, i) => ({
+      id: `p${i + 1}`,
+      name: `Player ${i + 1}`,
+      seed: i + 1,
+    }));
+
+    const bracket = generateDoubleEliminationBracket(players, {
+      tierId: 'gold',
+      bracketRouting: 'ACCELERATED_HYBRID',
+      finalsCutoff: 16,
+    });
+
+    const layout = calculateBracketLayout(bracket);
+
+    // Verify stage headers
+    expect(layout.stageHeaders).toBeDefined();
+    const stageTitles = layout.stageHeaders?.map(s => s.title);
+    expect(stageTitles).toContain('Accelerated Round');
+    expect(stageTitles).toContain('Pre-Merge Upper');
+    expect(stageTitles).toContain('Pre-Merge Lower & 2nd Chance');
+    expect(stageTitles).toContain('Play-Offs');
+    expect(stageTitles).toContain('Championship Tree');
+
+    // All 79 matches have valid layout positions
+    const matchIds = Object.keys(bracket.matchesById);
+    expect(matchIds.length).toBe(79);
+    matchIds.forEach(id => {
+      const pos = layout.matchPositions[id];
+      expect(pos).toBeDefined();
+      expect(pos.x).toBeGreaterThanOrEqual(0);
+      expect(pos.y).toBeGreaterThanOrEqual(0);
+      expect(pos.width).toBeGreaterThan(0);
+      expect(pos.height).toBeGreaterThan(0);
+    });
+
+    // Champion plaque is positioned to the right of Championship Finals
+    const finalsMatch = bracket.rounds.find(r => r.roundIdentifier === 'CHAMP_R4')!.matches[0];
+    const finalsPos = layout.matchPositions[finalsMatch.id];
+    expect(layout.championPosition.x).toBeGreaterThan(finalsPos.x);
+    expect(layout.championPath).toBeDefined();
+    expect(layout.championPath?.finalsMatchId).toBe(finalsMatch.id);
+
+    // Connector paths exist and connect feeders forward (source.x < target.x)
+    expect(layout.paths.length).toBeGreaterThan(0);
+    layout.paths.forEach(p => {
+      const targetPos = layout.matchPositions[p.targetMatchId];
+      expect(targetPos).toBeDefined();
+      p.sourceMatchIds.forEach(srcId => {
+        const srcPos = layout.matchPositions[srcId];
+        expect(srcPos).toBeDefined();
+        expect(srcPos.x).toBeLessThan(targetPos.x);
+      });
+    });
+  });
+
+  it('positions Grand Finals and finals labels closer to where matches actually occur in standard double elim', () => {
+    const players = Array.from({ length: 16 }, (_, i) => ({
+      id: `p${i + 1}`,
+      name: `Player ${i + 1}`,
+      seed: i + 1,
+    }));
+
+    const bracket = generateDoubleEliminationBracket(players, {
+      tierId: 'gold',
+      bracketRouting: 'TRADITIONAL_TREE',
+    });
+
+    const layout = calculateBracketLayout(bracket, {}, 'standard');
+
+    // Find Grand Finals match and header
+    const gfRound = bracket.rounds.find((r) => r.stage === 'GRAND_FINALS')!;
+    expect(gfRound).toBeDefined();
+    const gfMatch = gfRound.matches[0];
+    const gfPos = layout.matchPositions[gfMatch.id];
+    expect(gfPos).toBeDefined();
+
+    const gfHeader = layout.roundHeaders.find((h) => h.name === 'Grand Finals')!;
+    expect(gfHeader).toBeDefined();
+
+    // Grand Finals header should sit directly above Grand Finals match (within ~50px), NOT at top of canvas (y=70)
+    expect(gfPos.y - gfHeader.y).toBeLessThanOrEqual(50);
+    expect(gfHeader.y).toBeGreaterThan(200);
+
+    // Winners Finals header should sit directly above Winners Finals match
+    const wfMatch = bracket.rounds.find((r) => r.name === 'Winners Finals')!.matches[0];
+    const wfPos = layout.matchPositions[wfMatch.id];
+    const wfHeader = layout.roundHeaders.find((h) => h.name === 'Winners Finals')!;
+    expect(wfPos.y - wfHeader.y).toBeLessThanOrEqual(50);
+
+    // Losers Finals header should sit directly above Losers Finals match
+    const lfMatch = bracket.rounds.find((r) => r.name === "Loser's Finals")!.matches[0];
+    const lfPos = layout.matchPositions[lfMatch.id];
+    const lfHeader = layout.roundHeaders.find((h) => h.name === "Loser's Finals")!;
+    expect(lfPos.y - lfHeader.y).toBeLessThanOrEqual(50);
+  });
+
+  it('calculates split wing layout for traditional double elim placing losers bracket on the far right', () => {
+    const players = Array.from({ length: 16 }, (_, i) => ({
+      id: `p${i + 1}`,
+      name: `Player ${i + 1}`,
+      seed: i + 1,
+    }));
+
+    const bracket = generateDoubleEliminationBracket(players, {
+      tierId: 'gold',
+      bracketRouting: 'TRADITIONAL_TREE',
+    });
+
+    const standardLayout = calculateBracketLayout(bracket, {}, 'standard');
+    const splitLayout = calculateBracketLayout(bracket, {}, 'split');
+
+    expect(splitLayout.viewMode).toBe('split');
+
+    // In split mode, height is substantially less than in standard stacked mode
+    expect(splitLayout.totalHeight).toBeLessThan(standardLayout.totalHeight);
+    // In split mode, width is substantially wider than standard mode
+    expect(splitLayout.totalWidth).toBeGreaterThan(standardLayout.totalWidth);
+
+    // Grand Finals is located after Winners Bracket
+    const gfMatch = bracket.rounds.find((r) => r.stage === 'GRAND_FINALS')!.matches[0];
+    const gfPos = splitLayout.matchPositions[gfMatch.id];
+
+    const winnersMatches = bracket.rounds
+      .filter((r) => r.stage === 'WINNERS')
+      .flatMap((r) => r.matches);
+    winnersMatches.forEach((m) => {
+      const pos = splitLayout.matchPositions[m.id];
+      expect(pos.x).toBeLessThan(gfPos.x);
+    });
+
+    // Losers Bracket matches are located on the far right (x > Grand Finals x)
+    const losersMatches = bracket.rounds
+      .filter((r) => r.stage === 'LOSERS')
+      .flatMap((r) => r.matches);
+    losersMatches.forEach((m) => {
+      const pos = splitLayout.matchPositions[m.id];
+      expect(pos.x).toBeGreaterThan(gfPos.x);
+    });
+
+    // Stage headers reflect the split structure
+    const stageTitles = splitLayout.stageHeaders?.map((s) => s.title);
+    expect(stageTitles).toContain('Winners Bracket');
+    expect(stageTitles).toContain('Grand Finals');
+    expect(stageTitles).toContain('Losers Bracket');
+
+    const winnersStage = splitLayout.stageHeaders?.find((s) => s.title === 'Winners Bracket')!;
+    const gfStage = splitLayout.stageHeaders?.find((s) => s.title === 'Grand Finals')!;
+    const losersStage = splitLayout.stageHeaders?.find((s) => s.title === 'Losers Bracket')!;
+    expect(winnersStage.x).toBeLessThan(gfStage.x);
+    expect(gfStage.x).toBeLessThan(losersStage.x);
+  });
+
+  it('calculates split wing layout for flat staged double elim placing losers bracket on the far right', () => {
+    const players = Array.from({ length: 16 }, (_, i) => ({
+      id: `p${i + 1}`,
+      name: `Player ${i + 1}`,
+      seed: i + 1,
+    }));
+
+    const bracket = generateDoubleEliminationBracket(players, {
+      tierId: 'silver',
+      bracketRouting: 'FLAT_STAGED',
+      flatWidth: 4,
+    });
+
+    const splitLayout = calculateBracketLayout(bracket, {}, 'split');
+    expect(splitLayout.viewMode).toBe('split');
+
+    const gfMatch = bracket.rounds.find((r) => r.stage === 'GRAND_FINALS')!.matches[0];
+    const gfPos = splitLayout.matchPositions[gfMatch.id];
+
+    // Losers Bracket is placed on the far right of Grand Finals
+    const losersMatches = bracket.rounds
+      .filter((r) => r.stage === 'LOSERS')
+      .flatMap((r) => r.matches);
+    losersMatches.forEach((m) => {
+      const pos = splitLayout.matchPositions[m.id];
+      expect(pos.x).toBeGreaterThan(gfPos.x);
     });
   });
 });

@@ -1000,5 +1000,136 @@ describe('Final Standings Rollup Engine', () => {
       expect(epsilon?.player.playstyle).toBe('DAS');
     });
   });
+
+  describe('Double Elimination Standings Engine', () => {
+    it('ranks Champion, Runner-up, and Losers exit rounds sequentially (without GF reset)', async () => {
+      const { generateDoubleEliminationBracket } = await import('../../bracket/math');
+      const players = [
+        { id: 'p1', name: 'Alpha', seed: 1 },
+        { id: 'p2', name: 'Beta', seed: 2 },
+        { id: 'p3', name: 'Gamma', seed: 3 },
+        { id: 'p4', name: 'Delta', seed: 4 },
+      ];
+
+      let bracket = generateDoubleEliminationBracket(players, { tierId: 'gold', bestOf: 3 });
+
+      // 1. W1-M1: p1 beats p4 (2-0)
+      bracket = advanceMatchWinner(bracket, 'gold-w1-m1', 'p1');
+      // 2. W1-M2: p2 beats p3 (2-0)
+      bracket = advanceMatchWinner(bracket, 'gold-w1-m2', 'p2');
+      // 3. L1-M1: p3 beats p4 (2-1) -> p4 eliminated (4th place)
+      bracket = advanceMatchWinner(bracket, 'gold-l1-m1', 'p3');
+      // 4. W2-M1 (WB Finals): p1 beats p2 (2-0)
+      bracket = advanceMatchWinner(bracket, 'gold-w2-m1', 'p1');
+      // 5. L2-M1 (LB Finals): p2 beats p3 (2-1) -> p3 eliminated (3rd place)
+      bracket = advanceMatchWinner(bracket, 'gold-l2-m1', 'p2');
+      // 6. GF1: p1 (WB Champ) beats p2 (LB Champ) (2-0) -> p1 is Champion, p2 is Runner-up!
+      bracket = advanceMatchWinner(bracket, 'gold-gf1', 'p1');
+
+      const matchScores: Record<string, MatchScoreRecord> = {
+        'gold-w1-m1': { matchId: 'gold-w1-m1', tierId: 'gold', bestOf: 3, player1Wins: 2, player2Wins: 0, games: [], winnerPlayerId: 'p1', loserPlayerId: 'p4', isComplete: true },
+        'gold-w1-m2': { matchId: 'gold-w1-m2', tierId: 'gold', bestOf: 3, player1Wins: 2, player2Wins: 0, games: [], winnerPlayerId: 'p2', loserPlayerId: 'p3', isComplete: true },
+        'gold-l1-m1': { matchId: 'gold-l1-m1', tierId: 'gold', bestOf: 3, player1Wins: 1, player2Wins: 2, games: [], winnerPlayerId: 'p3', loserPlayerId: 'p4', isComplete: true },
+        'gold-w2-m1': { matchId: 'gold-w2-m1', tierId: 'gold', bestOf: 3, player1Wins: 2, player2Wins: 0, games: [], winnerPlayerId: 'p1', loserPlayerId: 'p2', isComplete: true },
+        'gold-l2-m1': { matchId: 'gold-l2-m1', tierId: 'gold', bestOf: 3, player1Wins: 1, player2Wins: 2, games: [], winnerPlayerId: 'p2', loserPlayerId: 'p3', isComplete: true },
+        'gold-gf1': { matchId: 'gold-gf1', tierId: 'gold', bestOf: 3, player1Wins: 2, player2Wins: 0, games: [], winnerPlayerId: 'p1', loserPlayerId: 'p2', isComplete: true },
+      };
+
+      const tier: TournamentTier = {
+        id: 'gold',
+        slug: 'gold',
+        name: 'Gold Tier',
+        priority: 1,
+        bracketType: 'TRADITIONAL',
+        eliminationType: 'DOUBLE',
+        bestOf: 3,
+        playerCount: 4,
+        bracket,
+        isLocked: true,
+      };
+
+      const tierStandings = calculateTierStandings(tier, matchScores);
+      expect(tierStandings.length).toBe(4);
+      expect(tierStandings[0].player.id).toBe('p1');
+      expect(tierStandings[0].rankNumber).toBe(1);
+      expect(tierStandings[0].rankLabel).toBe('1st Place (Champion)');
+
+      expect(tierStandings[1].player.id).toBe('p2');
+      expect(tierStandings[1].rankNumber).toBe(2);
+      expect(tierStandings[1].rankLabel).toBe('2nd Place (Runner-up)');
+
+      expect(tierStandings[2].player.id).toBe('p3');
+      expect(tierStandings[2].rankNumber).toBe(3);
+
+      expect(tierStandings[3].player.id).toBe('p4');
+      expect(tierStandings[3].rankNumber).toBe(4);
+    });
+
+    it('correctly ranks standings when Grand Finals Reset occurs', async () => {
+      const { generateDoubleEliminationBracket } = await import('../../bracket/math');
+      const players = [
+        { id: 'p1', name: 'Alpha', seed: 1 },
+        { id: 'p2', name: 'Beta', seed: 2 },
+        { id: 'p3', name: 'Gamma', seed: 3 },
+        { id: 'p4', name: 'Delta', seed: 4 },
+      ];
+
+      let bracket = generateDoubleEliminationBracket(players, { tierId: 'gold', bestOf: 3 });
+
+      bracket = advanceMatchWinner(bracket, 'gold-w1-m1', 'p1');
+      bracket = advanceMatchWinner(bracket, 'gold-w1-m2', 'p2');
+      bracket = advanceMatchWinner(bracket, 'gold-l1-m1', 'p3');
+      bracket = advanceMatchWinner(bracket, 'gold-w2-m1', 'p1');
+      bracket = advanceMatchWinner(bracket, 'gold-l2-m1', 'p2');
+
+      // LB Champ p2 wins GF1! -> GF Reset triggered
+      bracket = advanceMatchWinner(bracket, 'gold-gf1', 'p2');
+      // LB Champ p2 wins GF Reset -> p2 is Champion, p1 is Runner-up!
+      bracket = advanceMatchWinner(bracket, 'gold-gf-reset', 'p2');
+
+      const matchScores: Record<string, MatchScoreRecord> = {
+        'gold-w1-m1': { matchId: 'gold-w1-m1', tierId: 'gold', bestOf: 3, player1Wins: 2, player2Wins: 0, games: [], winnerPlayerId: 'p1', loserPlayerId: 'p4', isComplete: true },
+        'gold-w1-m2': { matchId: 'gold-w1-m2', tierId: 'gold', bestOf: 3, player1Wins: 2, player2Wins: 0, games: [], winnerPlayerId: 'p2', loserPlayerId: 'p3', isComplete: true },
+        'gold-l1-m1': { matchId: 'gold-l1-m1', tierId: 'gold', bestOf: 3, player1Wins: 1, player2Wins: 2, games: [], winnerPlayerId: 'p3', loserPlayerId: 'p4', isComplete: true },
+        'gold-w2-m1': { matchId: 'gold-w2-m1', tierId: 'gold', bestOf: 3, player1Wins: 2, player2Wins: 0, games: [], winnerPlayerId: 'p1', loserPlayerId: 'p2', isComplete: true },
+        'gold-l2-m1': { matchId: 'gold-l2-m1', tierId: 'gold', bestOf: 3, player1Wins: 1, player2Wins: 2, games: [], winnerPlayerId: 'p2', loserPlayerId: 'p3', isComplete: true },
+        'gold-gf1': { matchId: 'gold-gf1', tierId: 'gold', bestOf: 3, player1Wins: 1, player2Wins: 2, games: [], winnerPlayerId: 'p2', loserPlayerId: 'p1', isComplete: true },
+        'gold-gf-reset': { matchId: 'gold-gf-reset', tierId: 'gold', bestOf: 3, player1Wins: 0, player2Wins: 2, games: [], winnerPlayerId: 'p2', loserPlayerId: 'p1', isComplete: true },
+      };
+
+      const tier: TournamentTier = {
+        id: 'gold',
+        slug: 'gold',
+        name: 'Gold Tier',
+        priority: 1,
+        bracketType: 'TRADITIONAL',
+        eliminationType: 'DOUBLE',
+        bestOf: 3,
+        playerCount: 4,
+        bracket,
+        isLocked: true,
+      };
+
+      const tierStandings = calculateTierStandings(tier, matchScores);
+      expect(tierStandings.length).toBe(4);
+      // Beta (p2) is Champion
+      expect(tierStandings[0].player.id).toBe('p2');
+      expect(tierStandings[0].rankNumber).toBe(1);
+      expect(tierStandings[0].rankLabel).toBe('1st Place (Champion)');
+
+      // Alpha (p1) is Runner-up
+      expect(tierStandings[1].player.id).toBe('p1');
+      expect(tierStandings[1].rankNumber).toBe(2);
+      expect(tierStandings[1].rankLabel).toBe('2nd Place (Runner-up)');
+
+      // Gamma (p3) is 3rd
+      expect(tierStandings[2].player.id).toBe('p3');
+      expect(tierStandings[2].rankNumber).toBe(3);
+
+      // Delta (p4) is 4th
+      expect(tierStandings[3].player.id).toBe('p4');
+      expect(tierStandings[3].rankNumber).toBe(4);
+    });
+  });
 });
 

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { BracketStructure, BracketMatch, isMatchPlayable } from '../types';
+import { BracketStructure, BracketMatch, isMatchPlayable, SeededPlayer } from '../types';
 import { Tournament, TournamentTier, PlayerProfile } from '../../tournament/types';
 import { MatchScoreDrawer } from './MatchScoreDrawer';
 import {
@@ -131,15 +131,52 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
   }, [effectiveObsView, viewportDim, layout.totalWidth, layout.totalHeight, isObsMode]);
 
   // Find final match winner if tournament is concluded
-  const finalRound = rounds[rounds.length - 1];
-  const finalMatch = finalRound?.matches[0];
-  const championWinnerId = finalMatch?.winnerId;
-  const championPlayer =
-    championWinnerId === finalMatch?.player1.player?.id
-      ? finalMatch?.player1.player
-      : championWinnerId === finalMatch?.player2.player?.id
-      ? finalMatch?.player2.player
-      : null;
+  let championPlayer: SeededPlayer | null = null;
+  if (tier.eliminationType === 'DOUBLE' && tier.bracketRouting !== 'ACCELERATED_HYBRID') {
+    const gfResetMatch = Object.values(bracket.matchesById).find(
+      (m) => m.stage === 'GRAND_FINALS_RESET' || m.roundIdentifier === 'GF_RESET'
+    );
+    const gf1Match = Object.values(bracket.matchesById).find(
+      (m) => m.stage === 'GRAND_FINALS' || m.roundIdentifier === 'GF'
+    );
+
+    const activeGfMatch =
+      gfResetMatch && (tournament.matchScores[gfResetMatch.id]?.winnerPlayerId || gfResetMatch.winnerId)
+        ? gfResetMatch
+        : gf1Match;
+
+    if (activeGfMatch) {
+      const record = tournament.matchScores[activeGfMatch.id];
+      const p1 = activeGfMatch.player1.player;
+      const p2 = activeGfMatch.player2.player;
+      const winnerId = record?.winnerPlayerId || activeGfMatch.winnerId;
+
+      if (winnerId && (winnerId === p1?.id || winnerId === p2?.id)) {
+        if (activeGfMatch === gf1Match && p2?.id && winnerId === p2.id && gfResetMatch) {
+          const resetRecord = tournament.matchScores[gfResetMatch.id];
+          const resetWinner = resetRecord?.winnerPlayerId || gfResetMatch.winnerId;
+          if (resetWinner) {
+            championPlayer =
+              resetWinner === gfResetMatch.player1.player?.id
+                ? gfResetMatch.player1.player
+                : gfResetMatch.player2.player;
+          }
+        } else {
+          championPlayer = winnerId === p1?.id ? p1 : p2;
+        }
+      }
+    }
+  } else {
+    const finalRound = rounds[rounds.length - 1];
+    const finalMatch = finalRound?.matches[0];
+    const championWinnerId = finalMatch?.winnerId || tournament.matchScores[finalMatch?.id || '']?.winnerPlayerId;
+    championPlayer =
+      championWinnerId === finalMatch?.player1.player?.id
+        ? finalMatch?.player1.player
+        : championWinnerId === finalMatch?.player2.player?.id
+        ? finalMatch?.player2.player
+        : null;
+  }
 
   const championProfile = championPlayer
     ? (tournament.playersPool || []).find((p) => p.id === championPlayer.id)
@@ -175,48 +212,108 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
         minHeight: `${layout.totalHeight}px`,
       }}
     >
-      {/* Sticky Round Headers Bar (Pinned to top when scrolling down in standard mode; fixed at top in fit mode) */}
-      <div
-        style={{
-          position: effectiveObsView === 'fit' ? 'absolute' : 'sticky',
-          top: 0,
-          left: 0,
-          zIndex: 10,
-          width: `${layout.totalWidth}px`,
-          height: `${Math.max(48, (layout.roundHeaders[0]?.y ?? 8) + 38)}px`,
-          background: effectiveCanvasBg,
-          pointerEvents: 'none',
-          marginBottom: '6px',
-        }}
-      >
-        {layout.roundHeaders.map((header) => (
-          <div
-            key={header.roundNumber}
-            style={{
-              position: 'absolute',
-              left: `${header.x}px`,
-              top: `${header.y}px`,
-              width: `${header.width}px`,
-              height: '34px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '0.82rem',
-              fontWeight: 800,
-              color: primaryColor,
-              textTransform: 'uppercase',
-              letterSpacing: '0.08em',
-              background: effectiveCardBg,
-              borderRadius: 'var(--radius-sm)',
-              border: `1.5px solid ${primaryColor}`,
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)',
-              pointerEvents: 'auto',
-            }}
-          >
-            {header.name}
-          </div>
-        ))}
-      </div>
+      {tier.eliminationType === 'DOUBLE' ? (
+        <>
+          {/* Double Elimination Stage Section Badges */}
+          {layout.stageHeaders?.map((sh) => (
+            <div
+              key={sh.id}
+              style={{
+                position: 'absolute',
+                left: `${sh.x}px`,
+                top: `${sh.y}px`,
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: '0.2rem 0.65rem',
+                fontSize: '0.72rem',
+                fontWeight: 900,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                color: primaryColor,
+                background: effectiveCardBg,
+                border: `1.5px solid ${primaryColor}77`,
+                borderRadius: 'var(--radius-sm)',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+                zIndex: 10,
+              }}
+            >
+              {sh.title}
+            </div>
+          ))}
+
+          {/* Double Elimination Round Headers */}
+          {layout.roundHeaders.map((header) => (
+            <div
+              key={header.roundNumber}
+              style={{
+                position: 'absolute',
+                left: `${header.x}px`,
+                top: `${header.y}px`,
+                width: `${header.width}px`,
+                height: '34px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '0.82rem',
+                fontWeight: 800,
+                color: primaryColor,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                background: effectiveCardBg,
+                borderRadius: 'var(--radius-sm)',
+                border: `1.5px solid ${primaryColor}`,
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)',
+                zIndex: 10,
+              }}
+            >
+              {header.name}
+            </div>
+          ))}
+        </>
+      ) : (
+        /* Sticky Round Headers Bar for Single Elimination */
+        <div
+          style={{
+            position: effectiveObsView === 'fit' ? 'absolute' : 'sticky',
+            top: 0,
+            left: 0,
+            zIndex: 10,
+            width: `${layout.totalWidth}px`,
+            height: `${Math.max(48, (layout.roundHeaders[0]?.y ?? 8) + 38)}px`,
+            background: effectiveCanvasBg,
+            pointerEvents: 'none',
+            marginBottom: '6px',
+          }}
+        >
+          {layout.roundHeaders.map((header) => (
+            <div
+              key={header.roundNumber}
+              style={{
+                position: 'absolute',
+                left: `${header.x}px`,
+                top: `${header.y}px`,
+                width: `${header.width}px`,
+                height: '34px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '0.82rem',
+                fontWeight: 800,
+                color: primaryColor,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                background: effectiveCardBg,
+                borderRadius: 'var(--radius-sm)',
+                border: `1.5px solid ${primaryColor}`,
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)',
+                pointerEvents: 'auto',
+              }}
+            >
+              {header.name}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Layer 1: Dynamic SVG Orthogonal Connector Lines */}
       <svg
@@ -281,16 +378,16 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
           const p1Profile = p1 ? (tournament.playersPool || []).find((p) => p.id === p1.id) : null;
           const p2Profile = p2 ? (tournament.playersPool || []).find((p) => p.id === p2.id) : null;
 
-          const p1Name =
-            p1?.name ||
-            (match.player1.sourceMatchId
-              ? `Winner of M#${bracket.matchesById[match.player1.sourceMatchId]?.matchNumber || '?'}`
-              : 'TBD');
-          const p2Name =
-            p2?.name ||
-            (match.player2.sourceMatchId
-              ? `Winner of M#${bracket.matchesById[match.player2.sourceMatchId]?.matchNumber || '?'}`
-              : 'TBD');
+          const getSlotPlaceholder = (slot: typeof match.player1, fallbackNumber: number) => {
+            if (!slot.sourceMatchId) return 'TBD';
+            const src = bracket.matchesById[slot.sourceMatchId];
+            if (!src) return 'TBD';
+            const isLoserDrop = match.stage === 'LOSERS' && src.stage === 'WINNERS';
+            return `${isLoserDrop ? 'Loser' : 'Winner'} of M#${src.matchNumber || fallbackNumber}`;
+          };
+
+          const p1Name = p1?.name || getSlotPlaceholder(match.player1, 1);
+          const p2Name = p2?.name || getSlotPlaceholder(match.player2, 2);
 
           const p1Wins = record?.player1Wins || 0;
           const p2Wins = record?.player2Wins || 0;

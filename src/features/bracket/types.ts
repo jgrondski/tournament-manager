@@ -1,4 +1,7 @@
 export type BracketType = 'TRADITIONAL' | 'FLAT';
+export type EliminationType = 'SINGLE' | 'DOUBLE';
+export type BracketRouting = 'TRADITIONAL_TREE' | 'FLAT_STAGED' | 'ACCELERATED_HYBRID';
+export type BracketStage = 'WINNERS' | 'LOSERS' | 'GRAND_FINALS' | 'GRAND_FINALS_RESET';
 
 export interface SeededPlayer {
   id: string;
@@ -14,17 +17,29 @@ export interface MatchParticipant {
   isBye?: boolean;
 }
 
+export interface MatchSlotFeeder {
+  matchId?: string;
+  type: 'WINNER' | 'LOSER' | 'DIRECT';
+}
+
 export interface BracketMatch {
   id: string;
   tierId?: string;
+  stage?: BracketStage;
+  roundIdentifier?: string; // e.g. 'W1', 'W2', 'L1', 'L2', 'GF', 'GF_RESET'
   roundNumber: number; // 1-indexed (1, 2, ..., totalRounds)
-  matchNumber: number; // 1-indexed within the round
+  roundIndex?: number; // 0-indexed DAG round index
+  matchNumber: number; // Sequential match number across bracket
   player1: MatchParticipant;
   player2: MatchParticipant;
+  slotA?: MatchSlotFeeder;
+  slotB?: MatchSlotFeeder;
   winnerId: string | null;
   loserId: string | null;
   nextMatchId?: string;
   nextMatchSlot?: 1 | 2;
+  loserNextMatchId?: string;
+  loserNextMatchSlot?: 1 | 2;
   bestOf: number;
   isBye: boolean;
 }
@@ -32,23 +47,34 @@ export interface BracketMatch {
 export interface BracketRound {
   roundNumber: number;
   name: string;
+  shortName?: string;
+  stage?: BracketStage;
+  roundIdentifier?: string;
   matches: BracketMatch[];
 }
 
 export interface BracketStructure {
   tierId?: string;
   type: BracketType;
+  eliminationType?: EliminationType;
+  bracketRouting?: BracketRouting;
   totalPlayers: number;
   totalRounds: number;
   flatWidth?: number;
+  finalsCutoff?: number;
   rounds: BracketRound[];
   matchesById: Record<string, BracketMatch>;
+  grandFinalsResetMatchId?: string;
 }
 
 export interface GenerateBracketOptions {
   tierId?: string;
   bestOf?: number;
-  roundBestOfOverrides?: Record<number, number>;
+  eliminationType?: EliminationType;
+  bracketRouting?: BracketRouting;
+  flatWidth?: number;
+  finalsCutoff?: number;
+  roundBestOfOverrides?: Record<string | number, number>;
 }
 
 export const isMatchPlayable = (match: BracketMatch): boolean => {

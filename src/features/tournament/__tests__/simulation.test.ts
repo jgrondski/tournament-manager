@@ -413,5 +413,73 @@ describe('Simulation Engine', () => {
       expect(simulatedTourney.tiers).toHaveLength(2);
       expect(Object.keys(simulatedTourney.matchScores).length).toBeGreaterThan(0);
     });
+
+    it('simulates a Double Elimination tier completely and crowns a champion', async () => {
+      const { generateDoubleEliminationBracket } = await import('../../bracket/math');
+      const { calculateTierStandings } = await import('../standings');
+
+      const players: PlayerProfile[] = Array.from({ length: 8 }, (_, i) => ({
+        id: `de-p${i + 1}`,
+        name: `Competitor ${i + 1}`,
+        personalBest: 1000000,
+        playstyle: 'Rolling' as const,
+      }));
+
+      const seededPlayers = players.map((p, i) => ({
+        id: p.id,
+        name: p.name,
+        seed: i + 1,
+      }));
+
+      const deTier: TournamentTier = {
+        id: 'tier-de',
+        slug: 'de',
+        name: 'Double Elim Tier',
+        priority: 1,
+        bracketType: 'TRADITIONAL',
+        eliminationType: 'DOUBLE',
+        playerCount: 8,
+        bestOf: 3,
+        isLocked: false,
+        bracket: generateDoubleEliminationBracket(seededPlayers, { tierId: 'tier-de', bestOf: 3 }),
+      };
+
+      const tournament: Tournament = {
+        id: 'tourney-de',
+        organizationId: 'org-test',
+        slug: 'tourney-de',
+        name: 'Double Elim Open',
+        date: '2026-09-24',
+        location: 'Arena',
+        qualFormat: 'HIGH_SCORE',
+        isLocked: false,
+        tiers: [deTier],
+        matchScores: {},
+        playersPool: players,
+        qualifierSubmissions: players.map((p, i) => ({
+          id: `sub-${i + 1}`,
+          tournamentId: 'tourney-de',
+          playerId: p.id,
+          score: 900000 - i * 10000,
+          submittedAt: Date.now() + i,
+        })),
+        tournamentPlayers: {},
+      };
+
+      const simulated = runFullSimulation(tournament);
+      expect(simulated.isLocked).toBe(true);
+
+      const tierSim = simulated.tiers[0];
+      const matchCount = Object.keys(tierSim.bracket.matchesById).length;
+      // Either 14 (no GF reset) or 15 (GF reset)
+      expect([14, 15]).toContain(matchCount);
+
+      const standings = calculateTierStandings(tierSim, simulated.matchScores);
+      expect(standings).toHaveLength(8);
+      expect(standings[0].rankNumber).toBe(1);
+      expect(standings[0].status).toBe('champion');
+      expect(standings[1].rankNumber).toBe(2);
+      expect(standings[1].status).toBe('runner_up');
+    });
   });
 });

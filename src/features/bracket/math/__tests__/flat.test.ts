@@ -162,6 +162,26 @@ describe('generateFlatBracket', () => {
     });
   });
 
+  describe('Sequential match numbering across rounds', () => {
+    it('numbers all matches sequentially from 1 to N-1 without resetting per round', () => {
+      const players = createMockPlayers(16);
+      const bracket = generateFlatBracket(players, 4);
+      const allMatches = bracket.rounds.flatMap(r => r.matches);
+      expect(allMatches).toHaveLength(15);
+      const numbers = allMatches.map(m => m.matchNumber);
+      expect(numbers).toEqual(Array.from({ length: 15 }, (_, i) => i + 1));
+    });
+
+    it('correctly numbers matches sequentially for N=9, width=2', () => {
+      const players = createMockPlayers(9);
+      const bracket = generateFlatBracket(players, 2);
+      const allMatches = bracket.rounds.flatMap(r => r.matches);
+      expect(allMatches).toHaveLength(8);
+      const numbers = allMatches.map(m => m.matchNumber);
+      expect(numbers).toEqual(Array.from({ length: 8 }, (_, i) => i + 1));
+    });
+  });
+
   describe('getValidFlatWidths', () => {
     it('returns [2, 4] for 9 players', () => {
       expect(getValidFlatWidths(9)).toEqual([2, 4]);

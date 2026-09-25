@@ -1,5 +1,7 @@
-import { BracketStructure, BracketType } from '../bracket/types';
+import { BracketStructure, BracketType, EliminationType, BracketStage, BracketRouting } from '../bracket/types';
 import { TierThemeColors } from '../bracket/colorUtils';
+
+export type { EliminationType, BracketStage, BracketRouting };
 
 export type QualFormat = 'HIGH_SCORE' | 'AVERAGE_OF_X' | 'POINTS';
 
@@ -89,7 +91,10 @@ export interface TournamentTier {
   name: string; // e.g. 'Gold Bracket'
   priority: number; // 1 for highest/default tier
   bracketType: BracketType;
+  eliminationType?: EliminationType; // 'SINGLE' | 'DOUBLE' (default 'SINGLE')
+  bracketRouting?: BracketRouting;
   flatWidth?: number;
+  finalsCutoff?: number;
   bestOf: number;
   playerCount: number;
   primaryColor?: string;
@@ -100,7 +105,7 @@ export interface TournamentTier {
   textSize?: 'compact' | 'normal' | 'large' | 'small' | 'medium' | 'xlarge' | number; // Bracket text size scaling
   bracket: BracketStructure;
   isLocked: boolean;
-  roundBestOfOverrides?: Record<number, number>; // Key: roundNumber (1, 2, ...), Value: bestOf (1..99)
+  roundBestOfOverrides?: Record<string | number, number>; // Key: roundNumber (1, 2, ...) or stage ('W1', 'L1', 'GF', 'GF_RESET'), Value: bestOf (1..99)
 }
 
 export interface QualifierSubmission {

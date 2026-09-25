@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Tournament, TournamentTier } from '../features/tournament/types';
 import { useTournament } from '../features/tournament/store';
 import { useOrganization } from '../features/organizations/store';
+import { getStoredTierSlug, setStoredTierSlug } from '../features/tournament/tierStorage';
 import { colorWithAlpha } from '../features/bracket/colorUtils';
 import { VerifyBracketModal } from '../features/tournament/components/VerifyBracketModal';
 import {
@@ -47,7 +48,12 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
   const [obsSearchTerm, setObsSearchTerm] = useState('');
   const [selectedChroma, setSelectedChroma] = useState<'none' | 'green' | 'magenta' | 'blue'>('none');
 
-  const currentTierSlug = activeTier?.slug || tournament.tiers[0]?.slug;
+  const storedTierSlug = tournament?.slug ? getStoredTierSlug(tournament.slug) : null;
+  const currentTierSlug =
+    activeTier?.slug ||
+    (storedTierSlug && tournament.tiers.some(t => t.slug === storedTierSlug)
+      ? storedTierSlug
+      : tournament.tiers[0]?.slug);
   const isBracketSpecificView = activeView === 'bracket' || activeView === 'sheet' || activeView === 'judge';
 
   const copyToClipboard = (urlPath: string, key: string, e: React.MouseEvent) => {
@@ -336,8 +342,8 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
             </Link>
 
             <Link
-              to={currentTierSlug ? `/${tournament.slug}/${currentTierSlug}` : `/${tournament.slug}/bracket`}
-              onClick={e => handleLinkClick(e, currentTierSlug ? `/${tournament.slug}/${currentTierSlug}` : `/${tournament.slug}/bracket`)}
+              to={currentTierSlug ? `/${tournament.slug}/${currentTierSlug}` : `/${tournament.slug}/brackets`}
+              onClick={e => handleLinkClick(e, currentTierSlug ? `/${tournament.slug}/${currentTierSlug}` : `/${tournament.slug}/brackets`)}
               style={{
                 ...viewTabStyle,
                 background: activeView === 'bracket' ? 'var(--color-bg-surface)' : 'transparent',
@@ -574,7 +580,10 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
                 <Link
                   key={tier.id}
                   to={targetPath}
-                  onClick={e => handleLinkClick(e, targetPath)}
+                  onClick={e => {
+                    setStoredTierSlug(tournament.slug, tier.slug);
+                    handleLinkClick(e, targetPath);
+                  }}
                   style={{
                     padding: '0.25rem 0.65rem',
                     borderRadius: 'var(--radius-sm)',

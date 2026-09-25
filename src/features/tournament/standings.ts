@@ -245,6 +245,127 @@ export function calculateTierStandings(
   const placements: StandingsPlacement[] = [];
   const placedPlayerIds = new Set<string>();
 
+  if (tier.eliminationType === 'DOUBLE') {
+    // 1. Grand Finals Match (check reset first, then GF1)
+    const gfResetMatch = Object.values(tier.bracket.matchesById).find(
+      (m) => m.stage === 'GRAND_FINALS_RESET' || m.roundIdentifier === 'GF_RESET'
+    );
+    const gf1Match = Object.values(tier.bracket.matchesById).find(
+      (m) => m.stage === 'GRAND_FINALS' || m.roundIdentifier === 'GF'
+    );
+
+    const activeGfMatch =
+      gfResetMatch && (matchScores[gfResetMatch.id]?.winnerPlayerId || gfResetMatch.winnerId)
+        ? gfResetMatch
+        : gf1Match;
+
+    if (activeGfMatch) {
+      const record = matchScores[activeGfMatch.id];
+      const p1 = activeGfMatch.player1.player;
+      const p2 = activeGfMatch.player2.player;
+      const winnerId = record?.winnerPlayerId || activeGfMatch.winnerId;
+
+      if (winnerId && (winnerId === p1?.id || winnerId === p2?.id)) {
+        const champ = winnerId === p1?.id ? p1 : p2;
+        const runnerUp = winnerId === p1?.id ? p2 : p1;
+
+        if (champ && !placedPlayerIds.has(champ.id)) {
+          placements.push({
+            rankLabel: '1st Place (Champion)',
+            rankNumber: 1,
+            player: champ,
+            status: 'champion',
+          });
+          placedPlayerIds.add(champ.id);
+        }
+
+        if (runnerUp && !placedPlayerIds.has(runnerUp.id)) {
+          placements.push({
+            rankLabel: '2nd Place (Runner-up)',
+            rankNumber: 2,
+            player: runnerUp,
+            status: 'runner_up',
+          });
+          placedPlayerIds.add(runnerUp.id);
+        }
+      }
+    }
+
+    // 2. Losers Bracket elimination rounds in reverse chronological order
+    const loserRounds = tier.bracket.rounds.filter(
+      (r) => r.stage === 'LOSERS' || r.roundIdentifier?.startsWith('L')
+    );
+
+    let currentRankCounter = 3;
+
+    for (let rIdx = loserRounds.length - 1; rIdx >= 0; rIdx--) {
+      const round = loserRounds[rIdx];
+      const roundLosers: Array<{
+        player: SeededPlayer;
+        exitGameWins: number;
+        avgLossScore: number;
+        seed: number;
+        status: StandingsPlacement['status'];
+      }> = [];
+
+      for (const match of round.matches) {
+        if (match.isBye) continue;
+        const record = matchScores[match.id];
+        const loserId = record?.loserPlayerId || match.loserId;
+        const p1 = match.player1.player;
+        const p2 = match.player2.player;
+        const loser = loserId === p1?.id ? p1 : loserId === p2?.id ? p2 : null;
+        const winner = loserId === p1?.id ? p2 : loserId === p2?.id ? p1 : null;
+
+        if (loser && !placedPlayerIds.has(loser.id)) {
+          let exitWins = 0;
+          let avgLoss = 0;
+
+          if (record) {
+            const details = calculateExitDetails(record, match.bestOf || tier.bestOf, tier.bestOf, loser.id, winner, round.shortName || round.name, match);
+            exitWins = details.playerWins;
+            avgLoss = details.avgLossScore;
+          }
+
+          const status: StandingsPlacement['status'] =
+            rIdx === loserRounds.length - 1
+              ? 'semifinalist'
+              : rIdx === loserRounds.length - 2
+              ? 'semifinalist'
+              : 'participant';
+
+          roundLosers.push({
+            player: loser,
+            exitGameWins: exitWins,
+            avgLossScore: avgLoss,
+            seed: loser.seed || 999,
+            status,
+          });
+          placedPlayerIds.add(loser.id);
+        }
+      }
+
+      // Sort round losers by intra-round exit tiebreaker
+      roundLosers.sort((a, b) => {
+        if (b.exitGameWins !== a.exitGameWins) return b.exitGameWins - a.exitGameWins;
+        if (b.avgLossScore !== a.avgLossScore) return b.avgLossScore - a.avgLossScore;
+        return a.seed - b.seed;
+      });
+
+      for (const loserItem of roundLosers) {
+        placements.push({
+          rankLabel: getRankOrdinal(currentRankCounter),
+          rankNumber: currentRankCounter,
+          player: loserItem.player,
+          status: loserItem.status,
+        });
+        currentRankCounter++;
+      }
+    }
+
+    return placements;
+  }
+
   // 1. Finals (Round from finals = 0)
   const finalsRound = rounds[rounds.length - 1];
   const finalsMatch = finalsRound?.matches[0];
@@ -388,7 +509,19 @@ export function calculateGlobalStandings(tournament: Tournament): GlobalStanding
 
     // A. Finals Round (Champion and Runner-up)
     const finalsRound = rounds[rounds.length - 1];
-    const finalsMatch = finalsRound?.matches[0];
+    let finalsMatch = finalsRound?.matches[0];
+    if (tier.eliminationType === 'DOUBLE') {
+      const gfResetMatch = Object.values(tier.bracket.matchesById).find(
+        (m) => m.stage === 'GRAND_FINALS_RESET' || m.roundIdentifier === 'GF_RESET'
+      );
+      const gf1Match = Object.values(tier.bracket.matchesById).find(
+        (m) => m.stage === 'GRAND_FINALS' || m.roundIdentifier === 'GF'
+      );
+      finalsMatch =
+        gfResetMatch && (tournament.matchScores[gfResetMatch.id]?.winnerPlayerId || gfResetMatch.winnerId)
+          ? gfResetMatch
+          : gf1Match || finalsMatch;
+    }
     if (finalsMatch) {
       const record = tournament.matchScores[finalsMatch.id];
       const p1 = finalsMatch.player1.player;
@@ -509,10 +642,18 @@ export function calculateGlobalStandings(tournament: Tournament): GlobalStanding
       }
     }
 
-    // B. Earlier Elimination Rounds (Semifinals down to Round 1)
-    for (let rIdx = rounds.length - 2; rIdx >= 0; rIdx--) {
-      const round = rounds[rIdx];
-      const roundName = getRoundName(round.roundNumber, rounds.length, round.matches.length);
+    // B. Earlier Elimination Rounds
+    const earlierRounds =
+      tier.eliminationType === 'DOUBLE'
+        ? tier.bracket.rounds.filter((r) => r.stage === 'LOSERS' || r.roundIdentifier?.startsWith('L'))
+        : rounds.slice(0, rounds.length - 1);
+
+    for (let rIdx = earlierRounds.length - 1; rIdx >= 0; rIdx--) {
+      const round = earlierRounds[rIdx];
+      const roundName =
+        tier.eliminationType === 'DOUBLE'
+          ? (round.shortName || round.name)
+          : getRoundName(round.roundNumber, rounds.length, round.matches.length);
       const eliminatedInRound: EliminatedCompetitor[] = [];
 
       for (const match of round.matches) {

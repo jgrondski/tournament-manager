@@ -50,6 +50,7 @@ export const App: React.FC = () => {
 
           {/* Route Aliases for Direct Friendly URLs */}
           <Route path="/:slug/brackets" element={<PublicTierBracketPage />} />
+          <Route path="/:slug/bracket" element={<PublicTierBracketPage />} />
           <Route path="/:slug/sheet" element={<ManageSheetPage />} />
           <Route path="/:slug/judge" element={<ManageJudgePage />} />
           <Route path="/:slug/players" element={<ManageTournamentPlayersPage />} />

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Tournament, TournamentTier, QualFormat, PointsThreshold, DEFAULT_POINTS_THRESHOLDS } from '../types';
+import { Tournament, TournamentTier, QualFormat, PointsThreshold, DEFAULT_POINTS_THRESHOLDS, BracketRouting } from '../types';
 import { useTournament } from '../store';
 import {
   Plus,
@@ -27,7 +27,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { useOrganization } from '../../organizations/store';
-import { generateTraditionalBracket, generateFlatBracket, getValidFlatWidths } from '../../bracket/math';
+import { generateTraditionalBracket, generateFlatBracket, generateDoubleEliminationBracket, getValidFlatWidths } from '../../bracket/math';
 import { getDefaultTierColors, TierThemeColors } from '../../bracket/colorUtils';
 import { generateDraftBracketsForTournament } from '../../qualifiers/scoring';
 import { BestOfSelect } from '../../bracket/components/BestOfSelect';
@@ -39,33 +39,33 @@ import { PointsThresholdsDrawer } from './PointsThresholdsDrawer';
 
 interface DraftOverrideRow {
   id: string;
-  roundNumber: number;
+  roundKey: string | number;
   bestOf: number;
-  originalRoundNumber: number;
+  originalRoundKey: string | number;
   originalBestOf: number;
   isDirty: boolean;
 }
 
 interface RoundOverridesEditorProps {
   tier: TournamentTier;
-  onChange: (overrides: Record<number, number>) => void;
+  onChange: (overrides: Record<string | number, number>) => void;
   inputStyle: React.CSSProperties;
 }
 
 const RoundOverridesEditor: React.FC<RoundOverridesEditorProps> = ({ tier, onChange, inputStyle }) => {
   const [draftRows, setDraftRows] = useState<DraftOverrideRow[]>(() => {
     const entries = Object.entries(tier.roundBestOfOverrides || {})
-      .map(([rStr, boVal]) => ({
-        roundNumber: parseInt(rStr, 10),
-        bestOf: boVal,
-      }))
-      .sort((a, b) => a.roundNumber - b.roundNumber);
+      .map(([rStr, boVal]) => {
+        const num = parseInt(rStr, 10);
+        const roundKey = !isNaN(num) && String(num) === rStr ? num : rStr;
+        return { roundKey, bestOf: boVal };
+      });
 
     return entries.map(e => ({
-      id: `r_${e.roundNumber}`,
-      roundNumber: e.roundNumber,
+      id: `r_${e.roundKey}`,
+      roundKey: e.roundKey,
       bestOf: e.bestOf,
-      originalRoundNumber: e.roundNumber,
+      originalRoundKey: e.roundKey,
       originalBestOf: e.bestOf,
       isDirty: false,
     }));
@@ -74,11 +74,11 @@ const RoundOverridesEditor: React.FC<RoundOverridesEditorProps> = ({ tier, onCha
   // Sync with tier.roundBestOfOverrides changes if there are no dirty edits in progress
   useEffect(() => {
     const entries = Object.entries(tier.roundBestOfOverrides || {})
-      .map(([rStr, boVal]) => ({
-        roundNumber: parseInt(rStr, 10),
-        bestOf: boVal,
-      }))
-      .sort((a, b) => a.roundNumber - b.roundNumber);
+      .map(([rStr, boVal]) => {
+        const num = parseInt(rStr, 10);
+        const roundKey = !isNaN(num) && String(num) === rStr ? num : rStr;
+        return { roundKey, bestOf: boVal };
+      });
 
     setDraftRows(prev => {
       // If user has active dirty edits, do not disrupt unless overrides structurally changed
@@ -87,16 +87,16 @@ const RoundOverridesEditor: React.FC<RoundOverridesEditorProps> = ({ tier, onCha
 
       if (
         prev.length === entries.length &&
-        prev.every((r, idx) => r.roundNumber === entries[idx]?.roundNumber && r.bestOf === entries[idx]?.bestOf)
+        prev.every((r, idx) => r.roundKey === entries[idx]?.roundKey && r.bestOf === entries[idx]?.bestOf)
       ) {
         return prev;
       }
 
       return entries.map(e => ({
-        id: `r_${e.roundNumber}`,
-        roundNumber: e.roundNumber,
+        id: `r_${e.roundKey}`,
+        roundKey: e.roundKey,
         bestOf: e.bestOf,
-        originalRoundNumber: e.roundNumber,
+        originalRoundKey: e.roundKey,
         originalBestOf: e.bestOf,
         isDirty: false,
       }));
@@ -106,15 +106,16 @@ const RoundOverridesEditor: React.FC<RoundOverridesEditorProps> = ({ tier, onCha
   const availableRounds = getAvailableRoundsForTier(tier);
 
   const handleAdd = () => {
-    const takenRounds = new Set(draftRows.map(r => r.roundNumber));
-    const nextRound = availableRounds.find(r => !takenRounds.has(r.roundNumber));
+    const takenKeys = new Set(draftRows.map(r => String(r.roundKey)));
+    const nextRound = availableRounds.find(r => !takenKeys.has(String(r.roundIdentifier || r.roundNumber)));
     if (!nextRound) return;
 
+    const roundKey = nextRound.roundIdentifier || nextRound.roundNumber;
     const newRow: DraftOverrideRow = {
       id: `draft_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-      roundNumber: nextRound.roundNumber,
+      roundKey,
       bestOf: tier.bestOf,
-      originalRoundNumber: -1,
+      originalRoundKey: -1,
       originalBestOf: -1,
       isDirty: true,
     };
@@ -122,14 +123,14 @@ const RoundOverridesEditor: React.FC<RoundOverridesEditorProps> = ({ tier, onCha
     setDraftRows(prev => [...prev, newRow]);
   };
 
-  const handleRoundChange = (rowId: string, newRoundNumber: number) => {
+  const handleRoundChange = (rowId: string, newRoundKey: string | number) => {
     setDraftRows(prev =>
       prev.map(r => {
         if (r.id !== rowId) return r;
-        const isDirty = newRoundNumber !== r.originalRoundNumber || r.bestOf !== r.originalBestOf;
+        const isDirty = newRoundKey !== r.originalRoundKey || r.bestOf !== r.originalBestOf;
         return {
           ...r,
-          roundNumber: newRoundNumber,
+          roundKey: newRoundKey,
           isDirty,
         };
       })
@@ -140,7 +141,7 @@ const RoundOverridesEditor: React.FC<RoundOverridesEditorProps> = ({ tier, onCha
     setDraftRows(prev =>
       prev.map(r => {
         if (r.id !== rowId) return r;
-        const isDirty = r.roundNumber !== r.originalRoundNumber || newBo !== r.originalBestOf;
+        const isDirty = r.roundKey !== r.originalRoundKey || newBo !== r.originalBestOf;
         return {
           ...r,
           bestOf: newBo,
@@ -155,20 +156,18 @@ const RoundOverridesEditor: React.FC<RoundOverridesEditorProps> = ({ tier, onCha
       if (r.id !== rowId) return r;
       return {
         ...r,
-        originalRoundNumber: r.roundNumber,
+        originalRoundKey: r.roundKey,
         originalBestOf: r.bestOf,
         isDirty: false,
       };
     });
 
-    // Sort by roundNumber on Save with CSS transition
-    updatedRows.sort((a, b) => a.roundNumber - b.roundNumber);
     setDraftRows(updatedRows);
 
-    const nextOverrides: Record<number, number> = {};
+    const nextOverrides: Record<string | number, number> = {};
     for (const r of updatedRows) {
-      if (r.originalRoundNumber !== -1) {
-        nextOverrides[r.roundNumber] = r.bestOf;
+      if (r.originalRoundKey !== -1) {
+        nextOverrides[r.roundKey] = r.bestOf;
       }
     }
     onChange(nextOverrides);
@@ -178,10 +177,10 @@ const RoundOverridesEditor: React.FC<RoundOverridesEditorProps> = ({ tier, onCha
     const remaining = draftRows.filter(r => r.id !== rowId);
     setDraftRows(remaining);
 
-    const nextOverrides: Record<number, number> = {};
+    const nextOverrides: Record<string | number, number> = {};
     for (const r of remaining) {
-      if (r.originalRoundNumber !== -1) {
-        nextOverrides[r.roundNumber] = r.bestOf;
+      if (r.originalRoundKey !== -1) {
+        nextOverrides[r.roundKey] = r.bestOf;
       }
     }
     onChange(nextOverrides);
@@ -189,7 +188,7 @@ const RoundOverridesEditor: React.FC<RoundOverridesEditorProps> = ({ tier, onCha
 
   const configuredCount = Object.keys(tier.roundBestOfOverrides || {}).length;
   const isAllConfigured = availableRounds.length > 0 && availableRounds.every(r =>
-    draftRows.some(row => row.roundNumber === r.roundNumber)
+    draftRows.some(row => String(row.roundKey) === String(r.roundIdentifier || r.roundNumber))
   );
 
   return (
@@ -279,12 +278,13 @@ const RoundOverridesEditor: React.FC<RoundOverridesEditorProps> = ({ tier, onCha
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', transition: 'all 0.3s ease' }}>
           {draftRows.map(row => {
-            const otherDraftRounds = new Set(
-              draftRows.filter(r => r.id !== row.id).map(r => r.roundNumber)
+            const otherDraftKeys = new Set(
+              draftRows.filter(r => r.id !== row.id).map(r => String(r.roundKey))
             );
-            const selectableRounds = availableRounds.filter(
-              r => r.roundNumber === row.roundNumber || !otherDraftRounds.has(r.roundNumber)
-            );
+            const selectableRounds = availableRounds.filter(r => {
+              const k = String(r.roundIdentifier || r.roundNumber);
+              return k === String(row.roundKey) || !otherDraftKeys.has(k);
+            });
 
             return (
               <div
@@ -316,15 +316,23 @@ const RoundOverridesEditor: React.FC<RoundOverridesEditorProps> = ({ tier, onCha
                     Target Round
                   </label>
                   <select
-                    value={row.roundNumber}
-                    onChange={e => handleRoundChange(row.id, parseInt(e.target.value, 10))}
+                    value={String(row.roundKey)}
+                    onChange={e => {
+                      const val = e.target.value;
+                      const num = parseInt(val, 10);
+                      const parsedKey = !isNaN(num) && String(num) === val ? num : val;
+                      handleRoundChange(row.id, parsedKey);
+                    }}
                     style={inputStyle}
                   >
-                    {selectableRounds.map(r => (
-                      <option key={r.roundNumber} value={r.roundNumber}>
-                        {r.name}
-                      </option>
-                    ))}
+                    {selectableRounds.map(r => {
+                      const optVal = String(r.roundIdentifier || r.roundNumber);
+                      return (
+                        <option key={optVal} value={optVal}>
+                          {r.name}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 
@@ -579,6 +587,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
         (a.name || '').trim() !== (b.name || '').trim() ||
         a.priority !== b.priority ||
         a.bracketType !== b.bracketType ||
+        (a.eliminationType || 'SINGLE') !== (b.eliminationType || 'SINGLE') ||
         a.playerCount !== b.playerCount ||
         a.bestOf !== b.bestOf ||
         (a.flatWidth || 0) !== (b.flatWidth || 0) ||
@@ -803,10 +812,23 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
       const structuralChange =
         updates.playerCount !== undefined ||
         updates.bracketType !== undefined ||
-        updates.flatWidth !== undefined;
+        updates.eliminationType !== undefined ||
+        updates.bracketRouting !== undefined ||
+        updates.flatWidth !== undefined ||
+        updates.finalsCutoff !== undefined;
 
       if (structuralChange) {
-        if (target.bracketType === 'FLAT') {
+        if (target.eliminationType === 'DOUBLE') {
+          if (target.bracketRouting === 'FLAT_STAGED') {
+            if (target.flatWidth !== 4 && target.flatWidth !== 8) {
+              target.flatWidth = 4;
+            }
+          } else if (target.bracketRouting === 'ACCELERATED_HYBRID') {
+            if (target.finalsCutoff !== 8 && target.finalsCutoff !== 16) {
+              target.finalsCutoff = 16;
+            }
+          }
+        } else if (target.bracketType === 'FLAT') {
           const validWidths = getValidFlatWidths(target.playerCount);
           if (!validWidths.includes(target.flatWidth || 0)) {
             target.flatWidth = validWidths[validWidths.length - 1] ?? 2;
@@ -876,7 +898,16 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
         }));
 
         const newBracket =
-          tier.bracketType === 'FLAT'
+          tier.eliminationType === 'DOUBLE'
+            ? generateDoubleEliminationBracket(dummyPlayers, {
+                tierId: tier.id,
+                bracketRouting: tier.bracketRouting,
+                flatWidth: tier.flatWidth,
+                finalsCutoff: tier.finalsCutoff,
+                bestOf: tier.bestOf,
+                roundBestOfOverrides: tier.roundBestOfOverrides,
+              })
+            : tier.bracketType === 'FLAT'
             ? generateFlatBracket(dummyPlayers, tier.flatWidth || 4, {
                 tierId: tier.id,
                 bestOf: tier.bestOf,
@@ -1633,18 +1664,116 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
                   </div>
 
                   <div style={{ minWidth: 0 }}>
-                    <label style={{ ...labelStyle, height: '1.6rem', display: 'flex', alignItems: 'flex-end', marginBottom: '0.35rem' }}>Bracket Type</label>
+                    <label style={{ ...labelStyle, height: '1.6rem', display: 'flex', alignItems: 'flex-end', marginBottom: '0.35rem' }}>Elimination Style</label>
                     <select
-                      value={tier.bracketType}
-                      onChange={e => updateTier(idx, { bracketType: e.target.value as 'TRADITIONAL' | 'FLAT' })}
+                      value={tier.eliminationType || 'SINGLE'}
+                      onChange={e => updateTier(idx, { eliminationType: e.target.value as 'SINGLE' | 'DOUBLE' })}
                       style={inputStyle}
                     >
-                      <option value="TRADITIONAL">Traditional Single Elimination</option>
-                      <option value="FLAT">Flat Bracket</option>
+                      <option value="SINGLE">Single Elimination</option>
+                      <option value="DOUBLE">Double Elimination</option>
                     </select>
                   </div>
 
-                  {tier.bracketType === 'FLAT' && (
+                  {tier.eliminationType === 'DOUBLE' ? (
+                    <div style={{ minWidth: 0 }}>
+                      <label style={{ ...labelStyle, height: '1.6rem', display: 'flex', alignItems: 'flex-end', marginBottom: '0.35rem' }}>Bracket Routing</label>
+                      <select
+                        value={tier.bracketRouting || 'TRADITIONAL_TREE'}
+                        onChange={e => {
+                          const routing = e.target.value as BracketRouting;
+                          updateTier(idx, {
+                            bracketRouting: routing,
+                            flatWidth: routing === 'FLAT_STAGED' ? (tier.flatWidth || 4) : undefined,
+                            finalsCutoff: routing === 'ACCELERATED_HYBRID' ? (tier.finalsCutoff || 16) : undefined,
+                          });
+                        }}
+                        style={inputStyle}
+                      >
+                        <option value="TRADITIONAL_TREE">Traditional Tree</option>
+                        <option value="FLAT_STAGED">Flat Staged</option>
+                        <option value="ACCELERATED_HYBRID">Accelerated Hybrid</option>
+                      </select>
+                    </div>
+                  ) : (
+                    <div style={{ minWidth: 0 }}>
+                      <label style={{ ...labelStyle, height: '1.6rem', display: 'flex', alignItems: 'flex-end', marginBottom: '0.35rem' }}>Bracket Routing</label>
+                      <select
+                        value={tier.bracketType}
+                        onChange={e => updateTier(idx, { bracketType: e.target.value as 'TRADITIONAL' | 'FLAT' })}
+                        style={inputStyle}
+                      >
+                        <option value="TRADITIONAL">Traditional Bracket</option>
+                        <option value="FLAT">Flat Bracket</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {tier.eliminationType === 'DOUBLE' && tier.bracketRouting === 'FLAT_STAGED' && (
+                    <div style={{ minWidth: 0 }}>
+                      <label
+                        style={{
+                          ...labelStyle,
+                          height: '1.6rem',
+                          display: 'flex',
+                          alignItems: 'flex-end',
+                          marginBottom: '0.35rem',
+                          whiteSpace: 'nowrap',
+                          textOverflow: 'ellipsis',
+                          overflow: 'hidden'
+                        }}
+                        title="Flat Width (Matches Per Round)"
+                      >
+                        Flat Width
+                      </label>
+                      <select
+                        value={tier.flatWidth || 4}
+                        onChange={e => updateTier(idx, { flatWidth: parseInt(e.target.value, 10) })}
+                        style={{
+                          ...inputStyle,
+                          borderColor: tier.playerCount % (tier.flatWidth || 4) !== 0 ? '#ef4444' : undefined,
+                        }}
+                      >
+                        <option value={4}>4 Wide</option>
+                        <option value={8}>8 Wide</option>
+                      </select>
+                      {tier.playerCount % (tier.flatWidth || 4) !== 0 && (
+                        <div style={{ color: '#ef4444', fontSize: '0.72rem', marginTop: '0.25rem' }}>
+                          Participant count ({tier.playerCount}) must be a multiple of flat width ({tier.flatWidth || 4}).
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {tier.eliminationType === 'DOUBLE' && tier.bracketRouting === 'ACCELERATED_HYBRID' && (
+                    <div style={{ minWidth: 0 }}>
+                      <label
+                        style={{
+                          ...labelStyle,
+                          height: '1.6rem',
+                          display: 'flex',
+                          alignItems: 'flex-end',
+                          marginBottom: '0.35rem',
+                          whiteSpace: 'nowrap',
+                          textOverflow: 'ellipsis',
+                          overflow: 'hidden'
+                        }}
+                        title="Finals Cutoff"
+                      >
+                        Finals Cutoff
+                      </label>
+                      <select
+                        value={tier.finalsCutoff || 16}
+                        onChange={e => updateTier(idx, { finalsCutoff: parseInt(e.target.value, 10) })}
+                        style={inputStyle}
+                      >
+                        <option value={8}>Top 8</option>
+                        <option value={16}>Top 16</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {tier.eliminationType !== 'DOUBLE' && tier.bracketType === 'FLAT' && (
                     <div style={{ minWidth: 0 }}>
                       <label
                         style={{

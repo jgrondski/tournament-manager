@@ -319,18 +319,21 @@ export function simulateTournamentMatches(
   currentTiers = currentTiers.map(tier => {
     let bracket = { ...tier.bracket };
 
-    // Iterate through rounds in sequential order
-    for (let rIdx = 0; rIdx < bracket.rounds.length; rIdx++) {
-      const round = bracket.rounds[rIdx];
+    // Simulate matches in topological dependency order
+    let matchSimulated = true;
+    let iterations = 0;
+    while (matchSimulated && iterations < 100) {
+      matchSimulated = false;
+      iterations++;
 
-      for (const match of round.matches) {
-        if (match.isBye) continue;
+      // Find all playable matches without a concluded winner
+      const playableMatches = Object.values(bracket.matchesById).filter(
+        (m) => !m.isBye && !m.winnerId && m.player1.player && m.player2.player
+      );
 
-        const currentMatch = bracket.matchesById[match.id] || match;
+      for (const currentMatch of playableMatches) {
         const p1 = currentMatch.player1.player;
         const p2 = currentMatch.player2.player;
-
-        // Only simulate if both competitors are present
         if (!p1 || !p2) continue;
 
         const bestOf = currentMatch.bestOf || tier.bestOf || 5;
@@ -385,6 +388,7 @@ export function simulateTournamentMatches(
 
         // Advance winner through bracket math
         bracket = advanceMatchWinner(bracket, currentMatch.id, matchWinnerId);
+        matchSimulated = true;
       }
     }
 

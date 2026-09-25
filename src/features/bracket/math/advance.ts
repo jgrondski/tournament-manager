@@ -76,14 +76,92 @@ export function advanceMatchWinner(
 
   propagateWinner(updatedMatch, winnerPlayer);
 
+  // Propagate loser downstream (Double Elimination)
+  const loserPlayer = p1 && p1.id === loserId ? p1 : p2 && p2.id === loserId ? p2 : null;
+  const propagateLoser = (m: BracketMatch, loser: SeededPlayer | null) => {
+    if (!m.loserNextMatchId || !m.loserNextMatchSlot || !loser) {
+      return;
+    }
+
+    const loserNextMatch = updatedMatchesById[m.loserNextMatchId];
+    if (!loserNextMatch) {
+      return;
+    }
+
+    if (m.loserNextMatchSlot === 1) {
+      loserNextMatch.player1 = {
+        ...loserNextMatch.player1,
+        player: loser,
+        sourceMatchId: m.id,
+      };
+    } else {
+      loserNextMatch.player2 = {
+        ...loserNextMatch.player2,
+        player: loser,
+        sourceMatchId: m.id,
+      };
+    }
+  };
+
+  propagateLoser(updatedMatch, loserPlayer);
+
+  // Dynamic Grand Finals Reset handling
+  const resetMatchId = `${updatedMatch.tierId ? updatedMatch.tierId + '-' : ''}gf-reset`;
+  let grandFinalsResetMatchId: string | undefined = bracket.grandFinalsResetMatchId;
+
+  if (updatedMatch.stage === 'GRAND_FINALS' && updatedMatch.roundIdentifier === 'GF') {
+    const wbChamp = updatedMatch.player1.player;
+    const lbChamp = updatedMatch.player2.player;
+
+    if (lbChamp && winnerId === lbChamp.id && wbChamp) {
+      // Losers Champion won Grand Finals Match 1 -> Instigate Grand Finals Reset Match 2
+      const gfResetMatch: BracketMatch = {
+        id: resetMatchId,
+        tierId: updatedMatch.tierId,
+        stage: 'GRAND_FINALS_RESET',
+        roundIdentifier: 'GF_RESET',
+        roundNumber: updatedMatch.roundNumber,
+        matchNumber: (updatedMatch.matchNumber || 0) + 1,
+        player1: { player: { ...wbChamp }, sourceMatchId: updatedMatch.id },
+        player2: { player: { ...lbChamp }, sourceMatchId: updatedMatch.id },
+        winnerId: null,
+        loserId: null,
+        bestOf: updatedMatch.bestOf,
+        isBye: false,
+      };
+
+      updatedMatchesById[resetMatchId] = gfResetMatch;
+      grandFinalsResetMatchId = resetMatchId;
+    } else if (wbChamp && winnerId === wbChamp.id) {
+      // Winners Champion won Grand Finals Match 1 -> Tier complete, remove reset match if previously present
+      delete updatedMatchesById[resetMatchId];
+      grandFinalsResetMatchId = undefined;
+    }
+  }
+
   // Rebuild rounds array with new match references
-  const updatedRounds = bracket.rounds.map((round) => ({
-    ...round,
-    matches: round.matches.map((m) => updatedMatchesById[m.id]),
-  }));
+  const updatedRounds = bracket.rounds.map((round) => {
+    let matches = round.matches
+      .filter((m) => updatedMatchesById[m.id])
+      .map((m) => updatedMatchesById[m.id]);
+
+    // If this is the Grand Finals round and a reset match exists, ensure it is included
+    if (round.stage === 'GRAND_FINALS' && grandFinalsResetMatchId && updatedMatchesById[grandFinalsResetMatchId]) {
+      const resetMatch = updatedMatchesById[grandFinalsResetMatchId];
+      if (!matches.some((m) => m.id === grandFinalsResetMatchId)) {
+        matches = [...matches, resetMatch];
+      }
+    }
+
+    return {
+      ...round,
+      matches,
+    };
+  });
 
   return {
     ...bracket,
+    grandFinalsResetMatchId,
     rounds: updatedRounds,
     matchesById: updatedMatchesById,
   };
@@ -119,46 +197,78 @@ export function retractMatchWinner(
 
   // Clear downstream slot and cascade if downstream match had also declared a winner
   const clearDownstream = (m: BracketMatch) => {
-    if (!m.nextMatchId || !m.nextMatchSlot) {
-      return;
-    }
+    // 1. Clear winner propagation
+    if (m.nextMatchId && m.nextMatchSlot) {
+      const nextMatch = updatedMatchesById[m.nextMatchId];
+      if (nextMatch) {
+        let clearedPlayer = false;
+        if (m.nextMatchSlot === 1 && nextMatch.player1.sourceMatchId === m.id) {
+          if (nextMatch.player1.player !== null) {
+            nextMatch.player1.player = null;
+            clearedPlayer = true;
+          }
+        } else if (m.nextMatchSlot === 2 && nextMatch.player2.sourceMatchId === m.id) {
+          if (nextMatch.player2.player !== null) {
+            nextMatch.player2.player = null;
+            clearedPlayer = true;
+          }
+        }
 
-    const nextMatch = updatedMatchesById[m.nextMatchId];
-    if (!nextMatch) {
-      return;
-    }
-
-    let clearedPlayer = false;
-    if (m.nextMatchSlot === 1 && nextMatch.player1.sourceMatchId === m.id) {
-      if (nextMatch.player1.player !== null) {
-        nextMatch.player1.player = null;
-        clearedPlayer = true;
+        if (clearedPlayer && (nextMatch.winnerId || nextMatch.loserId)) {
+          nextMatch.winnerId = null;
+          nextMatch.loserId = null;
+          clearDownstream(nextMatch);
+        }
       }
-    } else if (m.nextMatchSlot === 2 && nextMatch.player2.sourceMatchId === m.id) {
-      if (nextMatch.player2.player !== null) {
-        nextMatch.player2.player = null;
-        clearedPlayer = true;
-      }
     }
 
-    // If downstream match lost a participant and had a winner declared, cascade retraction
-    if (clearedPlayer && (nextMatch.winnerId || nextMatch.loserId)) {
-      nextMatch.winnerId = null;
-      nextMatch.loserId = null;
-      clearDownstream(nextMatch);
+    // 2. Clear loser propagation (Double Elimination)
+    if (m.loserNextMatchId && m.loserNextMatchSlot) {
+      const loserNextMatch = updatedMatchesById[m.loserNextMatchId];
+      if (loserNextMatch) {
+        let clearedPlayer = false;
+        if (m.loserNextMatchSlot === 1 && loserNextMatch.player1.sourceMatchId === m.id) {
+          if (loserNextMatch.player1.player !== null) {
+            loserNextMatch.player1.player = null;
+            clearedPlayer = true;
+          }
+        } else if (m.loserNextMatchSlot === 2 && loserNextMatch.player2.sourceMatchId === m.id) {
+          if (loserNextMatch.player2.player !== null) {
+            loserNextMatch.player2.player = null;
+            clearedPlayer = true;
+          }
+        }
+
+        if (clearedPlayer && (loserNextMatch.winnerId || loserNextMatch.loserId)) {
+          loserNextMatch.winnerId = null;
+          loserNextMatch.loserId = null;
+          clearDownstream(loserNextMatch);
+        }
+      }
     }
   };
 
   clearDownstream(updatedMatch);
 
+  // If retracting Grand Finals Match 1, remove any dynamically generated Reset match
+  let grandFinalsResetMatchId = bracket.grandFinalsResetMatchId;
+  const resetMatchId = `${updatedMatch.tierId ? updatedMatch.tierId + '-' : ''}gf-reset`;
+  if (updatedMatch.stage === 'GRAND_FINALS' && updatedMatch.roundIdentifier === 'GF') {
+    delete updatedMatchesById[resetMatchId];
+    grandFinalsResetMatchId = undefined;
+  }
+
   // Rebuild rounds array with new match references
-  const updatedRounds = bracket.rounds.map(round => ({
+  const updatedRounds = bracket.rounds.map((round) => ({
     ...round,
-    matches: round.matches.map(m => updatedMatchesById[m.id]),
+    matches: round.matches
+      .filter((m) => updatedMatchesById[m.id])
+      .map((m) => updatedMatchesById[m.id]),
   }));
 
   return {
     ...bracket,
+    grandFinalsResetMatchId,
     rounds: updatedRounds,
     matchesById: updatedMatchesById,
   };

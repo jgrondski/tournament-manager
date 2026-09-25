@@ -134,8 +134,8 @@ describe('Round Best-of Overrides & Bo99 Support', () => {
       const rounds = getAvailableRoundsForTier(tier);
       expect(rounds).toHaveLength(4);
       expect(rounds[0].name).toContain('Round 1');
-      expect(rounds[1].name).toContain('Quarterfinals');
-      expect(rounds[2].name).toContain('Semifinals');
+      expect(rounds[1].name).toContain('Quarters');
+      expect(rounds[2].name).toContain('Semis');
       expect(rounds[3].name).toContain('Finals');
     });
 

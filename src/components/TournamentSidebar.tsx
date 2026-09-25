@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Tournament, TournamentTier } from '../features/tournament/types';
 import { useTournament } from '../features/tournament/store';
 import { useOrganization } from '../features/organizations/store';
+import { getStoredTierSlug } from '../features/tournament/tierStorage';
 import { VerifyBracketModal } from '../features/tournament/components/VerifyBracketModal';
 import {
   Layers,
@@ -22,6 +23,7 @@ import {
   AlertTriangle,
   Check,
   Building2,
+  Search,
 } from 'lucide-react';
 
 export type SidebarNavView =
@@ -36,6 +38,39 @@ export type SidebarNavView =
   | 'globalPlayers'
   | 'organizations'
   | 'tournaments';
+
+export function filterTournamentsByQuery(tournaments: Tournament[], query: string): Tournament[] {
+  if (!query.trim()) return tournaments;
+  const q = query.toLowerCase().trim();
+  return tournaments.filter(t => t.name.toLowerCase().includes(q) || t.slug.toLowerCase().includes(q));
+}
+
+export function getTournamentTargetUrl(targetTourney: Tournament, view?: SidebarNavView): string {
+  const storedTier = getStoredTierSlug(targetTourney.slug);
+  const tierSlug =
+    storedTier && targetTourney.tiers?.some(t => t.slug === storedTier)
+      ? storedTier
+      : targetTourney.tiers?.[0]?.slug;
+  switch (view) {
+    case 'standings':
+      return `/${targetTourney.slug}/standings`;
+    case 'sheet':
+      return tierSlug ? `/${targetTourney.slug}/manage/sheet?tier=${tierSlug}` : `/${targetTourney.slug}/manage/sheet`;
+    case 'bracket':
+      return tierSlug ? `/${targetTourney.slug}/${tierSlug}` : `/${targetTourney.slug}/brackets`;
+    case 'judge':
+      return tierSlug ? `/${targetTourney.slug}/manage/judge?tier=${tierSlug}` : `/${targetTourney.slug}/manage/judge`;
+    case 'obs':
+      return `/${targetTourney.slug}/obs`;
+    case 'players':
+      return `/${targetTourney.slug}/manage/players`;
+    case 'settings':
+      return `/${targetTourney.slug}/manage/settings`;
+    case 'leaderboard':
+    default:
+      return `/${targetTourney.slug}/leaderboard`;
+  }
+}
 
 interface TournamentSidebarProps {
   tournament?: Tournament;
@@ -76,11 +111,18 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
   };
 
   const [isTournamentMenuOpen, setIsTournamentMenuOpen] = useState(false);
+  const [tournamentSearchQuery, setTournamentSearchQuery] = useState('');
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
   const [unlockError, setUnlockError] = useState<string | null>(null);
 
   const activeTourney = tournament || tournaments[0];
-  const currentTierSlug = activeTier?.slug || activeTourney?.tiers[0]?.slug;
+  const slug = activeTourney?.slug;
+  const storedTierSlug = slug ? getStoredTierSlug(slug) : null;
+  const currentTierSlug =
+    activeTier?.slug ||
+    (storedTierSlug && activeTourney?.tiers.some(t => t.slug === storedTierSlug)
+      ? storedTierSlug
+      : activeTourney?.tiers[0]?.slug);
   const currentOrg = activeTourney?.organizationId ? getOrganizationById(activeTourney.organizationId) : undefined;
 
   useEffect(() => {
@@ -115,6 +157,7 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
       const target = e.target as HTMLElement;
       if (!target.closest('[data-tournament-menu]')) {
         setIsTournamentMenuOpen(false);
+        setTournamentSearchQuery('');
       }
     };
     if (isTournamentMenuOpen) {
@@ -122,8 +165,6 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
     }
     return () => document.removeEventListener('click', handleClickOutside);
   }, [isTournamentMenuOpen]);
-
-  const slug = activeTourney?.slug;
 
   const navItems = [
     {
@@ -144,7 +185,7 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
       key: 'sheet' as const,
       label: 'Master Sheet',
       icon: Sheet,
-      to: slug ? `/${slug}/manage/sheet` : '/',
+      to: slug ? (currentTierSlug ? `/${slug}/manage/sheet?tier=${currentTierSlug}` : `/${slug}/manage/sheet`) : '/',
       badge: null,
     },
     {
@@ -158,7 +199,7 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
       key: 'judge' as const,
       label: 'Floor Judge',
       icon: Scale,
-      to: slug ? `/${slug}/manage/judge` : '/',
+      to: slug ? (currentTierSlug ? `/${slug}/manage/judge?tier=${currentTierSlug}` : `/${slug}/manage/judge`) : '/',
       badge: null,
     },
     {
@@ -183,6 +224,8 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
       badge: null,
     },
   ];
+
+  const filteredTournaments = filterTournamentsByQuery(tournaments, tournamentSearchQuery);
 
   return (
     <>
@@ -425,7 +468,7 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
                   </div>
                 )}
 
-                {/* 2. Switch Tournament List */}
+                {/* 2. Switch Tournament List & Search */}
                 <div
                   style={{
                     padding: '0.45rem 0.85rem 0.25rem',
@@ -434,44 +477,110 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
                     color: 'var(--color-text-muted, #64748b)',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
                   }}
                 >
-                  Tournaments ({tournaments.length})
+                  <span>Tournaments ({tournaments.length})</span>
+                  {tournamentSearchQuery && (
+                    <span style={{ fontSize: '0.62rem', color: 'var(--color-gold-bright, #ffc905)' }}>
+                      Filtered ({filteredTournaments.length})
+                    </span>
+                  )}
                 </div>
-                <div style={{ maxHeight: '180px', overflowY: 'auto' }}>
-                  {tournaments.map(t => {
-                    const isSelected = t.id === activeTourney.id;
-                    return (
+
+                {/* Search input field */}
+                <div style={{ padding: '0.25rem 0.65rem 0.45rem' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      background: 'rgba(0, 0, 0, 0.35)',
+                      border: '1px solid var(--color-border, rgba(255,255,255,0.12))',
+                      borderRadius: 'var(--radius-sm, 6px)',
+                      padding: '0.25rem 0.45rem',
+                    }}
+                  >
+                    <Search size={12} color="var(--color-text-muted, #94a3b8)" style={{ flexShrink: 0 }} />
+                    <input
+                      type="text"
+                      value={tournamentSearchQuery}
+                      onChange={e => setTournamentSearchQuery(e.target.value)}
+                      placeholder="Search tournaments..."
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        outline: 'none',
+                        color: '#ffffff',
+                        fontSize: '0.75rem',
+                        width: '100%',
+                      }}
+                    />
+                    {tournamentSearchQuery && (
                       <button
-                        key={t.id}
                         type="button"
-                        onClick={() => {
-                          setIsTournamentMenuOpen(false);
-                          navigate(`/${t.slug}/leaderboard`);
-                        }}
+                        onClick={() => setTournamentSearchQuery('')}
                         style={{
-                          width: '100%',
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--color-text-muted, #94a3b8)',
+                          cursor: 'pointer',
+                          padding: '0 0.2rem',
+                          fontSize: '0.75rem',
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '0.45rem 0.85rem',
-                          fontSize: '0.78rem',
-                          color: isSelected ? 'var(--color-gold-bright, #ffc905)' : 'var(--color-text-primary, #ffffff)',
-                          background: isSelected ? 'rgba(255, 201, 5, 0.1)' : 'transparent',
-                          border: 'none',
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                          fontWeight: isSelected ? 700 : 500,
-                          transition: 'background 0.12s ease',
                         }}
                       >
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {t.name}
-                        </span>
-                        {isSelected && <Check size={13} color="var(--color-gold-bright, #ffc905)" style={{ flexShrink: 0 }} />}
+                        ✕
                       </button>
-                    );
-                  })}
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ maxHeight: '180px', overflowY: 'auto' }}>
+                  {filteredTournaments.length === 0 ? (
+                    <div style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.75rem', color: 'var(--color-text-muted, #64748b)' }}>
+                      No tournaments found
+                    </div>
+                  ) : (
+                    filteredTournaments.map(t => {
+                      const isSelected = t.id === activeTourney.id;
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => {
+                            setIsTournamentMenuOpen(false);
+                            setTournamentSearchQuery('');
+                            const targetUrl = getTournamentTargetUrl(t, activeView);
+                            navigate(targetUrl);
+                          }}
+                          style={{
+                            width: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '0.45rem 0.85rem',
+                            fontSize: '0.78rem',
+                            color: isSelected ? 'var(--color-gold-bright, #ffc905)' : 'var(--color-text-primary, #ffffff)',
+                            background: isSelected ? 'rgba(255, 201, 5, 0.1)' : 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            fontWeight: isSelected ? 700 : 500,
+                            transition: 'background 0.12s ease',
+                          }}
+                        >
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {t.name}
+                          </span>
+                          {isSelected && <Check size={13} color="var(--color-gold-bright, #ffc905)" style={{ flexShrink: 0 }} />}
+                        </button>
+                      );
+                    })
+                  )}
                 </div>
 
                 {/* 3. Global Views Quick-Hop */}

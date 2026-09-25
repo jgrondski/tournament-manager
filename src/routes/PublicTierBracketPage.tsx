@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams, useNavigate, Navigate } from 'react-router-dom';
 import { useTournament } from '../features/tournament/store';
+import { getStoredTierSlug, setStoredTierSlug } from '../features/tournament/tierStorage';
 import { TournamentLayout } from '../components/TournamentLayout';
 import { BracketVisualizer } from '../features/bracket/components/BracketVisualizer';
 import { BracketTierBar } from '../features/bracket/components/BracketTierBar';
@@ -39,10 +40,21 @@ export const PublicTierBracketPage: React.FC = () => {
     };
   }, [isObsMode]);
 
+  // Persist current explored tier to sessionStorage
+  useEffect(() => {
+    if (tierData && slug) {
+      setStoredTierSlug(slug, tierData.tier.slug);
+    }
+  }, [tierData?.tier?.slug, slug]);
+
   // Handle missing tier / friendly aliases (e.g. /:slug/brackets)
   if (!tierData) {
     if (tournamentFallback && tournamentFallback.tiers.length > 0) {
-      return <Navigate to={`/${tournamentFallback.slug}/${tournamentFallback.tiers[0].slug}`} replace />;
+      const stored = getStoredTierSlug(slug);
+      const targetTier =
+        tournamentFallback.tiers.find(t => t.slug === stored || t.id === stored) ||
+        tournamentFallback.tiers[0];
+      return <Navigate to={`/${tournamentFallback.slug}/${targetTier.slug}`} replace />;
     }
 
     if (tournamentFallback && tournamentFallback.tiers.length === 0) {

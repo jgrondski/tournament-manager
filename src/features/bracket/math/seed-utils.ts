@@ -1,3 +1,5 @@
+import { BracketStructure } from '../types';
+
 /**
  * Mathematical utilities for tournament bracket seeding, pairing, and sizing.
  */
@@ -63,8 +65,8 @@ export function getRoundName(
 ): string {
   const roundsFromFinals = totalRounds - roundNumber;
   if (roundsFromFinals === 0) return 'Finals';
-  if (roundsFromFinals === 1) return 'Semifinals';
-  if (roundsFromFinals === 2) return 'Quarterfinals';
+  if (roundsFromFinals === 1) return 'Semis';
+  if (roundsFromFinals === 2) return 'Quarters';
 
   if (isRoundZero && roundNumber === 1) {
     return 'Round 0';
@@ -72,4 +74,21 @@ export function getRoundName(
 
   const adjustedNumber = isRoundZero ? roundNumber - 1 : roundNumber;
   return `Round ${adjustedNumber}`;
+}
+
+/**
+ * Ensures that all matches across rounds have strictly sequential 1..N match numbering.
+ * Also synchronizes the matchNumber on matchesById entries.
+ */
+export function ensureSequentialMatchNumbers(bracket: BracketStructure): BracketStructure {
+  let globalMatchNum = 1;
+  for (const round of bracket.rounds) {
+    for (const match of round.matches) {
+      match.matchNumber = globalMatchNum++;
+      if (bracket.matchesById && bracket.matchesById[match.id]) {
+        bracket.matchesById[match.id].matchNumber = match.matchNumber;
+      }
+    }
+  }
+  return bracket;
 }

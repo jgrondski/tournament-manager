@@ -41,8 +41,8 @@ describe('generateTraditionalBracket', () => {
 
       expect(bracket.totalPlayers).toBe(8);
       expect(bracket.totalRounds).toBe(3); // QF, SF, Finals
-      expect(bracket.rounds[0].name).toBe('Quarterfinals');
-      expect(bracket.rounds[1].name).toBe('Semifinals');
+      expect(bracket.rounds[0].name).toBe('Quarters');
+      expect(bracket.rounds[1].name).toBe('Semis');
       expect(bracket.rounds[2].name).toBe('Finals');
 
       // 4 QF matches, 2 SF matches, 1 Final match = 7 total matches
@@ -87,14 +87,14 @@ describe('generateTraditionalBracket', () => {
       expect(sfMatches[1].nextMatchSlot).toBe(2);
     });
 
-    it('correctly generates a 16-player bracket with Round 1, Quarterfinals, Semifinals, Finals', () => {
+    it('correctly generates a 16-player bracket with Round 1, Quarters, Semis, Finals', () => {
       const players = createMockPlayers(16);
       const bracket = generateTraditionalBracket(players);
 
       expect(bracket.totalRounds).toBe(4);
       expect(bracket.rounds[0].name).toBe('Round 1');
-      expect(bracket.rounds[1].name).toBe('Quarterfinals');
-      expect(bracket.rounds[2].name).toBe('Semifinals');
+      expect(bracket.rounds[1].name).toBe('Quarters');
+      expect(bracket.rounds[2].name).toBe('Semis');
       expect(bracket.rounds[3].name).toBe('Finals');
 
       expect(bracket.rounds[0].matches).toHaveLength(8);
@@ -104,15 +104,15 @@ describe('generateTraditionalBracket', () => {
       expect(Object.keys(bracket.matchesById)).toHaveLength(15);
     });
 
-    it('correctly generates a 32-player bracket with Round 1, Round 2, Quarterfinals, Semifinals, Finals', () => {
+    it('correctly generates a 32-player bracket with Round 1, Round 2, Quarters, Semis, Finals', () => {
       const players = createMockPlayers(32);
       const bracket = generateTraditionalBracket(players);
 
       expect(bracket.totalRounds).toBe(5);
       expect(bracket.rounds[0].name).toBe('Round 1');
       expect(bracket.rounds[1].name).toBe('Round 2');
-      expect(bracket.rounds[2].name).toBe('Quarterfinals');
-      expect(bracket.rounds[3].name).toBe('Semifinals');
+      expect(bracket.rounds[2].name).toBe('Quarters');
+      expect(bracket.rounds[3].name).toBe('Semis');
       expect(bracket.rounds[4].name).toBe('Finals');
     });
   });
@@ -220,8 +220,8 @@ describe('generateTraditionalBracket', () => {
       expect(r0.matches[0].player2.player?.seed).toBe(9);
 
       // Subsequent rounds follow standard names
-      expect(bracket.rounds[1].name).toBe('Quarterfinals');
-      expect(bracket.rounds[2].name).toBe('Semifinals');
+      expect(bracket.rounds[1].name).toBe('Quarters');
+      expect(bracket.rounds[2].name).toBe('Semis');
       expect(bracket.rounds[3].name).toBe('Finals');
     });
 

@@ -8,7 +8,7 @@ import {
   PlayerProfile,
   QualifierSubmission,
 } from './types';
-import { advanceMatchWinner, retractMatchWinner } from '../bracket/math';
+import { advanceMatchWinner, retractMatchWinner, ensureSequentialMatchNumbers } from '../bracket/math';
 import { generateDraftBracketsForTournament } from '../qualifiers/scoring';
 import {
   generateSimulatedQualifiers,
@@ -118,11 +118,46 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           return parsed.map((t: Tournament & { isVerified?: boolean; qualsClosed?: boolean }) => {
             const isLocked = Boolean(t.isLocked ?? t.isVerified);
             const { isVerified: _iv, qualsClosed: _qc, ...rest } = t;
-            return {
+            const tourney: Tournament = {
               ...rest,
               organizationId: rest.organizationId || 'org_ctwc',
               isLocked,
             };
+
+            // Auto-heal any FLAT_STAGED tiers generated with the obsolete WR2 seed formula
+            const hasCorruptedFlatStagedTier = tourney.tiers.some(tier => {
+              if (tier.eliminationType === 'DOUBLE' && tier.bracketRouting === 'FLAT_STAGED') {
+                const totalP = tier.playerCount || tier.bracket?.totalPlayers || 0;
+                const fw = tier.flatWidth || 4;
+                const w2m1 = tier.bracket?.matchesById?.[`${tier.id ? `${tier.id}-` : ''}w2-m1`];
+                if (w2m1?.player1?.player?.seed && totalP >= 2 * fw) {
+                  return w2m1.player1.player.seed > totalP - 2 * fw;
+                }
+              }
+              return false;
+            });
+
+            if (hasCorruptedFlatStagedTier) {
+              try {
+                tourney.tiers = generateDraftBracketsForTournament(tourney);
+              } catch {
+                // ignore
+              }
+            }
+
+            // Auto-heal any tiers with non-sequential or duplicate match numbers
+            tourney.tiers.forEach(tier => {
+              if (tier.bracket?.rounds) {
+                const matchNums = tier.bracket.rounds.flatMap(r => r.matches.map(m => m.matchNumber));
+                const uniqueNums = new Set(matchNums);
+                const hasDuplicatesOrZero = uniqueNums.size !== matchNums.length || uniqueNums.has(0);
+                if (hasDuplicatesOrZero) {
+                  ensureSequentialMatchNumbers(tier.bracket);
+                }
+              }
+            });
+
+            return tourney;
           });
         }
       }

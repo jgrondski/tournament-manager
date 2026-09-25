@@ -33,14 +33,15 @@ The system prioritizes human readability, deterministic rules, minimal runtime o
     * Org-level branding and default rules inheritance with per-tournament override toggles.
     * Org-level Discord webhook configuration with per-tournament fallback.
     * Raw multi-entity metric indexing: every score submission, match record, and tournament roster entry explicitly associates `(organizationId, playerId, tournamentId)`.
-* **Phase 5: Double Elimination Bracket Engine (Active Goal - Highest Priority)**
+* **Phase 5: Double Elimination Bracket Engine (Complete)**
   * Comprehensive double-elimination routing:
     * Retain `bracketType: 'TRADITIONAL' | 'FLAT'`; introduce independent `eliminationType: 'SINGLE' | 'DOUBLE'`.
-    * Standard cascading loser drop routing across both Traditional and Flat brackets (Winners R1/R2 losers feed Losers ladder).
+    * Standard cascading loser drop routing across both Traditional and Flat brackets (Winners R1/R2 losers feed Losers ladder) with strict bye invariants ($2N - 2$ total matches, no phantom matches, bye recipients who lose in W2 drop into L2).
     * Grand Finals Match 1 + dynamic Grand Finals Reset (Match 2) if the Losers Champion wins Match 1.
     * Stage-specific round overrides keyed by stage & round (`W1`, `W2`, `L1`, `L2`, `GF`, `GF_RESET`).
     * Sequential double-elimination global standings: placement determined by Losers bracket exit round, with intra-round ties broken via competitive exit tiebreakers.
-    * Canvas visualizer layout: Winners tree on top, Losers tree on the bottom half, Grand Finals centered on the right.
+    * Canvas visualizer layout: Winners tree on top, Losers tree on the bottom half, Grand Finals centered on the right, and dynamic GF Reset insertion.
+    * Floor Judge feed: Stage filter tabs (`All`, `Winners`, `Losers`, `Grand Finals`) and precise drop placeholder labeling.
 * **Phase 6: Relational Persistence & RBAC Foundation (Upcoming)**
   * Translation of finalized TypeScript contracts into Neon serverless PostgreSQL tables via Drizzle ORM schemas and server functions.
   * Granular Role-Based Access Control (RBAC): `ORG_OWNER`, `ORG_ADMIN`, `TOURNAMENT_ADMIN`, and `FLOOR_JUDGE`.
@@ -254,7 +255,7 @@ The system prioritizes human readability, deterministic rules, minimal runtime o
 
 ---
 
-## 7. Phase 5 Detailed Specifications: Double Elimination Bracket Engine (Active Goal)
+## 7. Phase 5 Detailed Specifications: Double Elimination Bracket Engine (Complete)
 
 ### 7.1 Tier Configuration & Types
 * `TournamentTier` model updated with independent elimination style:

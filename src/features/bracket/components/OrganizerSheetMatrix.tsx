@@ -360,7 +360,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
 
                           {/* Round Name (RowSpan 2) */}
                           <td rowSpan={2} style={{ ...tdMergedStyle, borderTop: borderTopStyle, color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>
-                            {round.name}
+                            {round.shortName || round.name}
                           </td>
 
                           {/* Best Of (RowSpan 2) */}
