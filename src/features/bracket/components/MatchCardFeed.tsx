@@ -55,7 +55,7 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
       {isDoubleElim && (
         <div style={{ display: 'flex', gap: '0.4rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem', overflowX: 'auto' }}>
           {(['ALL', 'WINNERS', 'LOSERS', 'GRAND_FINALS'] as const).map((stage) => {
-            const label = stage === 'ALL' ? 'All Rounds' : stage === 'WINNERS' ? 'Winners' : stage === 'LOSERS' ? 'Losers' : 'Grand Finals';
+            const label = stage === 'ALL' ? 'All Rounds' : stage === 'WINNERS' ? 'Winners' : stage === 'LOSERS' ? 'Losers' : 'Finals';
             const isSelected = selectedStage === stage;
             return (
               <button

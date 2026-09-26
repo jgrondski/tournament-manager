@@ -330,7 +330,12 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                         {/* Row 1: Player 1 */}
                         <tr
                           onClick={() => {
-                            if (isPlayable && tournament.isLocked) setSelectedMatch({ match, roundName: round.name });
+                            if (isPlayable && tournament.isLocked) {
+                              setSelectedMatch({
+                                match,
+                                roundName: match.stage === 'GRAND_FINALS_RESET' ? 'Grand Finals' : round.name,
+                              });
+                            }
                           }}
                           onMouseEnter={() => setHoveredMatchId(match.id)}
                           onMouseLeave={() => setHoveredMatchId(null)}
@@ -360,7 +365,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
 
                           {/* Round Name (RowSpan 2) */}
                           <td rowSpan={2} style={{ ...tdMergedStyle, borderTop: borderTopStyle, color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>
-                            {round.shortName || round.name}
+                            {match.stage === 'GRAND_FINALS_RESET' ? 'Grand Finals' : (round.shortName || round.name)}
                           </td>
 
                           {/* Best Of (RowSpan 2) */}
@@ -479,7 +484,12 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                         {/* Row 2: Player 2 */}
                         <tr
                           onClick={() => {
-                            if (isPlayable && tournament.isLocked) setSelectedMatch({ match, roundName: round.name });
+                            if (isPlayable && tournament.isLocked) {
+                              setSelectedMatch({
+                                match,
+                                roundName: match.stage === 'GRAND_FINALS_RESET' ? 'Grand Finals' : round.name,
+                              });
+                            }
                           }}
                           onMouseEnter={() => setHoveredMatchId(match.id)}
                           onMouseLeave={() => setHoveredMatchId(null)}

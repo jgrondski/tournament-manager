@@ -1,7 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import { generateTraditionalBracket, generateFlatBracket, generateDoubleEliminationBracket } from '../math';
 import { advanceMatchWinner } from '../math/advance';
-import { calculateBracketLayout } from '../bracketLayout';
+import {
+  calculateBracketLayout,
+  calculateAcceleratedHybridPhase1Layout,
+  calculateAcceleratedHybridPhase2Layout,
+  calculateAcceleratedHybridAccelLayout,
+  calculateAcceleratedHybridPreMergeLayout,
+  calculateAcceleratedHybridPreMergeUpperLayout,
+  calculateAcceleratedHybridPreMergeLowerLayout,
+  calculateAcceleratedHybridReClimbLayout,
+  calculateAcceleratedHybridLowerBracketLayout,
+} from '../bracketLayout';
 
 describe('bracketLayout calculation engine', () => {
   it('correctly calculates vertical midpoint tree alignment for a 16-player traditional bracket', () => {
@@ -185,11 +195,16 @@ describe('bracketLayout calculation engine', () => {
     const layout = calculateBracketLayout(bracket);
 
     expect(layout.roundHeaders).toHaveLength(6);
-    // All round headers should start at paddingTop
-    layout.roundHeaders.forEach(h => {
+    // Non-finals round headers should start at paddingTop
+    layout.roundHeaders.slice(0, -1).forEach(h => {
       expect(h.y).toBe(8);
       expect(h.width).toBe(260);
     });
+    // Finals round header is positioned about one match height above the finals match
+    const finalsHeader = layout.roundHeaders[layout.roundHeaders.length - 1];
+    expect(finalsHeader.name).toBe('Finals');
+    expect(finalsHeader.isFinals).toBe(true);
+    expect(finalsHeader.y).toBeGreaterThan(200);
 
     // Matches should all start below the round header (paddingTop + headerHeight = 74)
     Object.values(layout.matchPositions).forEach(pos => {
@@ -260,7 +275,7 @@ describe('bracketLayout calculation engine', () => {
     expect(layout.stageHeaders?.map(s => s.title)).toEqual([
       'Winners Bracket',
       'Losers Bracket',
-      'Grand Finals',
+      'Finals',
     ]);
 
     // Find matches by stage
@@ -306,10 +321,12 @@ describe('bracketLayout calculation engine', () => {
     expect(layout.championPosition.centerY).toBeCloseTo(gfPos.centerY);
 
     // Connector paths exist into Grand Finals
-    const gfPath = layout.paths.find(p => p.targetMatchId === gfMatch!.id);
-    expect(gfPath).toBeDefined();
-    expect(gfPath?.sourceMatchIds).toContain(wfMatch!.id);
-    expect(gfPath?.sourceMatchIds).toContain(lfMatch!.id);
+    const gfPaths = layout.paths.filter(p => p.targetMatchId === gfMatch!.id);
+    expect(gfPaths.length).toBe(2);
+    const gfP1Path = gfPaths.find(p => p.targetSlot === 1);
+    const gfP2Path = gfPaths.find(p => p.targetSlot === 2);
+    expect(gfP1Path?.sourceMatchIds).toContain(wfMatch!.id);
+    expect(gfP2Path?.sourceMatchIds).toContain(lfMatch!.id);
 
     // Champion connector path exists
     expect(layout.championPath).toBeDefined();
@@ -361,6 +378,15 @@ describe('bracketLayout calculation engine', () => {
     // Champion path connects from GF Reset to Champion
     expect(resetLayout.championPath).toBeDefined();
     expect(resetLayout.championPath?.finalsMatchId).toBe(resetMatch!.id);
+
+    // Round headers: Match 1 is "Finals", Reset Match is "Grand Finals"
+    const gf1Header = resetLayout.roundHeaders.find(h => h.name === 'Finals');
+    const resetHeader = resetLayout.roundHeaders.find(h => h.name === 'Grand Finals');
+    expect(gf1Header).toBeDefined();
+    expect(gf1Header?.x).toBe(gf1Pos.x);
+    expect(resetHeader).toBeDefined();
+    expect(resetHeader?.x).toBe(resetPos.x);
+    expect(resetHeader?.isFinals).toBe(true);
   });
 
   it('correctly calculates Accelerated Hybrid layout for 48-player tournament', () => {
@@ -440,24 +466,27 @@ describe('bracketLayout calculation engine', () => {
     const gfPos = layout.matchPositions[gfMatch.id];
     expect(gfPos).toBeDefined();
 
-    const gfHeader = layout.roundHeaders.find((h) => h.name === 'Grand Finals')!;
+    const gfHeader = layout.roundHeaders.find((h) => h.name === 'Finals')!;
     expect(gfHeader).toBeDefined();
 
-    // Grand Finals header should sit directly above Grand Finals match (within ~50px), NOT at top of canvas (y=70)
-    expect(gfPos.y - gfHeader.y).toBeLessThanOrEqual(50);
+    // Finals header should sit about one match height above Finals match (112px = 80px card + 32px gap), NOT at top of canvas
+    expect(gfPos.y - gfHeader.y).toBe(112);
     expect(gfHeader.y).toBeGreaterThan(200);
+    expect(gfHeader.isFinals).toBe(true);
 
-    // Winners Finals header should sit directly above Winners Finals match
+    // Winners Finals header should sit about one match height above Winners Finals match
     const wfMatch = bracket.rounds.find((r) => r.name === 'Winners Finals')!.matches[0];
     const wfPos = layout.matchPositions[wfMatch.id];
     const wfHeader = layout.roundHeaders.find((h) => h.name === 'Winners Finals')!;
-    expect(wfPos.y - wfHeader.y).toBeLessThanOrEqual(50);
+    expect(wfPos.y - wfHeader.y).toBe(112);
+    expect(wfHeader.isFinals).toBe(true);
 
-    // Losers Finals header should sit directly above Losers Finals match
+    // Losers Finals header should sit about one match height above Losers Finals match
     const lfMatch = bracket.rounds.find((r) => r.name === "Loser's Finals")!.matches[0];
     const lfPos = layout.matchPositions[lfMatch.id];
     const lfHeader = layout.roundHeaders.find((h) => h.name === "Loser's Finals")!;
-    expect(lfPos.y - lfHeader.y).toBeLessThanOrEqual(50);
+    expect(lfPos.y - lfHeader.y).toBe(112);
+    expect(lfHeader.isFinals).toBe(true);
   });
 
   it('calculates split wing layout for traditional double elim placing losers bracket on the far right', () => {
@@ -506,11 +535,11 @@ describe('bracketLayout calculation engine', () => {
     // Stage headers reflect the split structure
     const stageTitles = splitLayout.stageHeaders?.map((s) => s.title);
     expect(stageTitles).toContain('Winners Bracket');
-    expect(stageTitles).toContain('Grand Finals');
+    expect(stageTitles).toContain('Finals');
     expect(stageTitles).toContain('Losers Bracket');
 
     const winnersStage = splitLayout.stageHeaders?.find((s) => s.title === 'Winners Bracket')!;
-    const gfStage = splitLayout.stageHeaders?.find((s) => s.title === 'Grand Finals')!;
+    const gfStage = splitLayout.stageHeaders?.find((s) => s.title === 'Finals')!;
     const losersStage = splitLayout.stageHeaders?.find((s) => s.title === 'Losers Bracket')!;
     expect(winnersStage.x).toBeLessThan(gfStage.x);
     expect(gfStage.x).toBeLessThan(losersStage.x);
@@ -544,4 +573,368 @@ describe('bracketLayout calculation engine', () => {
       expect(pos.x).toBeGreaterThan(gfPos.x);
     });
   });
+
+  describe('Accelerated Hybrid Staged Visualizations', () => {
+    const players48 = Array.from({ length: 48 }, (_, i) => ({
+      id: `p${i + 1}`,
+      name: `Player ${i + 1}`,
+      seed: i + 1,
+    }));
+
+    const hybridBracket = generateDoubleEliminationBracket(players48, {
+      tierId: 'gold',
+      bracketRouting: 'ACCELERATED_HYBRID',
+      finalsCutoff: 16,
+    });
+
+    it('calculates Phase 1 Qualification Gauntlet as a two-track conveyor layout with 4 columns', () => {
+      const p1Layout = calculateAcceleratedHybridPhase1Layout(hybridBracket);
+
+      // Verify Stage Headers
+      const stageTitles = p1Layout.stageHeaders?.map((s) => s.title);
+      expect(stageTitles).toContain('Top Track: Upper Path');
+      expect(stageTitles).toContain('Bottom Track: Lower / Re-Climb Path');
+      expect(stageTitles).toContain('Convergence: Play-Offs');
+
+      // Col 0: AR (Top) & PRE_L1 (Bottom)
+      const arMatch = hybridBracket.rounds.find((r) => r.roundIdentifier === 'AR')!.matches[0];
+      const preL1Match = hybridBracket.rounds.find((r) => r.roundIdentifier === 'PRE_L1')!.matches[0];
+      expect(p1Layout.matchPositions[arMatch.id].x).toBe(p1Layout.matchPositions[preL1Match.id].x);
+
+      // Col 1: PRE_W1 (Top) & PRE_L2 (Bottom)
+      const preW1Match = hybridBracket.rounds.find((r) => r.roundIdentifier === 'PRE_W1')!.matches[0];
+      const preL2Match = hybridBracket.rounds.find((r) => r.roundIdentifier === 'PRE_L2')!.matches[0];
+      expect(p1Layout.matchPositions[preW1Match.id].x).toBe(p1Layout.matchPositions[preL2Match.id].x);
+      expect(p1Layout.matchPositions[preW1Match.id].x).toBeGreaterThan(p1Layout.matchPositions[arMatch.id].x);
+
+      // Col 2: PRE_W2 (Top) & 2C (Bottom)
+      const preW2Match = hybridBracket.rounds.find((r) => r.roundIdentifier === 'PRE_W2')!.matches[0];
+      const scMatch = hybridBracket.rounds.find((r) => r.roundIdentifier === '2C')!.matches[0];
+      expect(p1Layout.matchPositions[preW2Match.id].x).toBe(p1Layout.matchPositions[scMatch.id].x);
+      expect(p1Layout.matchPositions[preW2Match.id].x).toBeGreaterThan(p1Layout.matchPositions[preW1Match.id].x);
+
+      // Col 3: Play-Offs (Convergence)
+      const poMatch = hybridBracket.rounds.find((r) => r.roundIdentifier === 'PO')!.matches[0];
+      expect(p1Layout.matchPositions[poMatch.id].x).toBeGreaterThan(p1Layout.matchPositions[preW2Match.id].x);
+
+      // Top track matches are above Bottom track matches
+      expect(p1Layout.matchPositions[preL1Match.id].y).toBeGreaterThan(p1Layout.matchPositions[arMatch.id].y);
+      expect(p1Layout.matchPositions[preL2Match.id].y).toBeGreaterThan(p1Layout.matchPositions[preW1Match.id].y);
+      expect(p1Layout.matchPositions[scMatch.id].y).toBeGreaterThan(p1Layout.matchPositions[preW2Match.id].y);
+
+      // Connector paths strictly connect Phase 1 matches (no paths to CHAMP rounds)
+      p1Layout.paths.forEach((p) => {
+        const target = hybridBracket.matchesById[p.targetMatchId];
+        expect(target).toBeDefined();
+        expect(target.phase).toBe('QUALIFIERS');
+      });
+
+      // No champion plaque in Phase 1
+      expect(p1Layout.championPosition.width).toBe(0);
+      expect(p1Layout.championPath).toBeUndefined();
+    });
+
+    it('calculates Phase 2 Championship Top 16 single elimination finals cleanly', () => {
+      const p2Layout = calculateAcceleratedHybridPhase2Layout(hybridBracket);
+
+      // 4 single-elimination rounds (Round of 16, QF, SF, Finals)
+      expect(p2Layout.roundHeaders).toHaveLength(4);
+      expect(p2Layout.roundHeaders[0].name).toBe('Round of 16');
+      expect(p2Layout.roundHeaders[3].name).toBe('Championship Finals');
+
+      // All matches in Phase 2 have phase === 'CHAMPIONSHIP'
+      Object.keys(p2Layout.matchPositions).forEach((mId) => {
+        const m = hybridBracket.matchesById[mId];
+        expect(m.phase).toBe('CHAMPIONSHIP');
+      });
+
+      // Connector paths strictly connect Phase 2 matches
+      p2Layout.paths.forEach((p) => {
+        const target = hybridBracket.matchesById[p.targetMatchId];
+        expect(target).toBeDefined();
+        expect(target.phase).toBe('CHAMPIONSHIP');
+      });
+
+      // Champion Plaque and path are present for Finals
+      expect(p2Layout.championPosition.width).toBeGreaterThan(0);
+      expect(p2Layout.championPath).toBeDefined();
+      const champFinalsMatch = hybridBracket.rounds.find((r) => r.roundIdentifier === 'CHAMP_R4')!.matches[0];
+      expect(p2Layout.championPath?.finalsMatchId).toBe(champFinalsMatch.id);
+
+      // Verify duplicate stage header is suppressed in Championship view
+      expect(p2Layout.stageHeaders).toHaveLength(0);
+    });
+
+    it('calculates separate Accelerated Round layout with direct qualification matches', () => {
+      const accelLayout = calculateAcceleratedHybridAccelLayout(hybridBracket);
+
+      // Verify Stage Header & Round Header
+      expect(accelLayout.stageHeaders).toHaveLength(1);
+      expect(accelLayout.stageHeaders![0].title).toBe('Accelerated Round');
+      expect(accelLayout.roundHeaders).toHaveLength(1);
+      expect(accelLayout.roundHeaders[0].name).toBe('Round 1');
+
+      // 8 AR matches (for 16 cutoff)
+      const arRound = hybridBracket.rounds.find((r) => r.roundIdentifier === 'AR')!;
+      expect(arRound.matches).toHaveLength(8);
+
+      // All AR matches positioned vertically in 1 column
+      arRound.matches.forEach((m) => {
+        const pos = accelLayout.matchPositions[m.id];
+        expect(pos).toBeDefined();
+        expect(pos.x).toBe(accelLayout.roundHeaders[0].x);
+      });
+
+      // No cross connectors, no champion plaque
+      expect(accelLayout.paths).toHaveLength(0);
+      expect(accelLayout.championPosition.width).toBe(0);
+      expect(accelLayout.championPath).toBeUndefined();
+      expect(accelLayout.totalWidth).toBeGreaterThan(0);
+      expect(accelLayout.totalHeight).toBeGreaterThan(0);
+    });
+
+    it('calculates separate Pre-Merge layout with 4 columns and strict left-to-right connectors', () => {
+      const preMergeLayout = calculateAcceleratedHybridPreMergeLayout(hybridBracket);
+
+      // Verify Stage Headers
+      const stageTitles = preMergeLayout.stageHeaders?.map((s) => s.title);
+      expect(stageTitles).toContain('Pre-Merge Upper (Double Elimination)');
+      expect(stageTitles).toContain('Pre-Merge Lower & 2nd Chance');
+      expect(stageTitles).toContain('Play-Offs (Top 16 Advancement)');
+
+      // Verify 4 columns:
+      // Col 0: PRE_W1 & PRE_L1
+      const preW1Match = hybridBracket.rounds.find((r) => r.roundIdentifier === 'PRE_W1')!.matches[0];
+      const preL1Match = hybridBracket.rounds.find((r) => r.roundIdentifier === 'PRE_L1')!.matches[0];
+      expect(preMergeLayout.matchPositions[preW1Match.id].x).toBe(preMergeLayout.matchPositions[preL1Match.id].x);
+
+      // Col 1: PRE_W2 & PRE_L2
+      const preW2Match = hybridBracket.rounds.find((r) => r.roundIdentifier === 'PRE_W2')!.matches[0];
+      const preL2Match = hybridBracket.rounds.find((r) => r.roundIdentifier === 'PRE_L2')!.matches[0];
+      expect(preMergeLayout.matchPositions[preW2Match.id].x).toBe(preMergeLayout.matchPositions[preL2Match.id].x);
+      expect(preMergeLayout.matchPositions[preW2Match.id].x).toBeGreaterThan(preMergeLayout.matchPositions[preW1Match.id].x);
+
+      // Col 2: 2nd Chance Round
+      const scMatch = hybridBracket.rounds.find((r) => r.roundIdentifier === '2C')!.matches[0];
+      expect(preMergeLayout.matchPositions[scMatch.id].x).toBeGreaterThan(preMergeLayout.matchPositions[preW2Match.id].x);
+
+      // Col 3: Play-Offs
+      const poMatch = hybridBracket.rounds.find((r) => r.roundIdentifier === 'PO')!.matches[0];
+      expect(preMergeLayout.matchPositions[poMatch.id].x).toBeGreaterThan(preMergeLayout.matchPositions[scMatch.id].x);
+
+      // Accelerated Round matches are NOT in Pre-Merge layout (kept separate)
+      const arMatch = hybridBracket.rounds.find((r) => r.roundIdentifier === 'AR')!.matches[0];
+      expect(preMergeLayout.matchPositions[arMatch.id]).toBeUndefined();
+
+      // Connector paths strictly connect within Pre-Merge matches
+      expect(preMergeLayout.paths.length).toBeGreaterThan(0);
+      preMergeLayout.paths.forEach((p) => {
+        const target = hybridBracket.matchesById[p.targetMatchId];
+        expect(target).toBeDefined();
+        expect(target.subTrack).not.toBe('ACCELERATED');
+        expect(target.phase).toBe('QUALIFIERS');
+      });
+
+      // No champion plaque in Pre-Merge
+      expect(preMergeLayout.championPosition.width).toBe(0);
+      expect(preMergeLayout.championPath).toBeUndefined();
+    });
+
+    it('calculates Pod 2 Upper Bracket layout with 2 columns and intra-panel tree connectors', () => {
+      const upperLayout = calculateAcceleratedHybridPreMergeUpperLayout(hybridBracket);
+
+      // Verify Headers
+      expect(upperLayout.stageHeaders).toHaveLength(1);
+      expect(upperLayout.stageHeaders![0].title).toBe('Upper Bracket');
+      expect(upperLayout.roundHeaders).toHaveLength(2);
+      expect(upperLayout.roundHeaders[0].name).toBe('Round 1');
+      expect(upperLayout.roundHeaders[1].name).toBe('Round 2');
+
+      // Col 0: Upper R1 (16 matches)
+      const r1 = hybridBracket.rounds.find((r) => r.roundIdentifier === 'PRE_W1')!;
+      expect(r1.matches).toHaveLength(16);
+      r1.matches.forEach((m) => {
+        const pos = upperLayout.matchPositions[m.id];
+        expect(pos).toBeDefined();
+        expect(pos.x).toBe(upperLayout.roundHeaders[0].x);
+      });
+
+      // Col 1: Upper R2 (8 matches)
+      const r2 = hybridBracket.rounds.find((r) => r.roundIdentifier === 'PRE_W2')!;
+      expect(r2.matches).toHaveLength(8);
+      r2.matches.forEach((m) => {
+        const pos = upperLayout.matchPositions[m.id];
+        expect(pos).toBeDefined();
+        expect(pos.x).toBe(upperLayout.roundHeaders[1].x);
+      });
+
+      // Intra-panel SVG connectors strictly connect R1 to R2
+      expect(upperLayout.paths.length).toBeGreaterThan(0);
+      upperLayout.paths.forEach((p) => {
+        const target = hybridBracket.matchesById[p.targetMatchId];
+        expect(target).toBeDefined();
+        expect(target.subTrack).toBe('PRE_MERGE_UPPER');
+      });
+
+      // No champion plaque
+      expect(upperLayout.championPosition.width).toBe(0);
+      expect(upperLayout.championPath).toBeUndefined();
+    });
+
+    it('calculates Pod 3 Pre-Merge Lower layout with 2 columns and intra-panel connectors', () => {
+      const lowerLayout = calculateAcceleratedHybridPreMergeLowerLayout(hybridBracket);
+
+      // Verify Headers
+      expect(lowerLayout.stageHeaders).toHaveLength(1);
+      expect(lowerLayout.stageHeaders![0].title).toBe('Pre-Merge Lower Bracket');
+      expect(lowerLayout.roundHeaders).toHaveLength(2);
+      expect(lowerLayout.roundHeaders[0].name).toBe('Pre-Merge Lower R1');
+      expect(lowerLayout.roundHeaders[1].name).toBe('Pre-Merge Lower R2');
+
+      // Col 0: Lower R1 (8 matches)
+      const l1 = hybridBracket.rounds.find((r) => r.roundIdentifier === 'PRE_L1')!;
+      expect(l1.matches).toHaveLength(8);
+      l1.matches.forEach((m) => {
+        const pos = lowerLayout.matchPositions[m.id];
+        expect(pos).toBeDefined();
+        expect(pos.x).toBe(lowerLayout.roundHeaders[0].x);
+      });
+
+      // Col 1: Lower R2 (8 matches)
+      const l2 = hybridBracket.rounds.find((r) => r.roundIdentifier === 'PRE_L2')!;
+      expect(l2.matches).toHaveLength(8);
+      l2.matches.forEach((m) => {
+        const pos = lowerLayout.matchPositions[m.id];
+        expect(pos).toBeDefined();
+        expect(pos.x).toBe(lowerLayout.roundHeaders[1].x);
+      });
+
+      // Intra-panel SVG connectors connect L1 to L2 Slot 1
+      expect(lowerLayout.paths.length).toBe(8);
+      lowerLayout.paths.forEach((p) => {
+        const target = hybridBracket.matchesById[p.targetMatchId];
+        expect(target).toBeDefined();
+        expect(target.subTrack).toBe('PRE_MERGE_LOWER');
+      });
+
+      // No champion plaque
+      expect(lowerLayout.championPosition.width).toBe(0);
+      expect(lowerLayout.championPath).toBeUndefined();
+    });
+
+    it('calculates Pod 4 Re-Climb Stage layout with 2 columns (2C and PO) and intra-panel connectors', () => {
+      const reClimbLayout = calculateAcceleratedHybridReClimbLayout(hybridBracket);
+
+      // Verify Headers
+      expect(reClimbLayout.stageHeaders).toHaveLength(1);
+      expect(reClimbLayout.stageHeaders![0].title).toBe('Re-Climb Stage (2nd Chance & Play-Offs)');
+      expect(reClimbLayout.roundHeaders).toHaveLength(2);
+      expect(reClimbLayout.roundHeaders[0].name).toBe('2nd Chance Round');
+      expect(reClimbLayout.roundHeaders[1].name).toBe('Play-Offs');
+
+      // Col 0: 2nd Chance (8 matches)
+      const sc = hybridBracket.rounds.find((r) => r.roundIdentifier === '2C')!;
+      expect(sc.matches).toHaveLength(8);
+      sc.matches.forEach((m) => {
+        const pos = reClimbLayout.matchPositions[m.id];
+        expect(pos).toBeDefined();
+        expect(pos.x).toBe(reClimbLayout.roundHeaders[0].x);
+      });
+
+      // Col 1: Play-Offs (8 matches)
+      const po = hybridBracket.rounds.find((r) => r.roundIdentifier === 'PO')!;
+      expect(po.matches).toHaveLength(8);
+      po.matches.forEach((m) => {
+        const pos = reClimbLayout.matchPositions[m.id];
+        expect(pos).toBeDefined();
+        expect(pos.x).toBe(reClimbLayout.roundHeaders[1].x);
+      });
+
+      // Intra-panel SVG connectors strictly connect 2C winners to PO Slot 2
+      expect(reClimbLayout.paths.length).toBe(8);
+      reClimbLayout.paths.forEach((p) => {
+        const target = hybridBracket.matchesById[p.targetMatchId];
+        expect(target).toBeDefined();
+        expect(target.roundIdentifier).toBe('PO');
+      });
+
+      // No champion plaque
+      expect(reClimbLayout.championPosition.width).toBe(0);
+      expect(reClimbLayout.championPath).toBeUndefined();
+    });
+
+    it('calculates Pod 3 Lower Bracket layout consolidating R1->R2->R3->R4 with horizontal SVG connectors', () => {
+      const lowerLayout = calculateAcceleratedHybridLowerBracketLayout(hybridBracket);
+
+      // Verify Headers
+      expect(lowerLayout.stageHeaders).toHaveLength(1);
+      expect(lowerLayout.stageHeaders![0].title).toBe('Lower Bracket');
+      expect(lowerLayout.roundHeaders).toHaveLength(4);
+      expect(lowerLayout.roundHeaders[0].name).toBe('Round 1');
+      expect(lowerLayout.roundHeaders[1].name).toBe('Round 2');
+      expect(lowerLayout.roundHeaders[2].name).toBe('Round 3');
+      expect(lowerLayout.roundHeaders[3].name).toBe('Round 4');
+
+      // Verify all 4 rounds have 8 matches placed in ascending column X coordinates
+      const r1Matches = hybridBracket.rounds.find((r) => r.roundIdentifier === 'PRE_L1')!.matches;
+      const r2Matches = hybridBracket.rounds.find((r) => r.roundIdentifier === 'PRE_L2')!.matches;
+      const r3Matches = hybridBracket.rounds.find((r) => r.roundIdentifier === '2C')!.matches;
+      const r4Matches = hybridBracket.rounds.find((r) => r.roundIdentifier === 'PO')!.matches;
+
+      expect(r1Matches).toHaveLength(8);
+      expect(r2Matches).toHaveLength(8);
+      expect(r3Matches).toHaveLength(8);
+      expect(r4Matches).toHaveLength(8);
+
+      // Verify column X separation
+      expect(lowerLayout.matchPositions[r2Matches[0].id].x).toBeGreaterThan(lowerLayout.matchPositions[r1Matches[0].id].x);
+      expect(lowerLayout.matchPositions[r3Matches[0].id].x).toBeGreaterThan(lowerLayout.matchPositions[r2Matches[0].id].x);
+      expect(lowerLayout.matchPositions[r4Matches[0].id].x).toBeGreaterThan(lowerLayout.matchPositions[r3Matches[0].id].x);
+
+      // Verify horizontal SVG connectors across Rounds 1 -> 2 -> 3 -> 4 (8 + 8 + 8 = 24 paths)
+      expect(lowerLayout.paths).toHaveLength(24);
+      lowerLayout.paths.forEach((p) => {
+        expect(p.d).toMatch(/^M \d+ \d+ H \d+ V \d+ H \d+$/);
+      });
+
+      // No champion plaque
+      expect(lowerLayout.championPosition.width).toBe(0);
+      expect(lowerLayout.championPath).toBeUndefined();
+    });
+
+    it('positions Championship Finals header about one match height above finals match with isFinals = true', () => {
+      const p2Layout = calculateAcceleratedHybridPhase2Layout(hybridBracket);
+      const finalsRound = hybridBracket.rounds.find((r) => r.name === 'Championship Finals' || r.roundIdentifier === 'CHAMP_R4')!;
+      const finalsMatch = finalsRound.matches[0];
+      const finalsPos = p2Layout.matchPositions[finalsMatch.id];
+      const finalsHeader = p2Layout.roundHeaders.find((h) => h.name === 'Championship Finals')!;
+
+      expect(finalsHeader).toBeDefined();
+      expect(finalsHeader.isFinals).toBe(true);
+      expect(finalsPos.y - finalsHeader.y).toBe(112);
+    });
+  });
+
+  describe('Finals Header Positioning across All Bracket Types', () => {
+    it('positions Finals header in single elimination about one match height above finals with isFinals = true', () => {
+      const players = Array.from({ length: 16 }, (_, i) => ({
+        id: `p${i + 1}`,
+        name: `Player ${i + 1}`,
+        seed: i + 1,
+      }));
+      const bracket = generateTraditionalBracket(players, { tierId: 'gold' });
+      const layout = calculateBracketLayout(bracket);
+
+      const finalsRound = bracket.rounds[bracket.rounds.length - 1];
+      const finalsMatch = finalsRound.matches[0];
+      const finalsPos = layout.matchPositions[finalsMatch.id];
+      const finalsHeader = layout.roundHeaders[layout.roundHeaders.length - 1];
+
+      expect(finalsHeader.name).toBe('Finals');
+      expect(finalsHeader.isFinals).toBe(true);
+      expect(finalsPos.y - finalsHeader.y).toBe(112);
+      expect(finalsHeader.y).toBeGreaterThan(layout.roundHeaders[0].y);
+    });
+  });
 });
+

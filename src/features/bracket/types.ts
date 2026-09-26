@@ -22,10 +22,15 @@ export interface MatchSlotFeeder {
   type: 'WINNER' | 'LOSER' | 'DIRECT';
 }
 
+export type BracketPhase = 'QUALIFIERS' | 'CHAMPIONSHIP';
+export type BracketSubTrack = 'ACCELERATED' | 'PRE_MERGE_UPPER' | 'PRE_MERGE_LOWER' | 'RE_CLIMB';
+
 export interface BracketMatch {
   id: string;
   tierId?: string;
   stage?: BracketStage;
+  phase?: BracketPhase;
+  subTrack?: BracketSubTrack;
   roundIdentifier?: string; // e.g. 'W1', 'W2', 'L1', 'L2', 'GF', 'GF_RESET'
   roundNumber: number; // 1-indexed (1, 2, ..., totalRounds)
   roundIndex?: number; // 0-indexed DAG round index
@@ -49,6 +54,7 @@ export interface BracketRound {
   name: string;
   shortName?: string;
   stage?: BracketStage;
+  phase?: BracketPhase;
   roundIdentifier?: string;
   matches: BracketMatch[];
 }

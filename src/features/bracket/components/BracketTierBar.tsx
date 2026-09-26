@@ -30,13 +30,33 @@ export const BracketTierBar: React.FC<BracketTierBarProps> = ({
 }) => {
   const navigate = useNavigate();
   const sortedTiers = [...tournament.tiers].sort((a, b) => a.priority - b.priority);
+  const isAcceleratedHybrid = activeTier.bracket?.bracketRouting === 'ACCELERATED_HYBRID';
+  const tierBarRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!tierBarRef.current) return;
+    const updateH = () => {
+      if (tierBarRef.current) {
+        document.documentElement.style.setProperty(
+          '--bracket-tier-bar-height',
+          `${tierBarRef.current.offsetHeight}px`
+        );
+      }
+    };
+    updateH();
+    const observer = new ResizeObserver(updateH);
+    observer.observe(tierBarRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <div
+      ref={tierBarRef}
+      id="bracket-tier-bar"
       style={{
         position: 'sticky',
         top: 0,
-        zIndex: 40,
+        zIndex: 42,
         padding: '0.65rem 1.25rem',
         background: 'var(--color-bg-surface)',
         borderBottom: '1px solid var(--color-border)',
@@ -198,7 +218,8 @@ export const BracketTierBar: React.FC<BracketTierBarProps> = ({
 
             <button
               type="button"
-              onClick={() => onChangeViewMode('split')}
+              disabled={isAcceleratedHybrid}
+              onClick={() => !isAcceleratedHybrid && onChangeViewMode('split')}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -207,12 +228,13 @@ export const BracketTierBar: React.FC<BracketTierBarProps> = ({
                 borderRadius: 'var(--radius-xs)',
                 fontSize: '0.72rem',
                 fontWeight: viewMode === 'split' ? 700 : 500,
-                background: viewMode === 'split' ? 'var(--color-bg-surface-elevated)' : 'transparent',
-                color: viewMode === 'split' ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+                background: viewMode === 'split' && !isAcceleratedHybrid ? 'var(--color-bg-surface-elevated)' : 'transparent',
+                color: isAcceleratedHybrid ? 'var(--color-text-subtle, #666)' : viewMode === 'split' ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+                opacity: isAcceleratedHybrid ? 0.35 : 1,
                 border: 'none',
-                cursor: 'pointer',
+                cursor: isAcceleratedHybrid ? 'not-allowed' : 'pointer',
               }}
-              title="Bilateral Split Wings (Center Finals)"
+              title={isAcceleratedHybrid ? 'Split view is not available for Accelerated Hybrid' : 'Bilateral Split Wings (Center Finals)'}
             >
               <Split size={12} />
               <span>Split Wings</span>

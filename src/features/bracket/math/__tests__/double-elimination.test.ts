@@ -87,13 +87,13 @@ describe('Double Elimination Bracket Generators', () => {
     });
 
     describe('2-Player Bracket Edge Case', () => {
-      it('sets up 1 Winners Finals match and 1 Grand Finals match', () => {
+      it('sets up 1 Winners Finals match and 1 Finals match', () => {
         const players = createPlayers(2);
         const bracket = generateTraditionalDoubleElim(players, { tierId: 'gold' });
 
         expect(bracket.totalRounds).toBe(2);
         expect(bracket.rounds[0].name).toBe('Winners Finals');
-        expect(bracket.rounds[1].name).toBe('Grand Finals');
+        expect(bracket.rounds[1].name).toBe('Finals');
 
         const w1 = bracket.rounds[0].matches[0];
         const gf1 = bracket.rounds[1].matches[0];
@@ -427,6 +427,51 @@ describe('Double Elimination Bracket Generators', () => {
       expect(champFinals!.matches.length).toBe(1);
       expect(champFinals!.name).toBe('Championship Finals');
 
+      // Verify Phase & subTrack tagging across all constituent stages
+      arRound!.matches.forEach((m) => {
+        expect(m.phase).toBe('QUALIFIERS');
+        expect(m.subTrack).toBe('ACCELERATED');
+      });
+      expect(arRound!.phase).toBe('QUALIFIERS');
+
+      preW1!.matches.forEach((m) => {
+        expect(m.phase).toBe('QUALIFIERS');
+        expect(m.subTrack).toBe('PRE_MERGE_UPPER');
+      });
+      preW2!.matches.forEach((m) => {
+        expect(m.phase).toBe('QUALIFIERS');
+        expect(m.subTrack).toBe('PRE_MERGE_UPPER');
+      });
+
+      preL1!.matches.forEach((m) => {
+        expect(m.phase).toBe('QUALIFIERS');
+        expect(m.subTrack).toBe('PRE_MERGE_LOWER');
+      });
+      preL2!.matches.forEach((m) => {
+        expect(m.phase).toBe('QUALIFIERS');
+        expect(m.subTrack).toBe('PRE_MERGE_LOWER');
+      });
+
+      secondChanceRound!.matches.forEach((m) => {
+        expect(m.phase).toBe('QUALIFIERS');
+        expect(m.subTrack).toBe('RE_CLIMB');
+      });
+      expect(secondChanceRound!.phase).toBe('QUALIFIERS');
+
+      playOffRound!.matches.forEach((m) => {
+        expect(m.phase).toBe('QUALIFIERS');
+        expect(m.subTrack).toBe('RE_CLIMB');
+      });
+      expect(playOffRound!.phase).toBe('QUALIFIERS');
+
+      const champRounds = [champR1!, champR2!, champR3!, champFinals!];
+      champRounds.forEach((r) => {
+        expect(r.phase).toBe('CHAMPIONSHIP');
+        r.matches.forEach((m) => {
+          expect(m.phase).toBe('CHAMPIONSHIP');
+        });
+      });
+
       // Verify Total Match Count: 8 + 16 + 8 + 8 + 8 + 8 + 8 + 8 + 4 + 2 + 1 = 79 matches
       const allMatches = bracket.rounds.flatMap((r) => r.matches);
       expect(allMatches.length).toBe(79);
@@ -590,11 +635,11 @@ describe('Double Elimination Bracket Generators', () => {
       expect(lRounds[5].name).toBe("Loser's Finals");
       expect(lRounds[5].shortName).toBe('Finals (L)');
 
-      // Grand finals
-      expect(gfRound.name).toBe('Grand Finals');
-      expect(gfRound.shortName).toBe('Grand Finals');
+      // Finals
+      expect(gfRound.name).toBe('Finals');
+      expect(gfRound.shortName).toBe('Finals');
 
-      // Verify Grand Finals matchNumber is sequential (30), NOT match #2
+      // Verify Finals matchNumber is sequential (30), NOT match #2
       const gfMatch = gfRound.matches[0];
       expect(gfMatch.matchNumber).toBe(30);
     });
@@ -617,7 +662,7 @@ describe('Double Elimination Bracket Generators', () => {
       expect(lRounds[2].name).toBe("Loser's Semis");
       expect(lRounds[3].name).toBe("Loser's Finals");
 
-      expect(gfRound.name).toBe('Grand Finals');
+      expect(gfRound.name).toBe('Finals');
       expect(gfRound.matches[0].matchNumber).toBe(14);
     });
   });

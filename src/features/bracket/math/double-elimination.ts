@@ -124,8 +124,8 @@ export function applyDoubleElimRoundNames(
     }
   }
 
-  grandFinalsRound.name = 'Grand Finals';
-  grandFinalsRound.shortName = 'Grand Finals';
+  grandFinalsRound.name = 'Finals';
+  grandFinalsRound.shortName = 'Finals';
 }
 
 /**
@@ -220,7 +220,7 @@ export function generateTraditionalDoubleElim(
       totalRounds: 2,
       rounds: [
         { roundNumber: 1, name: 'Winners Finals', stage: 'WINNERS', roundIdentifier: 'W1', matches: [w1Match] },
-        { roundNumber: 2, name: 'Grand Finals', stage: 'GRAND_FINALS', roundIdentifier: 'GF', matches: [gf1Match] },
+        { roundNumber: 2, name: 'Finals', stage: 'GRAND_FINALS', roundIdentifier: 'GF', matches: [gf1Match] },
       ],
       matchesById: {
         [w1MatchId]: w1Match,
@@ -1353,6 +1353,8 @@ export function generateAcceleratedHybrid(
       id,
       tierId,
       stage: 'WINNERS',
+      phase: 'QUALIFIERS',
+      subTrack: 'ACCELERATED',
       roundIdentifier: 'AR',
       roundNumber: roundNumberCounter,
       roundIndex: roundIndexCounter,
@@ -1375,6 +1377,7 @@ export function generateAcceleratedHybrid(
     roundNumber: roundNumberCounter++,
     name: 'Accelerated Round',
     stage: 'WINNERS',
+    phase: 'QUALIFIERS',
     roundIdentifier: 'AR',
     matches: arMatches,
   };
@@ -1468,9 +1471,12 @@ export function generateAcceleratedHybrid(
       r.roundIdentifier = roundIdent;
       r.name = `Pre-Merge Upper R${idx + 1}`;
       r.stage = 'WINNERS';
+      r.phase = 'QUALIFIERS';
       r.roundNumber = roundNumberCounter++;
       r.matches.forEach((m) => {
         m.stage = 'WINNERS';
+        m.phase = 'QUALIFIERS';
+        m.subTrack = 'PRE_MERGE_UPPER';
         m.roundIdentifier = roundIdent;
         m.roundNumber = r.roundNumber;
         m.roundIndex = roundIndexCounter;
@@ -1488,9 +1494,12 @@ export function generateAcceleratedHybrid(
       r.roundIdentifier = roundIdent;
       r.name = `Pre-Merge Lower R${idx + 1}`;
       r.stage = 'LOSERS';
+      r.phase = 'QUALIFIERS';
       r.roundNumber = roundNumberCounter++;
       r.matches.forEach((m) => {
         m.stage = 'LOSERS';
+        m.phase = 'QUALIFIERS';
+        m.subTrack = 'PRE_MERGE_LOWER';
         m.roundIdentifier = roundIdent;
         m.roundNumber = r.roundNumber;
         m.roundIndex = roundIndexCounter;
@@ -1547,6 +1556,8 @@ export function generateAcceleratedHybrid(
       id,
       tierId,
       stage: 'LOSERS',
+      phase: 'QUALIFIERS',
+      subTrack: 'RE_CLIMB',
       roundIdentifier: '2C',
       roundNumber: scRoundNumber,
       roundIndex: roundIndexCounter,
@@ -1582,6 +1593,7 @@ export function generateAcceleratedHybrid(
     roundNumber: scRoundNumber,
     name: '2nd Chance Round',
     stage: 'LOSERS',
+    phase: 'QUALIFIERS',
     roundIdentifier: '2C',
     matches: secondChanceMatches,
   };
@@ -1611,6 +1623,8 @@ export function generateAcceleratedHybrid(
       id,
       tierId,
       stage: 'WINNERS',
+      phase: 'QUALIFIERS',
+      subTrack: 'RE_CLIMB',
       roundIdentifier: 'PO',
       roundNumber: poRoundNumber,
       roundIndex: roundIndexCounter,
@@ -1641,6 +1655,7 @@ export function generateAcceleratedHybrid(
     roundNumber: poRoundNumber,
     name: 'Play-Offs',
     stage: 'WINNERS',
+    phase: 'QUALIFIERS',
     roundIdentifier: 'PO',
     matches: playOffMatches,
   };
@@ -1673,6 +1688,7 @@ export function generateAcceleratedHybrid(
     const roundIdent = `CHAMP_R${rIdx + 1}`;
     r.roundNumber = roundNumber;
     r.stage = 'GRAND_FINALS';
+    r.phase = 'CHAMPIONSHIP';
     r.roundIdentifier = roundIdent;
     r.name =
       rIdx === champBracket.rounds.length - 1
@@ -1685,6 +1701,7 @@ export function generateAcceleratedHybrid(
 
     r.matches.forEach((m, mIdx) => {
       m.stage = 'GRAND_FINALS';
+      m.phase = 'CHAMPIONSHIP';
       m.roundIdentifier = roundIdent;
       m.roundNumber = roundNumber;
       m.roundIndex = roundIndexCounter;
