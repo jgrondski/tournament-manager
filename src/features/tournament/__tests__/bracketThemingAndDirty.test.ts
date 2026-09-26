@@ -26,14 +26,14 @@ describe('Bracket Theming, Dirty Checking & Loser Background', () => {
   const createDirtyChecker = (initialTiers: TournamentTier[]) => {
     const normColor = (
       tier: TournamentTier,
-      field: 'primaryColor' | 'secondaryColor' | 'cardColor' | 'textColor' | 'backgroundColor'
+      field: 'primaryColor' | 'secondaryColor' | 'cardColor' | 'textColor' | 'backgroundColor' | 'lowerBracketColor'
     ): string => {
       const val = tier[field];
       if (val && typeof val === 'string' && val.trim()) {
         return val.trim().toLowerCase();
       }
       const defaults = getDefaultTierColors(tier);
-      return defaults[field].toLowerCase();
+      return (defaults[field] || '#c2410c').toLowerCase();
     };
 
     return (currentTiers: TournamentTier[]): boolean => {
@@ -56,6 +56,7 @@ describe('Bracket Theming, Dirty Checking & Loser Background', () => {
           normColor(a, 'cardColor') !== normColor(b, 'cardColor') ||
           normColor(a, 'textColor') !== normColor(b, 'textColor') ||
           normColor(a, 'backgroundColor') !== normColor(b, 'backgroundColor') ||
+          normColor(a, 'lowerBracketColor') !== normColor(b, 'lowerBracketColor') ||
           (a.textSize || 'normal') !== (b.textSize || 'normal') ||
           JSON.stringify(a.roundBestOfOverrides || {}) !== JSON.stringify(b.roundBestOfOverrides || {})
         ) {
@@ -101,6 +102,10 @@ describe('Bracket Theming, Dirty Checking & Loser Background', () => {
 
     // Modifying background color
     expect(isDirty([{ ...baseTier, backgroundColor: '#333333' }])).toBe(true);
+
+    // Modifying lower bracket color
+    expect(isDirty([{ ...baseTier, lowerBracketColor: '#ea580c' }])).toBe(true);
+    expect(isDirty([{ ...baseTier, lowerBracketColor: '#C2410C' }])).toBe(false);
   });
 
   it('computes completed match row backgrounds: loser always gets cardBg and winner gets secondaryColor', () => {

@@ -546,7 +546,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
       return val.trim().toLowerCase();
     }
     const defaults = getDefaultTierColors(tier);
-    return defaults[field].toLowerCase();
+    return (defaults[field] || '#c2410c').toLowerCase();
   };
 
   // Track dirty state
@@ -596,6 +596,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
         normColor(a, 'cardColor') !== normColor(b, 'cardColor') ||
         normColor(a, 'textColor') !== normColor(b, 'textColor') ||
         normColor(a, 'backgroundColor') !== normColor(b, 'backgroundColor') ||
+        normColor(a, 'lowerBracketColor') !== normColor(b, 'lowerBracketColor') ||
         (a.textSize || 'normal') !== (b.textSize || 'normal') ||
         JSON.stringify(a.roundBestOfOverrides || {}) !== JSON.stringify(b.roundBestOfOverrides || {})
       ) {
@@ -1839,6 +1840,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
                   const cardBg = tier.cardColor || defaults.cardColor;
                   const txtColor = tier.textColor || defaults.textColor;
                   const canvasBg = tier.backgroundColor || defaults.backgroundColor;
+                  const lowerColor = tier.lowerBracketColor || defaults.lowerBracketColor || '#c2410c';
                   const isThemeOpen = Boolean(openThemes[tier.id]);
 
                   return (
@@ -1897,13 +1899,14 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
                               borderRadius: 'var(--radius-full)',
                               border: '1px solid var(--color-border-subtle)',
                             }}
-                            title={`Current theme: Primary (${priColor}), Secondary (${secColor}), Card (${cardBg}), Text (${txtColor}), Canvas (${canvasBg})`}
+                            title={`Current theme: Primary (${priColor}), Secondary (${secColor}), Card (${cardBg}), Text (${txtColor}), Canvas (${canvasBg}), Lower Bracket (${lowerColor})`}
                           >
                             <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: priColor, border: '1px solid rgba(0,0,0,0.3)', flexShrink: 0 }} />
                             <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: secColor, border: '1px solid rgba(0,0,0,0.3)', flexShrink: 0 }} />
                             <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: cardBg, border: '1px solid rgba(255,255,255,0.15)', flexShrink: 0 }} />
                             <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: txtColor, border: '1px solid rgba(0,0,0,0.3)', flexShrink: 0 }} />
                             <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: canvasBg, border: '1px solid rgba(255,255,255,0.15)', flexShrink: 0 }} />
+                            <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: lowerColor, border: '1px solid rgba(0,0,0,0.3)', flexShrink: 0 }} />
                             <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginLeft: '0.2rem', fontFamily: 'var(--font-mono)' }}>
                               {tier.textSize ? `${tier.textSize}` : 'normal'}
                             </span>
@@ -1943,6 +1946,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
                               cardColor: cardBg,
                               textColor: txtColor,
                               backgroundColor: canvasBg,
+                              lowerBracketColor: lowerColor,
                             }}
                             textSize={
                               tier.textSize === 'compact' || tier.textSize === 'small'
@@ -1959,6 +1963,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
                                 cardColor: colors.cardColor,
                                 textColor: colors.textColor,
                                 backgroundColor: colors.backgroundColor,
+                                lowerBracketColor: colors.lowerBracketColor,
                               });
                             }}
                             onTextSizeChange={size => {
@@ -1972,6 +1977,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
                                 cardColor: def.cardColor,
                                 textColor: def.textColor,
                                 backgroundColor: def.backgroundColor,
+                                lowerBracketColor: def.lowerBracketColor,
                                 textSize: 'normal',
                               });
                             }}

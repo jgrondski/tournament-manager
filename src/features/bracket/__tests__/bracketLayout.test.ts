@@ -891,11 +891,12 @@ describe('bracketLayout calculation engine', () => {
       expect(lowerLayout.matchPositions[r3Matches[0].id].x).toBeGreaterThan(lowerLayout.matchPositions[r2Matches[0].id].x);
       expect(lowerLayout.matchPositions[r4Matches[0].id].x).toBeGreaterThan(lowerLayout.matchPositions[r3Matches[0].id].x);
 
-      // Verify horizontal SVG connectors across Rounds 1 -> 2 -> 3 -> 4 (8 + 8 + 8 = 24 paths)
+      // Verify horizontal SVG connectors: straight across R1 -> R2 -> R3 (16 paths), stair step down R3 -> R4 (8 paths)
       expect(lowerLayout.paths).toHaveLength(24);
-      lowerLayout.paths.forEach((p) => {
-        expect(p.d).toMatch(/^M \d+ \d+ H \d+ V \d+ H \d+$/);
-      });
+      const straightPaths = lowerLayout.paths.filter((p) => p.d.match(/^M \d+ \d+ H \d+$/));
+      const stairPaths = lowerLayout.paths.filter((p) => p.d.match(/^M \d+ \d+ H \d+ V \d+ H \d+$/));
+      expect(straightPaths).toHaveLength(16);
+      expect(stairPaths).toHaveLength(8);
 
       // No champion plaque
       expect(lowerLayout.championPosition.width).toBe(0);

@@ -3793,7 +3793,7 @@ export function calculateAcceleratedHybridLowerBracketLayout(
     });
   });
 
-  // Horizontal SVG connectors across Rounds 1 -> 2 -> 3 -> 4
+  // Straight horizontal SVG connectors across Rounds 1 -> 2 -> 3 -> 4
   // 1) R1 -> R2 (Slot 1)
   if (preLowerR1 && preLowerR2) {
     preLowerR1.matches.forEach((r1Match, idx) => {
@@ -3805,11 +3805,9 @@ export function calculateAcceleratedHybridLowerBracketLayout(
         const outX = f1.x + f1.width;
         const outY = f1.centerY;
         const inX = child.x;
-        const inY = child.y + child.height * 0.25;
-        const midX = Math.round(outX + (inX - outX) / 2);
         paths.push({
           id: `lb-path-${r1Match.id}-${r2Match.id}`,
-          d: `M ${outX} ${outY} H ${midX} V ${inY} H ${inX}`,
+          d: `M ${outX} ${outY} H ${inX}`,
           sourceMatchIds: [r1Match.id],
           targetMatchId: r2Match.id,
           targetSlot: 1,
@@ -3829,11 +3827,9 @@ export function calculateAcceleratedHybridLowerBracketLayout(
         const outX = f1.x + f1.width;
         const outY = f1.centerY;
         const inX = child.x;
-        const inY = child.y + child.height * 0.25;
-        const midX = Math.round(outX + (inX - outX) / 2);
         paths.push({
           id: `lb-path-${r2Match.id}-${r3Match.id}`,
-          d: `M ${outX} ${outY} H ${midX} V ${inY} H ${inX}`,
+          d: `M ${outX} ${outY} H ${inX}`,
           sourceMatchIds: [r2Match.id],
           targetMatchId: r3Match.id,
           targetSlot: 1,
@@ -3842,7 +3838,7 @@ export function calculateAcceleratedHybridLowerBracketLayout(
     });
   }
 
-  // 3) R3 -> R4 (Slot 2)
+  // 3) R3 -> R4 (Slot 2: stair step down from R3 center to R4 Slot 2)
   if (secondChanceRound && playOffRound) {
     secondChanceRound.matches.forEach((r3Match, idx) => {
       const r4Match = playOffRound.matches[idx];

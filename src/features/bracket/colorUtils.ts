@@ -127,6 +127,7 @@ export interface TierThemeColors {
   cardColor: string;
   textColor: string;
   backgroundColor: string;
+  lowerBracketColor?: string;
 }
 
 /**
@@ -144,6 +145,7 @@ export function getDefaultTierColors(tier: { id?: string; slug?: string; priorit
       cardColor: '#1b1c1d',
       textColor: '#94A3B8',
       backgroundColor: '#020203',
+      lowerBracketColor: '#c2410c',
     };
   }
   if (isSilver) {
@@ -153,6 +155,7 @@ export function getDefaultTierColors(tier: { id?: string; slug?: string; priorit
       cardColor: '#0E1420',
       textColor: '#4f5c6d',
       backgroundColor: '#0B0E14',
+      lowerBracketColor: '#c2410c',
     };
   }
   if (isBronze) {
@@ -162,6 +165,7 @@ export function getDefaultTierColors(tier: { id?: string; slug?: string; priorit
       cardColor: '#181410',
       textColor: '#5e6f87',
       backgroundColor: '#0B0E14',
+      lowerBracketColor: '#c2410c',
     };
   }
   return {
@@ -170,5 +174,6 @@ export function getDefaultTierColors(tier: { id?: string; slug?: string; priorit
     cardColor: '#161922',
     textColor: '#94A3B8',
     backgroundColor: '#0B0E14',
+    lowerBracketColor: '#c2410c',
   };
 }

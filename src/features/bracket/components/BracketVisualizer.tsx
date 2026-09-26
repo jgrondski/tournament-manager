@@ -34,6 +34,7 @@ export interface MicroChipData {
   color: string;
   border?: string;
   glow?: string;
+  opacity?: number;
   sourceMatchId?: string;
   targetMatchId?: string;
 }
@@ -62,7 +63,7 @@ export const ACCELERATED_HYBRID_POD_PALETTE = {
   },
 } as const;
 
-export function getMatchBranchColor(match: BracketMatch): string | null {
+export function getMatchBranchColor(match: BracketMatch, lowerBracketColor?: string): string | null {
   // Top 16 Championship: Neutral / Default tier theme (remove any pod-specific accent colors)
   if (
     match.phase === 'CHAMPIONSHIP' ||
@@ -85,23 +86,41 @@ export function getMatchBranchColor(match: BracketMatch): string | null {
     match.roundIdentifier === '2C' ||
     match.roundIdentifier === 'PO'
   ) {
-    return ACCELERATED_HYBRID_POD_PALETTE.LB.border;
+    return lowerBracketColor || ACCELERATED_HYBRID_POD_PALETTE.LB.border;
   }
   return null;
 }
 
-export const getOriginChip = (
+export const getInboundChip = (
   slotNum: 1 | 2,
   match: BracketMatch,
   bracket: BracketStructure,
   mIdx: number,
-  isPhase2OpeningRound: boolean
+  isPhase2OpeningRound: boolean,
+  primaryColor = '#ffc905',
+  _lowerBracketColor = '#c2410c'
 ): MicroChipData | null => {
-  const slot = slotNum === 1 ? match.player1 : match.player2;
-  const srcMatch = slot?.sourceMatchId ? bracket.matchesById[slot.sourceMatchId] : undefined;
-  const srcId = srcMatch?.id || slot?.sourceMatchId;
+  // Finals Rule: Suppress all incoming and outgoing routing chips for Grand Finals,
+  // Grand Finals Reset, and Championship Finals (connecting lines already represent these paths).
+  const isChampOpening = Boolean(isPhase2OpeningRound || match.roundIdentifier === 'CHAMP_R1');
+  if (
+    !isChampOpening &&
+    (match.stage === 'GRAND_FINALS' ||
+      match.stage === 'GRAND_FINALS_RESET' ||
+      match.roundIdentifier === 'GF' ||
+      match.roundIdentifier === 'GFR' ||
+      match.phase === 'CHAMPIONSHIP')
+  ) {
+    return null;
+  }
 
-  const buildChip = (
+  const isAcceleratedHybrid = bracket?.bracketRouting === 'ACCELERATED_HYBRID';
+  const slot = slotNum === 1 ? match.player1 : match.player2;
+  const feeder = slotNum === 1 ? match.slotA : match.slotB;
+  const srcId = slot?.sourceMatchId || feeder?.matchId;
+  const srcMatch = srcId ? bracket?.matchesById?.[srcId] : undefined;
+
+  const buildAHChip = (
     branch: 'AR' | 'UB' | 'LB',
     matchNumber: number | string,
     action: string,
@@ -111,7 +130,7 @@ export const getOriginChip = (
     const palette = ACCELERATED_HYBRID_POD_PALETTE[branch];
     const resolvedId = targetId || srcId;
     return {
-      text: `${branch} ${matchNumber}`,
+      text: `${matchNumber}`,
       tooltip: `${action} of ${detailRound} (Match #${matchNumber})`,
       bg: palette.bgTranslucent,
       color: palette.text,
@@ -122,71 +141,425 @@ export const getOriginChip = (
   };
 
   // Phase 2 opening round (Top 16 Championship)
-  if (isPhase2OpeningRound) {
+  if (isPhase2OpeningRound || match.roundIdentifier === 'CHAMP_R1') {
     if (slotNum === 1) {
       const arMatches = Object.values(bracket.matchesById).filter(m => m.roundIdentifier === 'AR');
       const fallbackSrc = arMatches[mIdx];
       const targetId = srcMatch?.id || slot?.sourceMatchId || fallbackSrc?.id;
       const mNum = srcMatch?.matchNumber ?? fallbackSrc?.matchNumber ?? (mIdx + 1);
-      return buildChip('AR', mNum, 'Qualifier', 'Accelerated Round', targetId);
+      return buildAHChip('AR', mNum, 'Qualifier', 'Accelerated Round', targetId);
     } else {
       const poMatches = Object.values(bracket.matchesById).filter(m => m.roundIdentifier === 'PO');
       const fallbackSrc = poMatches[mIdx];
       const targetId = srcMatch?.id || slot?.sourceMatchId || fallbackSrc?.id;
       const mNum = srcMatch?.matchNumber ?? fallbackSrc?.matchNumber ?? (mIdx + 1);
-      return buildChip('LB', mNum, 'Qualifier', 'Lower Bracket Round 4 (Play-Offs)', targetId);
+      return buildAHChip('LB', mNum, 'Qualifier', 'Lower Bracket Round 4 (Play-Offs)', targetId);
     }
   }
 
-  // Lower Bracket Round 4 (PO):
-  // Slot 1: Inter-pod jump from Upper Bracket Round 2 (PRE_W2)
-  // Slot 2: Incoming horizontal connector line from 2C -> Hide chip
-  if (match.roundIdentifier === 'PO') {
-    if (slotNum === 1) {
-      const preW2Matches = Object.values(bracket.matchesById).filter(m => m.roundIdentifier === 'PRE_W2');
-      const fallbackSrc = preW2Matches[mIdx];
-      const targetId = srcMatch?.id || slot?.sourceMatchId || fallbackSrc?.id;
-      const mNum = srcMatch?.matchNumber ?? fallbackSrc?.matchNumber ?? (mIdx + 1);
-      return buildChip('UB', mNum, 'Winner', 'Upper Bracket Round 2', targetId);
+  if (isAcceleratedHybrid) {
+    // Lower Bracket Round 4 (PO):
+    // Slot 1: Inter-pod jump from Upper Bracket Round 2 (PRE_W2)
+    // Slot 2: Incoming horizontal connector line from 2C -> Hide chip
+    if (match.roundIdentifier === 'PO') {
+      if (slotNum === 1) {
+        const preW2Matches = Object.values(bracket.matchesById).filter(m => m.roundIdentifier === 'PRE_W2');
+        const fallbackSrc = preW2Matches[mIdx];
+        const targetId = srcMatch?.id || slot?.sourceMatchId || fallbackSrc?.id;
+        const mNum = srcMatch?.matchNumber ?? fallbackSrc?.matchNumber ?? (mIdx + 1);
+        return buildAHChip('UB', mNum, 'Winner', 'Upper Bracket Round 2', targetId);
+      }
+      return null;
     }
-    return null;
-  }
 
-  // Lower Bracket Round 3 (2C):
-  // Slot 1: Incoming horizontal connector line from PRE_L2 -> Hide chip
-  // Slot 2: Inter-pod jump from Accelerated Round losers (AR)
-  if (match.roundIdentifier === '2C') {
-    if (slotNum === 2) {
-      const arMatches = Object.values(bracket.matchesById).filter(m => m.roundIdentifier === 'AR');
-      const fallbackSrc = arMatches[mIdx];
-      const targetId = srcMatch?.id || slot?.sourceMatchId || fallbackSrc?.id;
-      const mNum = srcMatch?.matchNumber ?? fallbackSrc?.matchNumber ?? (mIdx + 1);
-      return buildChip('AR', mNum, 'Dropped', 'Accelerated Round', targetId);
+    // Lower Bracket Round 3 (2C):
+    // Slot 1: Incoming horizontal connector line from PRE_L2 -> Hide chip
+    // Slot 2: Inter-pod jump from Accelerated Round losers (AR)
+    if (match.roundIdentifier === '2C') {
+      if (slotNum === 2) {
+        const arMatches = Object.values(bracket.matchesById).filter(m => m.roundIdentifier === 'AR');
+        const fallbackSrc = arMatches[mIdx];
+        const targetId = srcMatch?.id || slot?.sourceMatchId || fallbackSrc?.id;
+        const mNum = srcMatch?.matchNumber ?? fallbackSrc?.matchNumber ?? (mIdx + 1);
+        return buildAHChip('AR', mNum, 'Dropped', 'Accelerated Round', targetId);
+      }
+      return null;
     }
-    return null;
-  }
 
-  // Lower Bracket Round 2 (PRE_L2):
-  // Slot 1: Incoming horizontal connector line from PRE_L1 -> Hide chip
-  // Slot 2: Inter-pod jump from Upper Bracket Round 1 losers (PRE_W1)
-  if (match.roundIdentifier === 'PRE_L2') {
-    if (slotNum === 2) {
+    // Lower Bracket Round 2 (PRE_L2):
+    // Slot 1: Incoming horizontal connector line from PRE_L1 -> Hide chip
+    // Slot 2: Inter-pod jump from Upper Bracket Round 1 losers (PRE_W1)
+    if (match.roundIdentifier === 'PRE_L2') {
+      if (slotNum === 2) {
+        const mNum = srcMatch?.matchNumber ?? (mIdx + 1);
+        return buildAHChip('UB', mNum, 'Dropped', 'Upper Bracket Round 1', srcId);
+      }
+      return null;
+    }
+
+    // Lower Bracket Round 1 (PRE_L1):
+    // Both slots entered from Upper Bracket Round 1 losers (PRE_W1 - inter-pod jump)
+    if (match.roundIdentifier === 'PRE_L1') {
       const mNum = srcMatch?.matchNumber ?? (mIdx + 1);
-      return buildChip('UB', mNum, 'Dropped', 'Upper Bracket Round 1', srcId);
+      return buildAHChip('UB', mNum, 'Dropped', 'Upper Bracket Round 1', srcId);
     }
+
+    // Upper Bracket Round 2 (PRE_W2): Incoming visual SVG connector line from PRE_W1 -> Hide chip
+    if (match.roundIdentifier === 'PRE_W2') {
+      return null;
+    }
+
     return null;
   }
 
-  // Lower Bracket Round 1 (PRE_L1):
-  // Both slots entered from Upper Bracket Round 1 losers (PRE_W1 - inter-pod jump)
-  if (match.roundIdentifier === 'PRE_L1') {
-    const mNum = srcMatch?.matchNumber ?? (mIdx + 1);
-    return buildChip('UB', mNum, 'Dropped', 'Upper Bracket Round 1', srcId);
+  // Double Elimination (Traditional & Flat)
+  if (bracket?.eliminationType === 'DOUBLE') {
+    // Lower Bracket matches: show chip ONLY for slots entering from Winners Bracket (disconnected transition)
+    if (match.stage === 'LOSERS' || match.roundIdentifier?.startsWith('L')) {
+      const isFromWinners = Boolean(
+        feeder?.type === 'LOSER' ||
+        srcMatch?.stage === 'WINNERS' ||
+        srcMatch?.roundIdentifier?.startsWith('W')
+      );
+      if (isFromWinners && (srcMatch || srcId)) {
+        const mNum = srcMatch?.matchNumber;
+        const label = mNum ? `${mNum}` : '';
+        const targetId = srcMatch?.id || srcId;
+        return {
+          text: label,
+          tooltip: `From Winners Bracket${mNum ? ` (Match #${mNum})` : ''}`,
+          bg: `${primaryColor}26`,
+          color: primaryColor,
+          border: `1px solid ${primaryColor}88`,
+          sourceMatchId: targetId,
+          targetMatchId: targetId,
+        };
+      }
+      return null;
+    }
+
+    return null;
   }
 
-  // Upper Bracket Round 2 (PRE_W2):
-  // Incoming visual SVG connector line from PRE_W1 -> Hide chip
-  if (match.roundIdentifier === 'PRE_W2') {
+  return null;
+};
+
+export const getOriginChip = getInboundChip;
+
+export const getOutboundChip = (
+  slotNum: 1 | 2,
+  match: BracketMatch,
+  isComplete: boolean,
+  p1Won: boolean,
+  p2Won: boolean,
+  finalsCutoff: number,
+  bracket?: BracketStructure,
+  primaryColor = '#ffc905',
+  _secondaryColor = '#f59e0b',
+  lowerBracketColor = '#c2410c'
+): MicroChipData | null => {
+  // Finals Rule: Suppress all incoming and outgoing routing chips for Grand Finals,
+  // Grand Finals Reset, and Championship Finals (connecting lines already represent these paths).
+  if (
+    match.stage === 'GRAND_FINALS' ||
+    match.stage === 'GRAND_FINALS_RESET' ||
+    match.roundIdentifier === 'GF' ||
+    match.roundIdentifier === 'GFR' ||
+    match.phase === 'CHAMPIONSHIP' ||
+    match.roundIdentifier?.startsWith('CHAMP')
+  ) {
+    return null;
+  }
+
+  const isAcceleratedHybrid = bracket?.bracketRouting === 'ACCELERATED_HYBRID';
+  const isSlot1 = slotNum === 1;
+  const isThisSlotWinner = isComplete && (isSlot1 ? p1Won : p2Won);
+  const isThisSlotLoser = isComplete && (isSlot1 ? !p1Won : !p2Won);
+
+  if (isAcceleratedHybrid) {
+    const findDestMatch = (mId: string): BracketMatch | undefined => {
+      if (!bracket?.matchesById) return undefined;
+      if (match.nextMatchId && bracket.matchesById[match.nextMatchId]) {
+        return bracket.matchesById[match.nextMatchId];
+      }
+      const dest = Object.values(bracket.matchesById).find(
+        (m) =>
+          (m.phase === 'CHAMPIONSHIP' || m.roundIdentifier?.startsWith('CHAMP')) &&
+          (m.player1.sourceMatchId === mId ||
+            m.player2.sourceMatchId === mId ||
+            m.slotA?.matchId === mId ||
+            m.slotB?.matchId === mId)
+      );
+      if (dest) return dest;
+
+      // Fallback if sourceMatchId wasn't populated on championship matches
+      if (match.roundIdentifier === 'AR' || match.roundIdentifier === 'PO') {
+        const roundMatches = Object.values(bracket.matchesById).filter(
+          (m) => m.roundIdentifier === match.roundIdentifier
+        );
+        const idx = roundMatches.findIndex((m) => m.id === mId);
+        if (idx >= 0) {
+          const champR1 = Object.values(bracket.matchesById).filter(
+            (m) => m.roundNumber === (bracket.rounds.find((r) => r.phase === 'CHAMPIONSHIP')?.roundNumber || 0)
+          );
+          if (champR1[idx]) return champR1[idx];
+        }
+      }
+      return undefined;
+    };
+
+    const findLbR3Match = (mId: string): BracketMatch | undefined => {
+      if (!bracket?.matchesById) return undefined;
+      const dest = Object.values(bracket.matchesById).find(
+        (m) =>
+          m.roundIdentifier === '2C' &&
+          (m.player1.sourceMatchId === mId ||
+            m.player2.sourceMatchId === mId ||
+            m.slotA?.matchId === mId ||
+            m.slotB?.matchId === mId)
+      );
+      if (dest) return dest;
+      const arMatches = Object.values(bracket.matchesById).filter((m) => m.roundIdentifier === 'AR');
+      const idx = arMatches.findIndex((m) => m.id === mId);
+      if (idx >= 0) {
+        const scMatches = Object.values(bracket.matchesById).filter((m) => m.roundIdentifier === '2C');
+        return scMatches[idx];
+      }
+      return undefined;
+    };
+
+    const findPoMatch = (mId: string): BracketMatch | undefined => {
+      if (!bracket?.matchesById) return undefined;
+      const dest = Object.values(bracket.matchesById).find(
+        (m) =>
+          m.roundIdentifier === 'PO' &&
+          (m.player1.sourceMatchId === mId ||
+            m.player2.sourceMatchId === mId ||
+            m.slotA?.matchId === mId ||
+            m.slotB?.matchId === mId)
+      );
+      if (dest) return dest;
+      const preW2Matches = Object.values(bracket.matchesById).filter((m) => m.roundIdentifier === 'PRE_W2');
+      const idx = preW2Matches.findIndex((m) => m.id === mId);
+      if (idx >= 0) {
+        const poMatches = Object.values(bracket.matchesById).filter((m) => m.roundIdentifier === 'PO');
+        return poMatches[idx];
+      }
+      return undefined;
+    };
+
+    const findLbDropMatch = (mId: string): BracketMatch | undefined => {
+      if (!bracket?.matchesById) return undefined;
+      return Object.values(bracket.matchesById).find(
+        (m) =>
+          (m.roundIdentifier === 'PRE_L1' || m.roundIdentifier === 'PRE_L2') &&
+          (m.player1.sourceMatchId === mId ||
+            m.player2.sourceMatchId === mId ||
+            m.slotA?.matchId === mId ||
+            m.slotB?.matchId === mId)
+      );
+    };
+
+    const cutoff = finalsCutoff || 16;
+
+    // 1. Accelerated Round (AR):
+    // Winner: Disconnected jump to Top 16 Championship ("► T16-[MatchNumber]")
+    // Loser: Disconnected drop to Lower Bracket Round 3 ("▼ LB-[MatchNumber]")
+    if (match.roundIdentifier === 'AR') {
+      const destMatch = findDestMatch(match.id);
+      const destNum = destMatch?.matchNumber;
+      const lbMatch = findLbR3Match(match.id);
+      const lbNum = lbMatch?.matchNumber;
+
+      if (isComplete) {
+        if (isThisSlotWinner) {
+          return {
+            text: destNum ? `${destNum}` : '',
+            tooltip: `QUALIFIED to Top ${cutoff} Championship${destNum ? ` (Match #${destNum})` : ''}`,
+            bg: `${primaryColor}26`,
+            color: primaryColor,
+            border: `1px solid ${primaryColor}88`,
+            glow: `0 0 10px ${primaryColor}88`,
+            sourceMatchId: destMatch?.id,
+            targetMatchId: destMatch?.id,
+            opacity: 1,
+          };
+        }
+        if (isThisSlotLoser) {
+          const lbPalette = ACCELERATED_HYBRID_POD_PALETTE.LB;
+          return {
+            text: lbNum ? `${lbNum}` : '',
+            tooltip: `Drops to Lower Bracket Round 3${lbNum ? ` (Match #${lbNum})` : ''}`,
+            bg: lbPalette.bgTranslucent,
+            color: lbPalette.text,
+            border: `1px solid ${lbPalette.border}88`,
+            sourceMatchId: lbMatch?.id,
+            targetMatchId: lbMatch?.id,
+            opacity: 1,
+          };
+        }
+        return null;
+      } else {
+        // In-progress / uncompleted: drop stake shown at opacity 0.4
+        const lbPalette = ACCELERATED_HYBRID_POD_PALETTE.LB;
+        return {
+          text: lbNum ? `${lbNum}` : '',
+          tooltip: `Drops to Lower Bracket Round 3 on defeat${lbNum ? ` (Match #${lbNum})` : ''}`,
+          bg: lbPalette.bgTranslucent,
+          color: lbPalette.text,
+          border: `1px solid ${lbPalette.border}88`,
+          sourceMatchId: lbMatch?.id,
+          targetMatchId: lbMatch?.id,
+          opacity: 0.4,
+        };
+      }
+    }
+
+    // 2. Upper Bracket Round 1 (PRE_W1):
+    // Winner: advances to PRE_W2 via SVG connector line -> SUPPRESS chip
+    // Loser: drops to Lower Bracket (PRE_L1 / PRE_L2)
+    if (match.roundIdentifier === 'PRE_W1') {
+      const lbMatch = findLbDropMatch(match.id);
+      const lbNum = lbMatch?.matchNumber;
+      if (isComplete) {
+        if (isThisSlotLoser && lbMatch) {
+          const lbPalette = ACCELERATED_HYBRID_POD_PALETTE.LB;
+          return {
+            text: lbNum ? `${lbNum}` : '',
+            tooltip: `Drops to Lower Bracket${lbNum ? ` (Match #${lbNum})` : ''}`,
+            bg: lbPalette.bgTranslucent,
+            color: lbPalette.text,
+            border: `1px solid ${lbPalette.border}88`,
+            sourceMatchId: lbMatch.id,
+            targetMatchId: lbMatch.id,
+            opacity: 1,
+          };
+        }
+        return null;
+      } else if (lbMatch) {
+        // In-progress / uncompleted drop stake
+        const lbPalette = ACCELERATED_HYBRID_POD_PALETTE.LB;
+        return {
+          text: lbNum ? `${lbNum}` : '',
+          tooltip: `Drops to Lower Bracket on defeat${lbNum ? ` (Match #${lbNum})` : ''}`,
+          bg: lbPalette.bgTranslucent,
+          color: lbPalette.text,
+          border: `1px solid ${lbPalette.border}88`,
+          sourceMatchId: lbMatch.id,
+          targetMatchId: lbMatch.id,
+          opacity: 0.4,
+        };
+      }
+      return null;
+    }
+
+    // 3. Upper Bracket Round 2 (PRE_W2):
+    // Winner: advances to Lower Bracket Round 4 (Play-Offs PO) -> "► LB-[MatchNumber]"
+    // Loser: eliminated -> no chip
+    if (match.roundIdentifier === 'PRE_W2') {
+      if (isComplete && isThisSlotWinner) {
+        const destMatch = findPoMatch(match.id);
+        const lbPalette = ACCELERATED_HYBRID_POD_PALETTE.LB;
+        return {
+          text: destMatch?.matchNumber ? `${destMatch.matchNumber}` : '',
+          tooltip: `Advances to Lower Bracket Round 4 (Play-Offs${destMatch?.matchNumber ? ` - Match #${destMatch.matchNumber}` : ''})`,
+          bg: lbPalette.bgTranslucent,
+          color: lbPalette.text,
+          border: `1px solid ${lbPalette.border}88`,
+          sourceMatchId: destMatch?.id,
+          targetMatchId: destMatch?.id,
+          opacity: 1,
+        };
+      }
+      return null;
+    }
+
+    // 4. Lower Bracket Round 4 (PO):
+    // Winner: qualifies to Top 16 Championship ("► T16-[MatchNumber]")
+    // Loser: eliminated -> no chip
+    if (match.roundIdentifier === 'PO') {
+      if (isComplete && isThisSlotWinner) {
+        const destMatch = findDestMatch(match.id);
+        const destNum = destMatch?.matchNumber;
+        return {
+          text: destNum ? `${destNum}` : '',
+          tooltip: `QUALIFIED to Top ${cutoff} Championship${destNum ? ` (Match #${destNum})` : ''}`,
+          bg: `${primaryColor}26`,
+          color: primaryColor,
+          border: `1px solid ${primaryColor}88`,
+          glow: `0 0 10px ${primaryColor}88`,
+          sourceMatchId: destMatch?.id,
+          targetMatchId: destMatch?.id,
+          opacity: 1,
+        };
+      }
+      return null;
+    }
+
+    // All other rounds: connected by SVG lines or elimination -> SUPPRESS chip
+    return null;
+  }
+
+  // Double Elimination (Traditional & Flat)
+  if (bracket?.eliminationType === 'DOUBLE') {
+    // 1. Winners Bracket:
+    if (match.stage === 'WINNERS' || match.roundIdentifier?.startsWith('W')) {
+      // Find loser drop match in Losers bracket
+      let destMatch = match.loserNextMatchId && bracket?.matchesById
+        ? bracket.matchesById[match.loserNextMatchId]
+        : undefined;
+      if (!destMatch && bracket?.matchesById) {
+        destMatch = Object.values(bracket.matchesById).find(
+          (m) =>
+            (m.stage === 'LOSERS' || m.roundIdentifier?.startsWith('L')) &&
+            ((m.slotA?.matchId === match.id && m.slotA?.type === 'LOSER') ||
+              (m.slotB?.matchId === match.id && m.slotB?.type === 'LOSER') ||
+              (m.player1?.sourceMatchId === match.id && m.slotA?.type === 'LOSER') ||
+              (m.player2?.sourceMatchId === match.id && m.slotB?.type === 'LOSER'))
+        );
+      }
+
+      if (destMatch) {
+        const destNum = destMatch.matchNumber;
+        const label = destNum ? `${destNum}` : '';
+
+        if (isComplete) {
+          // Only show on the dropping loser's row
+          if (isThisSlotLoser) {
+            return {
+              text: label,
+              tooltip: `Drops to Lower Bracket (Match #${destNum ?? '?'})`,
+              bg: `${lowerBracketColor}26`,
+              color: lowerBracketColor,
+              border: `1px solid ${lowerBracketColor}88`,
+              sourceMatchId: destMatch.id,
+              targetMatchId: destMatch.id,
+              opacity: 1,
+            };
+          }
+          // Advancing winner advances via SVG line -> null
+          return null;
+        } else {
+          // Uncompleted / in-progress: both slots have drop stake at opacity 0.4
+          return {
+            text: label,
+            tooltip: `Drops to Lower Bracket on defeat (Match #${destNum ?? '?'})`,
+            bg: `${lowerBracketColor}26`,
+            color: lowerBracketColor,
+            border: `1px solid ${lowerBracketColor}88`,
+            sourceMatchId: destMatch.id,
+            targetMatchId: destMatch.id,
+            opacity: 0.4,
+          };
+        }
+      }
+
+      return null;
+    }
+
+    // 2. Losers Bracket:
+    // Winner advances via SVG line (or to GF via SVG line). Loser eliminated.
+    // Connector line rule & Finals rule -> SUPPRESS chip completely.
     return null;
   }
 
@@ -199,143 +572,21 @@ export const getOutcomeChip = (
   finalsCutoff: number,
   bracket?: BracketStructure,
   primaryColor = '#ffc905',
-  _secondaryColor = '#f59e0b'
+  secondaryColor = '#f59e0b',
+  lowerBracketColor = '#c2410c'
 ): MicroChipData | null => {
-  const findDestMatch = (mId: string): BracketMatch | undefined => {
-    if (!bracket?.matchesById) return undefined;
-    if (match.nextMatchId && bracket.matchesById[match.nextMatchId]) {
-      return bracket.matchesById[match.nextMatchId];
-    }
-    const dest = Object.values(bracket.matchesById).find(
-      (m) =>
-        (m.phase === 'CHAMPIONSHIP' || m.roundIdentifier?.startsWith('CHAMP')) &&
-        (m.player1.sourceMatchId === mId ||
-          m.player2.sourceMatchId === mId ||
-          m.slotA?.matchId === mId ||
-          m.slotB?.matchId === mId)
-    );
-    if (dest) return dest;
-
-    // Fallback if sourceMatchId wasn't populated on championship matches
-    if (match.roundIdentifier === 'AR' || match.roundIdentifier === 'PO') {
-      const roundMatches = Object.values(bracket.matchesById).filter(
-        (m) => m.roundIdentifier === match.roundIdentifier
-      );
-      const idx = roundMatches.findIndex((m) => m.id === mId);
-      if (idx >= 0) {
-        const champR1 = Object.values(bracket.matchesById).filter(
-          (m) => m.roundNumber === (bracket.rounds.find((r) => r.phase === 'CHAMPIONSHIP')?.roundNumber || 0)
-        );
-        if (champR1[idx]) return champR1[idx];
-      }
-    }
-    return undefined;
-  };
-
-  const findLbR3Match = (mId: string): BracketMatch | undefined => {
-    if (!bracket?.matchesById) return undefined;
-    const dest = Object.values(bracket.matchesById).find(
-      (m) =>
-        m.roundIdentifier === '2C' &&
-        (m.player1.sourceMatchId === mId ||
-          m.player2.sourceMatchId === mId ||
-          m.slotA?.matchId === mId ||
-          m.slotB?.matchId === mId)
-    );
-    if (dest) return dest;
-    const arMatches = Object.values(bracket.matchesById).filter((m) => m.roundIdentifier === 'AR');
-    const idx = arMatches.findIndex((m) => m.id === mId);
-    if (idx >= 0) {
-      const scMatches = Object.values(bracket.matchesById).filter((m) => m.roundIdentifier === '2C');
-      return scMatches[idx];
-    }
-    return undefined;
-  };
-
-  const findPoMatch = (mId: string): BracketMatch | undefined => {
-    if (!bracket?.matchesById) return undefined;
-    const dest = Object.values(bracket.matchesById).find(
-      (m) =>
-        m.roundIdentifier === 'PO' &&
-        (m.player1.sourceMatchId === mId ||
-          m.player2.sourceMatchId === mId ||
-          m.slotA?.matchId === mId ||
-          m.slotB?.matchId === mId)
-    );
-    if (dest) return dest;
-    const preW2Matches = Object.values(bracket.matchesById).filter((m) => m.roundIdentifier === 'PRE_W2');
-    const idx = preW2Matches.findIndex((m) => m.id === mId);
-    if (idx >= 0) {
-      const poMatches = Object.values(bracket.matchesById).filter((m) => m.roundIdentifier === 'PO');
-      return poMatches[idx];
-    }
-    return undefined;
-  };
-
-  const cutoff = finalsCutoff || 16;
-  const tLabel = `T${cutoff}`;
-
-  // Accelerated Round (Pod 1 Terminal Matches):
-  if (match.roundIdentifier === 'AR') {
-    if (slotWon) {
-      const destMatch = findDestMatch(match.id);
-      const destNum = destMatch?.matchNumber;
-      return {
-        text: destNum ? `${tLabel} ${destNum}` : tLabel,
-        tooltip: `QUALIFIED to Top ${cutoff} Championship${destNum ? ` (Match #${destNum})` : ''}`,
-        bg: `${primaryColor}26`,
-        color: primaryColor,
-        border: `1.5px solid ${primaryColor}`,
-        glow: `0 0 10px ${primaryColor}88`,
-        sourceMatchId: destMatch?.id,
-        targetMatchId: destMatch?.id,
-      };
-    } else {
-      const destMatch = findLbR3Match(match.id);
-      return {
-        text: destMatch?.matchNumber ? `LB #${destMatch.matchNumber}` : 'LB R3',
-        tooltip: `Drops to Lower Bracket Round 3${destMatch?.matchNumber ? ` (Match #${destMatch.matchNumber})` : ''}`,
-        bg: 'rgba(5, 150, 105, 0.2)',
-        color: '#34d399',
-        border: '1px solid rgba(5, 150, 105, 0.5)',
-        sourceMatchId: destMatch?.id,
-        targetMatchId: destMatch?.id,
-      };
-    }
-  }
-
-  // Upper Bracket Round 2 (Pod 2 Terminal Matches):
-  if (match.roundIdentifier === 'PRE_W2' && slotWon) {
-    const destMatch = findPoMatch(match.id);
-    return {
-      text: destMatch?.matchNumber ? `LB #${destMatch.matchNumber}` : 'LB R4',
-      tooltip: `Advances to Lower Bracket Round 4 (Play-Offs${destMatch?.matchNumber ? ` - Match #${destMatch.matchNumber}` : ''})`,
-      bg: 'rgba(5, 150, 105, 0.2)',
-      color: '#34d399',
-      border: '1px solid rgba(5, 150, 105, 0.5)',
-      sourceMatchId: destMatch?.id,
-      targetMatchId: destMatch?.id,
-    };
-  }
-
-  // Lower Bracket Round 4 (Pod 3 Terminal Matches):
-  if (match.roundIdentifier === 'PO' && slotWon) {
-    const destMatch = findDestMatch(match.id);
-    const destNum = destMatch?.matchNumber;
-    return {
-      text: destNum ? `${tLabel} ${destNum}` : tLabel,
-      tooltip: `QUALIFIED to Top ${cutoff} Championship${destNum ? ` (Match #${destNum})` : ''}`,
-      bg: `${primaryColor}26`,
-      color: primaryColor,
-      border: `1.5px solid ${primaryColor}`,
-      glow: `0 0 10px ${primaryColor}88`,
-      sourceMatchId: destMatch?.id,
-      targetMatchId: destMatch?.id,
-    };
-  }
-
-  // Hide "Going To" chips for all intermediate rounds
-  return null;
+  return getOutboundChip(
+    1,
+    match,
+    true,
+    slotWon,
+    !slotWon,
+    finalsCutoff,
+    bracket,
+    primaryColor,
+    secondaryColor,
+    lowerBracketColor
+  );
 };
 
 export const renderMicroChip = (
@@ -343,7 +594,7 @@ export const renderMicroChip = (
   onHover?: (sourceMatchId: string | null) => void,
   onClick?: (matchId: string) => void
 ) => {
-  if (!chip) return null;
+  if (!chip || !chip.text) return null;
   const matchId = chip.targetMatchId || chip.sourceMatchId;
   return (
     <span
@@ -368,22 +619,23 @@ export const renderMicroChip = (
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '0 4px',
-        minWidth: '22px',
-        height: '17px',
-        fontSize: '0.62rem',
-        fontWeight: 900,
+        padding: '1px 5px',
+        minWidth: '18px',
+        fontSize: '10px',
+        fontWeight: 700,
         fontFamily: 'var(--font-mono, monospace)',
         borderRadius: '3px',
         backgroundColor: chip.bg,
         color: chip.color,
         border: chip.border || 'none',
         boxShadow: chip.glow || 'none',
+        opacity: chip.opacity !== undefined ? chip.opacity : 1,
         lineHeight: 1,
         flexShrink: 0,
         letterSpacing: '-0.02em',
         cursor: matchId ? 'pointer' : 'help',
         userSelect: 'none',
+        whiteSpace: 'nowrap',
         transition: 'all 0.15s ease',
       }}
       title={chip.tooltip}
@@ -404,6 +656,7 @@ export function findPlayerJourney(
   matchIds: Set<string>;
   slotKeys: Set<string>;
   isChampion: boolean;
+  targetPlayerId?: string | null;
 } {
   const matchIds = new Set<string>();
   const slotKeys = new Set<string>();
@@ -456,7 +709,7 @@ export function findPlayerJourney(
     }
 
     const isChampion = Boolean(championPlayerId && championPlayerId === targetPlayerId);
-    return { matchIds, slotKeys, isChampion };
+    return { matchIds, slotKeys, isChampion, targetPlayerId };
   }
 
   // Fallback for unassigned placeholder slots: traverse ancestry backwards and descendants forwards
@@ -492,7 +745,7 @@ export function findPlayerJourney(
     }
   }
 
-  return { matchIds, slotKeys, isChampion: false };
+  return { matchIds, slotKeys, isChampion: false, targetPlayerId: null };
 }
 
 export const findAncestors = (
@@ -506,6 +759,40 @@ export const findAncestors = (
   const participant = startSlotNum === 1 ? match?.player1 : match?.player2;
   return findPlayerJourney(participant?.player?.id, startMatchId, startSlotNum, bracket, scores, championPlayerId);
 };
+
+export function getHighlightedPlayerNameColor({
+  isHighlightActive,
+  isTargetSlot,
+  isOpponentSlot,
+  isHoveredText,
+  isComplete,
+  isWinner,
+  isLeading,
+  primaryColor,
+  secondaryColor,
+  textColor,
+}: {
+  isHighlightActive: boolean;
+  isTargetSlot: boolean;
+  isOpponentSlot: boolean;
+  isHoveredText: boolean;
+  isComplete: boolean;
+  isWinner: boolean;
+  isLeading: boolean;
+  primaryColor: string;
+  secondaryColor: string;
+  textColor: string;
+}): string {
+  if (isHighlightActive) {
+    if (isTargetSlot && !isOpponentSlot) return primaryColor;
+    if (isOpponentSlot && !isTargetSlot) return secondaryColor;
+  }
+  return isHoveredText
+    ? secondaryColor
+    : (isComplete && isWinner) || isLeading
+    ? primaryColor
+    : textColor;
+}
 
 interface BracketVisualizerProps {
   tournament: Tournament;
@@ -538,6 +825,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
     matchIds: Set<string>;
     slotKeys: Set<string>;
     isChampion?: boolean;
+    targetPlayerId?: string | null;
   } | null>(null);
 
   const combinedContentRef = useRef<HTMLDivElement>(null);
@@ -612,6 +900,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
   const cardColor = tier.cardColor || tierDefaults.cardColor;
   const backgroundColor = tier.backgroundColor || tierDefaults.backgroundColor;
   const textColor = tier.textColor || tierDefaults.textColor;
+  const lowerBracketColor = tier.lowerBracketColor || tierDefaults.lowerBracketColor || '#c2410c';
   const textScale = getTextScale(tier.textSize);
 
   // Dynamic text scaling derived from smaller baseline:
@@ -1015,14 +1304,22 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
       >
         {/* Stage Section Badges */}
         {targetLayout.stageHeaders?.filter(() => !isPhase2View).map((sh) => {
+          const isLosersStageHeader =
+            (tier.eliminationType === 'DOUBLE' || bracket?.eliminationType === 'DOUBLE') &&
+            !isAcceleratedHybrid &&
+            (sh.id?.toLowerCase().includes('loser') ||
+              sh.title.toLowerCase().includes('loser') ||
+              sh.title.toLowerCase().includes('lower'));
           const badgeAccentColor = isAcceleratedHybrid
             ? sh.title.includes('Accelerated')
               ? ACCELERATED_HYBRID_POD_PALETTE.AR.border
               : sh.title.includes('Upper')
               ? ACCELERATED_HYBRID_POD_PALETTE.UB.border
               : sh.title.includes('Lower') || sh.title.includes('2nd Chance')
-              ? ACCELERATED_HYBRID_POD_PALETTE.LB.border
+              ? (lowerBracketColor || ACCELERATED_HYBRID_POD_PALETTE.LB.border)
               : podBorderColor
+            : isLosersStageHeader
+            ? lowerBracketColor
             : null;
           return (
             <div
@@ -1040,13 +1337,10 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                 textTransform: 'uppercase',
                 color: primaryColor,
                 background: effectiveCardBg,
-                border: `1.5px solid ${secondaryColor}`,
-                ...(badgeAccentColor
-                  ? {
-                      borderLeft: `4px solid ${badgeAccentColor}`,
-                      borderRight: `4px solid ${badgeAccentColor}`,
-                    }
-                  : {}),
+                borderTop: `1.5px solid ${secondaryColor}`,
+                borderBottom: `1.5px solid ${secondaryColor}`,
+                borderLeft: badgeAccentColor ? `4px solid ${badgeAccentColor}` : `1.5px solid ${secondaryColor}`,
+                borderRight: badgeAccentColor ? `4px solid ${badgeAccentColor}` : `1.5px solid ${secondaryColor}`,
                 borderRadius: 'var(--radius-sm)',
                 boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
                 zIndex: 10,
@@ -1065,8 +1359,21 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
             header.name.toLowerCase().includes('grand finals');
           const roundObj = targetRounds.find((r) => r.roundNumber === header.roundNumber);
           const firstMatch = roundObj?.matches?.[0];
-          const roundAccentColor =
-            isAcceleratedHybrid && firstMatch ? getMatchBranchColor(firstMatch) : podBorderColor;
+          const isLosersRound =
+            (tier.eliminationType === 'DOUBLE' || bracket?.eliminationType === 'DOUBLE') &&
+            !isAcceleratedHybrid &&
+            (roundObj?.stage === 'LOSERS' ||
+              roundObj?.roundIdentifier?.startsWith('L') ||
+              header.name.includes('(L)') ||
+              header.name.toLowerCase().includes('loser') ||
+              header.name.startsWith('LR'));
+          const roundAccentColor = isAcceleratedHybrid
+            ? (roundObj?.roundIdentifier === 'PRE_L1' || roundObj?.roundIdentifier === 'PRE_L2' || roundObj?.roundIdentifier === '2C' || roundObj?.roundIdentifier === 'PO'
+                ? (lowerBracketColor || ACCELERATED_HYBRID_POD_PALETTE.LB.border)
+                : firstMatch ? getMatchBranchColor(firstMatch, lowerBracketColor) : podBorderColor)
+            : isLosersRound
+            ? lowerBracketColor
+            : null;
           return (
             <div
               key={header.roundNumber}
@@ -1086,15 +1393,10 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                 letterSpacing: isFinals ? '0.1em' : '0.08em',
                 background: effectiveCardBg,
                 borderRadius: 'var(--radius-sm)',
-                border: isFinals
-                  ? `2px solid ${primaryColor}`
-                  : `1.5px solid ${secondaryColor}`,
-                ...(roundAccentColor
-                  ? {
-                      borderLeft: `4px solid ${roundAccentColor}`,
-                      borderRight: `4px solid ${roundAccentColor}`,
-                    }
-                  : {}),
+                borderTop: isFinals ? `2px solid ${primaryColor}` : `1.5px solid ${secondaryColor}`,
+                borderBottom: isFinals ? `2px solid ${primaryColor}` : `1.5px solid ${secondaryColor}`,
+                borderLeft: roundAccentColor ? `4px solid ${roundAccentColor}` : isFinals ? `2px solid ${primaryColor}` : `1.5px solid ${secondaryColor}`,
+                borderRight: roundAccentColor ? `4px solid ${roundAccentColor}` : isFinals ? `2px solid ${primaryColor}` : `1.5px solid ${secondaryColor}`,
                 boxShadow: isFinals
                   ? `0 0 16px ${primaryColor}44, 0 4px 12px rgba(0, 0, 0, 0.45)`
                   : '0 2px 8px rgba(0, 0, 0, 0.4)',
@@ -1287,17 +1589,41 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
             const p1Won = Boolean(p1?.id && (match.winnerId === p1.id || record?.winnerPlayerId === p1.id));
             const p2Won = Boolean(p2?.id && (match.winnerId === p2.id || record?.winnerPlayerId === p2.id));
             const finalsCutoff = bracket.finalsCutoff || 16;
-            const p1OriginChip = isAcceleratedHybrid
-              ? getOriginChip(1, match, bracket, mIdx, isPhase2OpeningRound)
+            const isDoubleElim =
+              tier.eliminationType === 'DOUBLE' ||
+              bracket?.eliminationType === 'DOUBLE' ||
+              Boolean(bracket?.rounds?.some((r) => r.stage === 'LOSERS' || r.name?.toLowerCase().includes('loser')));
+            const p1InboundChip = (isAcceleratedHybrid || isDoubleElim)
+              ? getInboundChip(1, match, bracket, mIdx, isPhase2OpeningRound, primaryColor, lowerBracketColor)
               : null;
-            const p2OriginChip = isAcceleratedHybrid
-              ? getOriginChip(2, match, bracket, mIdx, isPhase2OpeningRound)
+            const p2InboundChip = (isAcceleratedHybrid || isDoubleElim)
+              ? getInboundChip(2, match, bracket, mIdx, isPhase2OpeningRound, primaryColor, lowerBracketColor)
               : null;
-            const p1OutcomeChip = isComplete ? getOutcomeChip(p1Won, match, finalsCutoff, bracket, primaryColor, secondaryColor) : null;
-            const p2OutcomeChip = isComplete ? getOutcomeChip(p2Won, match, finalsCutoff, bracket, primaryColor, secondaryColor) : null;
+            const p1OutboundChip = (isAcceleratedHybrid || isDoubleElim)
+              ? getOutboundChip(1, match, isComplete, p1Won, p2Won, finalsCutoff, bracket, primaryColor, secondaryColor, lowerBracketColor)
+              : null;
+            const p2OutboundChip = (isAcceleratedHybrid || isDoubleElim)
+              ? getOutboundChip(2, match, isComplete, p1Won, p2Won, finalsCutoff, bracket, primaryColor, secondaryColor, lowerBracketColor)
+              : null;
             const isMatchHovered = hoveredMatchId === match.id;
             const isFocusedMatch = focusedMatchId === match.id;
-            const branchAccentColor = isAcceleratedHybrid ? getMatchBranchColor(match) : null;
+            const isLoserMatch =
+              match.stage === 'LOSERS' ||
+              round.stage === 'LOSERS' ||
+              match.roundIdentifier?.startsWith('L') ||
+              round.roundIdentifier?.startsWith('L') ||
+              match.id?.toLowerCase().includes('-l') ||
+              match.id?.toLowerCase().includes('loser') ||
+              round.name?.toLowerCase().includes('loser') ||
+              round.name?.toLowerCase().includes('lower') ||
+              round.name?.startsWith('LR') ||
+              round.name?.includes('(L)') ||
+              round.shortName?.toLowerCase().includes('(l)');
+            const branchAccentColor = isAcceleratedHybrid
+              ? getMatchBranchColor(match, lowerBracketColor)
+              : isDoubleElim && isLoserMatch
+              ? lowerBracketColor
+              : null;
             const isOriginHovered = hoveredOriginMatchId === match.id;
             const p1Leading = inProgress && p1Wins > p2Wins;
             const p2Leading = inProgress && p2Wins > p1Wins;
@@ -1306,6 +1632,60 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
             const isCardInAncestry = hoveredAncestry?.matchIds.has(match.id);
             const isP1Ancestor = hoveredAncestry?.slotKeys.has(`${match.id}-1`);
             const isP2Ancestor = hoveredAncestry?.slotKeys.has(`${match.id}-2`);
+
+            const isP1Target = Boolean(
+              isP1Ancestor ||
+              (hoveredAncestry?.targetPlayerId && p1?.id === hoveredAncestry.targetPlayerId)
+            );
+            const isP2Target = Boolean(
+              isP2Ancestor ||
+              (hoveredAncestry?.targetPlayerId && p2?.id === hoveredAncestry.targetPlayerId)
+            );
+
+            const isHighlightActive = Boolean(hoveredAncestry && isCardInAncestry);
+
+            const baseCardBorder = hoveredAncestry
+              ? isCardInAncestry
+                ? `1.5px solid ${secondaryColor}`
+                : `1.5px solid ${secondaryColor}44`
+              : inProgress || isComplete
+              ? `2px solid ${primaryColor}`
+              : isMatchHovered
+              ? `1.5px solid ${primaryColor}`
+              : `1.5px solid ${secondaryColor}`;
+
+            const cardBorderLeft = branchAccentColor
+              ? `4px solid ${branchAccentColor}`
+              : baseCardBorder;
+            const cardBorderRight = branchAccentColor
+              ? `4px solid ${branchAccentColor}`
+              : baseCardBorder;
+
+            const p1NameColor = getHighlightedPlayerNameColor({
+              isHighlightActive,
+              isTargetSlot: isP1Target,
+              isOpponentSlot: isP2Target,
+              isHoveredText: hoveredPlayerKey === `p1-${match.id}`,
+              isComplete,
+              isWinner: p1Won,
+              isLeading: p1Leading,
+              primaryColor,
+              secondaryColor,
+              textColor,
+            });
+
+            const p2NameColor = getHighlightedPlayerNameColor({
+              isHighlightActive,
+              isTargetSlot: isP2Target,
+              isOpponentSlot: isP1Target,
+              isHoveredText: hoveredPlayerKey === `p2-${match.id}`,
+              isComplete,
+              isWinner: p2Won,
+              isLeading: p2Leading,
+              primaryColor,
+              secondaryColor,
+              textColor,
+            });
 
             return (
               <div
@@ -1332,8 +1712,8 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                   transition: 'transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.35s ease',
                 }}
               >
-                {/* Outside Left: Origin Micro-Chips (Where they come from) */}
-                {p1OriginChip && (
+                {/* Entry (Inbound) Micro-Chips: OUTSIDE the match to the left */}
+                {p1InboundChip && (
                   <div
                     style={{
                       position: 'absolute',
@@ -1345,13 +1725,15 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                       justifyContent: 'flex-end',
                       zIndex: 30,
                       pointerEvents: 'auto',
+                      opacity: hoveredAncestry ? (isCardInAncestry ? 1 : 0.35) : 1,
+                      transition: 'opacity 0.15s ease',
                     }}
                   >
-                    {renderMicroChip(p1OriginChip, setHoveredOriginMatchId, handleChipClick)}
+                    {renderMicroChip(p1InboundChip, setHoveredOriginMatchId, handleChipClick)}
                   </div>
                 )}
 
-                {p2OriginChip && (
+                {p2InboundChip && (
                   <div
                     style={{
                       position: 'absolute',
@@ -1363,46 +1745,11 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                       justifyContent: 'flex-end',
                       zIndex: 30,
                       pointerEvents: 'auto',
+                      opacity: hoveredAncestry ? (isCardInAncestry ? 1 : 0.35) : 1,
+                      transition: 'opacity 0.15s ease',
                     }}
                   >
-                    {renderMicroChip(p2OriginChip, setHoveredOriginMatchId, handleChipClick)}
-                  </div>
-                )}
-
-                {/* Outside Right: Outcome Micro-Chips (Where they go) */}
-                {p1OutcomeChip && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: 'calc(100% + 6px)',
-                      top: '20px',
-                      height: '28px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'flex-start',
-                      zIndex: 30,
-                      pointerEvents: 'auto',
-                    }}
-                  >
-                    {renderMicroChip(p1OutcomeChip, undefined, handleChipClick)}
-                  </div>
-                )}
-
-                {p2OutcomeChip && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: 'calc(100% + 6px)',
-                      top: '49.5px',
-                      height: '28px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'flex-start',
-                      zIndex: 30,
-                      pointerEvents: 'auto',
-                    }}
-                  >
-                    {renderMicroChip(p2OutcomeChip, undefined, handleChipClick)}
+                    {renderMicroChip(p2InboundChip, setHoveredOriginMatchId, handleChipClick)}
                   </div>
                 )}
 
@@ -1423,25 +1770,10 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                     height: '100%',
                     background: effectiveCardBg,
                     borderRadius: '5px',
-                    border: hoveredAncestry
-                      ? isCardInAncestry
-                        ? `1.5px solid ${secondaryColor}`
-                        : `1.5px solid ${secondaryColor}44`
-                      : inProgress || isComplete
-                      ? `2px solid ${primaryColor}`
-                      : isMatchHovered
-                      ? `1.5px solid ${primaryColor}`
-                      : `1.5px solid ${secondaryColor}`,
-                    ...(branchAccentColor
-                      ? {
-                          borderLeft: hoveredAncestry && !isCardInAncestry
-                            ? `4px solid ${branchAccentColor}44`
-                            : `4px solid ${branchAccentColor}`,
-                          borderRight: hoveredAncestry && !isCardInAncestry
-                            ? `4px solid ${branchAccentColor}44`
-                            : `4px solid ${branchAccentColor}`,
-                        }
-                      : {}),
+                    borderTop: baseCardBorder,
+                    borderBottom: baseCardBorder,
+                    borderLeft: cardBorderLeft,
+                    borderRight: cardBorderRight,
                     boxShadow: isFocusedMatch
                       ? `0 0 0 3px ${primaryColor}, 0 0 35px ${primaryColor}dd, 0 0 70px ${primaryColor}66`
                       : hoveredAncestry
@@ -1526,127 +1858,157 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       padding: '0 0.55rem',
-                      background: isComplete ? (p1Won ? secondaryColor : effectiveCardBg) : p1ZebraBg,
+                      background: isHighlightActive
+                        ? p1ZebraBg
+                        : isComplete
+                        ? (p1Won ? secondaryColor : effectiveCardBg)
+                        : p1ZebraBg,
                       boxSizing: 'border-box',
                       position: 'relative',
                       transition: 'all 0.15s ease',
-                      ...(isP1Ancestor
+                      ...(isP1Target
                         ? {
-                            outline: `4.5px solid ${primaryColor}`,
-                            outlineOffset: '-2px',
-                            boxShadow: `inset 0 0 12px ${primaryColor}88, 0 0 18px ${primaryColor}cc`,
-                            zIndex: 20,
+                            boxShadow: `inset 0 0 0 2px ${primaryColor}, inset 0 0 10px ${primaryColor}88`,
+                            background: `${primaryColor}22`,
+                            zIndex: 10,
                             borderRadius: '3px',
                           }
                         : {}),
                     }}
                   >
+                    {/* Left Sub-container (Ingress / Origin & Competitor Info) */}
                     <div
-                      onClick={(e) => {
-                        if (p1?.id) {
-                          e.stopPropagation();
-                          handlePlayerClick(p1.id, p1.name, p1Profile?.country);
-                        }
-                      }}
-                      onMouseEnter={() => p1?.id && setHoveredPlayerKey(`p1-${match.id}`)}
-                      onMouseLeave={() => setHoveredPlayerKey(null)}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '0.35rem',
-                        overflow: 'hidden',
-                        padding: '0.05rem 0.2rem',
-                        borderRadius: 'var(--radius-sm)',
-                        backgroundColor:
-                          hoveredPlayerKey === `p1-${match.id}` ? `${secondaryColor}22` : 'transparent',
-                        cursor: p1?.id ? 'pointer' : 'inherit',
-                        transition: 'all 0.15s ease',
                         minWidth: 0,
+                        flex: 1,
+                        overflow: 'hidden',
                       }}
-                      title={p1?.id ? 'View competitor tournament profile' : undefined}
                     >
-                      {p1?.seed && (
+                      <div
+                        onClick={(e) => {
+                          if (p1?.id) {
+                            e.stopPropagation();
+                            handlePlayerClick(p1.id, p1.name, p1Profile?.country);
+                          }
+                        }}
+                        onMouseEnter={() => p1?.id && setHoveredPlayerKey(`p1-${match.id}`)}
+                        onMouseLeave={() => setHoveredPlayerKey(null)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          overflow: 'hidden',
+                          padding: '0.05rem 0.2rem',
+                          borderRadius: 'var(--radius-sm)',
+                          backgroundColor:
+                            hoveredPlayerKey === `p1-${match.id}` ? `${secondaryColor}22` : 'transparent',
+                          cursor: p1?.id ? 'pointer' : 'inherit',
+                          transition: 'all 0.15s ease',
+                          minWidth: 0,
+                          flex: 1,
+                        }}
+                        title={p1?.id ? 'View competitor tournament profile' : undefined}
+                      >
+                        {p1?.seed && (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: `${seedDim}px`,
+                              height: `${seedDim}px`,
+                              minWidth: `${seedDim}px`,
+                              background: effectiveCardBg,
+                              border: `1.5px solid ${(isComplete && p1Won) || p1Leading ? primaryColor : secondaryColor}`,
+                              color: (isComplete && p1Won) || p1Leading ? primaryColor : textColor,
+                              fontWeight: 900,
+                              fontSize: seedFontSize,
+                              fontFamily: 'var(--font-mono)',
+                              borderRadius: '3px',
+                              flexShrink: 0,
+                              lineHeight: `${seedDim}px`,
+                            }}
+                          >
+                            {p1.seed}
+                          </span>
+                        )}
+
+                        {p1Profile?.country && (
+                          <CountryFlag country={p1Profile.country} style={{ fontSize: flagFontSize, lineHeight: 1, flexShrink: 0 }} />
+                        )}
+
                         <span
                           style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            width: `${seedDim}px`,
-                            height: `${seedDim}px`,
-                            minWidth: `${seedDim}px`,
-                            background: effectiveCardBg,
-                            border: `1.5px solid ${(isComplete && p1Won) || p1Leading ? primaryColor : secondaryColor}`,
-                            color: (isComplete && p1Won) || p1Leading ? primaryColor : textColor,
-                            fontWeight: 900,
-                            fontSize: seedFontSize,
-                            fontFamily: 'var(--font-mono)',
-                            borderRadius: '3px',
-                            flexShrink: 0,
-                            lineHeight: `${seedDim}px`,
+                            flex: 1,
+                            minWidth: 0,
+                            fontSize: nameFontSize,
+                            fontWeight:
+                              (isComplete && p1Won) || p1Leading || (isHighlightActive && isP1Target)
+                                ? 900
+                                : 700,
+                            color: p1NameColor,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            lineHeight: 1.1,
                           }}
                         >
-                          {p1.seed}
+                          {p1Name}
                         </span>
-                      )}
-
-                      {p1Profile?.country && (
-                        <CountryFlag country={p1Profile.country} style={{ fontSize: flagFontSize, lineHeight: 1, flexShrink: 0 }} />
-                      )}
-
-                      <span
-                        style={{
-                          flex: 1,
-                          minWidth: 0,
-                          fontSize: nameFontSize,
-                          fontWeight: (isComplete && p1Won) || p1Leading ? 900 : 700,
-                          color:
-                            hoveredPlayerKey === `p1-${match.id}`
-                              ? secondaryColor
-                              : (isComplete && p1Won) || p1Leading
-                              ? primaryColor
-                              : textColor,
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          lineHeight: 1.1,
-                        }}
-                      >
-                        {p1Name}
-                      </span>
+                      </div>
                     </div>
 
-                    {/* Score Box */}
-                    <span
-                      className="tabular-nums"
+                    {/* Right Sub-container (Egress / Destination & Score) */}
+                    <div
                       style={{
-                        fontSize: scoreFontSize,
-                        fontWeight: 900,
-                        minWidth: `${scoreMinW}px`,
-                        height: `${scoreH}px`,
-                        display: 'inline-flex',
+                        display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center',
-                        color: !isComplete && !inProgress
-                          ? textColor
-                          : (isComplete && p1Won) || p1Leading
-                          ? getContrastingTextColor(primaryColor)
-                          : textColor,
-                        background: !isComplete && !inProgress
-                          ? effectiveCardBg
-                          : (isComplete && p1Won) || p1Leading
-                          ? primaryColor
-                          : 'transparent',
-                        border: !isComplete && !inProgress
-                          ? `1.5px solid ${secondaryColor}`
-                          : 'none',
-                        borderRadius: '3px',
-                        marginLeft: '0.35rem',
                         flexShrink: 0,
-                        lineHeight: 1,
+                        marginLeft: '4px',
                       }}
                     >
-                      {!isComplete && !inProgress ? '-' : p1ScoreDisplay}
-                    </span>
+                      {/* Outbound Chip: Placed right-aligned, immediately to left of score container with 8px margin */}
+                      {p1OutboundChip && (
+                        <div style={{ marginRight: '8px', display: 'flex', alignItems: 'center' }}>
+                          {renderMicroChip(p1OutboundChip, setHoveredOriginMatchId, handleChipClick)}
+                        </div>
+                      )}
+
+                      {/* Score Box */}
+                      <span
+                        className="tabular-nums"
+                        style={{
+                          fontSize: scoreFontSize,
+                          fontWeight: 900,
+                          minWidth: `${scoreMinW}px`,
+                          height: `${scoreH}px`,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: !isComplete && !inProgress
+                            ? textColor
+                            : (isComplete && p1Won) || p1Leading
+                            ? getContrastingTextColor(primaryColor)
+                            : textColor,
+                          background: !isComplete && !inProgress
+                            ? effectiveCardBg
+                            : (isComplete && p1Won) || p1Leading
+                            ? primaryColor
+                            : 'transparent',
+                          border: !isComplete && !inProgress
+                            ? `1.5px solid ${secondaryColor}`
+                            : 'none',
+                          borderRadius: '3px',
+                          marginLeft: 0,
+                          flexShrink: 0,
+                          lineHeight: 1,
+                        }}
+                      >
+                        {!isComplete && !inProgress ? '-' : p1ScoreDisplay}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Player Divider */}
@@ -1677,127 +2039,157 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       padding: '0 0.55rem',
-                      background: isComplete && p2Won ? secondaryColor : effectiveCardBg,
+                      background: isHighlightActive
+                        ? effectiveCardBg
+                        : isComplete && p2Won
+                        ? secondaryColor
+                        : effectiveCardBg,
                       boxSizing: 'border-box',
                       position: 'relative',
                       transition: 'all 0.15s ease',
-                      ...(isP2Ancestor
+                      ...(isP2Target
                         ? {
-                            outline: `4.5px solid ${primaryColor}`,
-                            outlineOffset: '-2px',
-                            boxShadow: `inset 0 0 12px ${primaryColor}88, 0 0 18px ${primaryColor}cc`,
-                            zIndex: 20,
+                            boxShadow: `inset 0 0 0 2px ${primaryColor}, inset 0 0 10px ${primaryColor}88`,
+                            background: `${primaryColor}22`,
+                            zIndex: 10,
                             borderRadius: '3px',
                           }
                         : {}),
                     }}
                   >
+                    {/* Left Sub-container (Ingress / Origin & Competitor Info) */}
                     <div
-                      onClick={(e) => {
-                        if (p2?.id) {
-                          e.stopPropagation();
-                          handlePlayerClick(p2.id, p2.name, p2Profile?.country);
-                        }
-                      }}
-                      onMouseEnter={() => p2?.id && setHoveredPlayerKey(`p2-${match.id}`)}
-                      onMouseLeave={() => setHoveredPlayerKey(null)}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '0.35rem',
-                        overflow: 'hidden',
-                        padding: '0.05rem 0.2rem',
-                        borderRadius: 'var(--radius-sm)',
-                        backgroundColor:
-                          hoveredPlayerKey === `p2-${match.id}` ? `${secondaryColor}22` : 'transparent',
-                        cursor: p2?.id ? 'pointer' : 'inherit',
-                        transition: 'all 0.15s ease',
                         minWidth: 0,
+                        flex: 1,
+                        overflow: 'hidden',
                       }}
-                      title={p2?.id ? 'View competitor tournament profile' : undefined}
                     >
-                      {p2?.seed && (
+                      <div
+                        onClick={(e) => {
+                          if (p2?.id) {
+                            e.stopPropagation();
+                            handlePlayerClick(p2.id, p2.name, p2Profile?.country);
+                          }
+                        }}
+                        onMouseEnter={() => p2?.id && setHoveredPlayerKey(`p2-${match.id}`)}
+                        onMouseLeave={() => setHoveredPlayerKey(null)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          overflow: 'hidden',
+                          padding: '0.05rem 0.2rem',
+                          borderRadius: 'var(--radius-sm)',
+                          backgroundColor:
+                            hoveredPlayerKey === `p2-${match.id}` ? `${secondaryColor}22` : 'transparent',
+                          cursor: p2?.id ? 'pointer' : 'inherit',
+                          transition: 'all 0.15s ease',
+                          minWidth: 0,
+                          flex: 1,
+                        }}
+                        title={p2?.id ? 'View competitor tournament profile' : undefined}
+                      >
+                        {p2?.seed && (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: `${seedDim}px`,
+                              height: `${seedDim}px`,
+                              minWidth: `${seedDim}px`,
+                              background: effectiveCardBg,
+                              border: `1.5px solid ${(isComplete && p2Won) || p2Leading ? primaryColor : secondaryColor}`,
+                              color: (isComplete && p2Won) || p2Leading ? primaryColor : textColor,
+                              fontWeight: 900,
+                              fontSize: seedFontSize,
+                              fontFamily: 'var(--font-mono)',
+                              borderRadius: '3px',
+                              flexShrink: 0,
+                              lineHeight: `${seedDim}px`,
+                            }}
+                          >
+                            {p2.seed}
+                          </span>
+                        )}
+
+                        {p2Profile?.country && (
+                          <CountryFlag country={p2Profile.country} style={{ fontSize: flagFontSize, lineHeight: 1, flexShrink: 0 }} />
+                        )}
+
                         <span
                           style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            width: `${seedDim}px`,
-                            height: `${seedDim}px`,
-                            minWidth: `${seedDim}px`,
-                            background: effectiveCardBg,
-                            border: `1.5px solid ${(isComplete && p2Won) || p2Leading ? primaryColor : secondaryColor}`,
-                            color: (isComplete && p2Won) || p2Leading ? primaryColor : textColor,
-                            fontWeight: 900,
-                            fontSize: seedFontSize,
-                            fontFamily: 'var(--font-mono)',
-                            borderRadius: '3px',
-                            flexShrink: 0,
-                            lineHeight: `${seedDim}px`,
+                            flex: 1,
+                            minWidth: 0,
+                            fontSize: nameFontSize,
+                            fontWeight:
+                              (isComplete && p2Won) || p2Leading || (isHighlightActive && isP2Target)
+                                ? 900
+                                : 700,
+                            color: p2NameColor,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            lineHeight: 1.1,
                           }}
                         >
-                          {p2.seed}
+                          {p2Name}
                         </span>
-                      )}
-
-                      {p2Profile?.country && (
-                        <CountryFlag country={p2Profile.country} style={{ fontSize: flagFontSize, lineHeight: 1, flexShrink: 0 }} />
-                      )}
-
-                      <span
-                        style={{
-                          flex: 1,
-                          minWidth: 0,
-                          fontSize: nameFontSize,
-                          fontWeight: (isComplete && p2Won) || p2Leading ? 900 : 700,
-                          color:
-                            hoveredPlayerKey === `p2-${match.id}`
-                              ? secondaryColor
-                              : (isComplete && p2Won) || p2Leading
-                              ? primaryColor
-                              : textColor,
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          lineHeight: 1.1,
-                        }}
-                      >
-                        {p2Name}
-                      </span>
+                      </div>
                     </div>
 
-                    {/* Score Box */}
-                    <span
-                      className="tabular-nums"
+                    {/* Right Sub-container (Egress / Destination & Score) */}
+                    <div
                       style={{
-                        fontSize: scoreFontSize,
-                        fontWeight: 900,
-                        minWidth: `${scoreMinW}px`,
-                        height: `${scoreH}px`,
-                        display: 'inline-flex',
+                        display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center',
-                        color: !isComplete && !inProgress
-                          ? textColor
-                          : (isComplete && p2Won) || p2Leading
-                          ? getContrastingTextColor(primaryColor)
-                          : textColor,
-                        background: !isComplete && !inProgress
-                          ? effectiveCardBg
-                          : (isComplete && p2Won) || p2Leading
-                          ? primaryColor
-                          : 'transparent',
-                        border: !isComplete && !inProgress
-                          ? `1.5px solid ${secondaryColor}`
-                          : 'none',
-                        borderRadius: '3px',
-                        marginLeft: '0.35rem',
                         flexShrink: 0,
-                        lineHeight: 1,
+                        marginLeft: '4px',
                       }}
                     >
-                      {!isComplete && !inProgress ? '-' : p2ScoreDisplay}
-                    </span>
+                      {/* Outbound Chip: Placed right-aligned, immediately to left of score container with 8px margin */}
+                      {p2OutboundChip && (
+                        <div style={{ marginRight: '8px', display: 'flex', alignItems: 'center' }}>
+                          {renderMicroChip(p2OutboundChip, setHoveredOriginMatchId, handleChipClick)}
+                        </div>
+                      )}
+
+                      {/* Score Box */}
+                      <span
+                        className="tabular-nums"
+                        style={{
+                          fontSize: scoreFontSize,
+                          fontWeight: 900,
+                          minWidth: `${scoreMinW}px`,
+                          height: `${scoreH}px`,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: !isComplete && !inProgress
+                            ? textColor
+                            : (isComplete && p2Won) || p2Leading
+                            ? getContrastingTextColor(primaryColor)
+                            : textColor,
+                          background: !isComplete && !inProgress
+                            ? effectiveCardBg
+                            : (isComplete && p2Won) || p2Leading
+                            ? primaryColor
+                            : 'transparent',
+                          border: !isComplete && !inProgress
+                            ? `1.5px solid ${secondaryColor}`
+                            : 'none',
+                          borderRadius: '3px',
+                          marginLeft: 0,
+                          flexShrink: 0,
+                          lineHeight: 1,
+                        }}
+                      >
+                        {!isComplete && !inProgress ? '-' : p2ScoreDisplay}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1947,7 +2339,8 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
           <div
             style={{
               background: effectiveCardBg,
-              border: `1.5px solid ${secondaryColor}`,
+              borderTop: `1.5px solid ${secondaryColor}`,
+              borderBottom: `1.5px solid ${secondaryColor}`,
               borderLeft: `4px solid ${ACCELERATED_HYBRID_POD_PALETTE.AR.border}`,
               borderRight: `4px solid ${ACCELERATED_HYBRID_POD_PALETTE.AR.border}`,
               borderRadius: 'var(--radius-md)',
@@ -2004,7 +2397,8 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
           <div
             style={{
               background: effectiveCardBg,
-              border: `1.5px solid ${secondaryColor}`,
+              borderTop: `1.5px solid ${secondaryColor}`,
+              borderBottom: `1.5px solid ${secondaryColor}`,
               borderLeft: `4px solid ${ACCELERATED_HYBRID_POD_PALETTE.UB.border}`,
               borderRight: `4px solid ${ACCELERATED_HYBRID_POD_PALETTE.UB.border}`,
               borderRadius: 'var(--radius-md)',
@@ -2062,9 +2456,10 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
         <div
           style={{
             background: effectiveCardBg,
-            border: `1.5px solid ${secondaryColor}`,
-            borderLeft: `4px solid ${ACCELERATED_HYBRID_POD_PALETTE.LB.border}`,
-            borderRight: `4px solid ${ACCELERATED_HYBRID_POD_PALETTE.LB.border}`,
+            borderTop: `1.5px solid ${secondaryColor}`,
+            borderBottom: `1.5px solid ${secondaryColor}`,
+            borderLeft: `4px solid ${lowerBracketColor || ACCELERATED_HYBRID_POD_PALETTE.LB.border}`,
+            borderRight: `4px solid ${lowerBracketColor || ACCELERATED_HYBRID_POD_PALETTE.LB.border}`,
             borderRadius: 'var(--radius-md)',
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)',
             display: 'flex',

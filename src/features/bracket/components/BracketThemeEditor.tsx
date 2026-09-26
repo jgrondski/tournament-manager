@@ -26,6 +26,7 @@ export const BracketThemeEditor: React.FC<BracketThemeEditorProps> = ({
   const cardBg = themeColors.cardColor || '#1b1c1d';
   const txtColor = themeColors.textColor || '#94A3B8';
   const canvasBg = themeColors.backgroundColor || '#020203';
+  const lowerColor = themeColors.lowerBracketColor || '#c2410c';
 
   const p1ZebraBg = getAlternateShade(cardBg, -0.06);
 
@@ -196,6 +197,28 @@ export const BracketThemeEditor: React.FC<BracketThemeEditorProps> = ({
               onChange={e => handleColorChange('backgroundColor', e.target.value)}
               style={hexTextInputStyle}
               placeholder="#020203"
+            />
+          </div>
+        </div>
+
+        {/* Lower Bracket Accent Color */}
+        <div>
+          <label style={colorLabelStyle} title="Lower Bracket Accent (Border highlights in Double Elimination)">
+            Lower Bracket
+          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <input
+              type="color"
+              value={lowerColor}
+              onChange={e => handleColorChange('lowerBracketColor', e.target.value)}
+              style={colorInputStyle}
+            />
+            <input
+              type="text"
+              value={lowerColor}
+              onChange={e => handleColorChange('lowerBracketColor', e.target.value)}
+              style={hexTextInputStyle}
+              placeholder="#c2410c"
             />
           </div>
         </div>

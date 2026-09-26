@@ -102,6 +102,7 @@ export interface TournamentTier {
   cardColor?: string; // Background for match cards / player names
   textColor?: string; // Standard text and neutral elements color
   backgroundColor?: string; // Overall background for the entire bracket canvas
+  lowerBracketColor?: string; // Left/right border highlights for lower bracket matches and headers in double elim
   textSize?: 'compact' | 'normal' | 'large' | 'small' | 'medium' | 'xlarge' | number; // Bracket text size scaling
   bracket: BracketStructure;
   isLocked: boolean;
