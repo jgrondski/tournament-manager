@@ -8,7 +8,7 @@ import {
   PlayerProfile,
   QualifierSubmission,
 } from './types';
-import { advanceMatchWinner, retractMatchWinner, ensureSequentialMatchNumbers } from '../bracket/math';
+import { advanceMatchWinner, retractMatchWinner, swapMatchSlots } from '../bracket/math';
 import { canonicalizeBracketRounds } from '../bracket/types';
 import { generateDraftBracketsForTournament } from '../qualifiers/scoring';
 import {
@@ -98,112 +98,37 @@ interface TournamentContextType {
     tournamentId: string,
     playerId: string
   ) => { success: boolean; error?: string };
+  swapMatchSlots: (
+    tournamentId: string,
+    tierId: string,
+    payload: {
+      sourceMatchId: string;
+      sourceSlot: 1 | 2;
+      targetMatchId: string;
+      targetSlot: 1 | 2;
+    }
+  ) => { success: boolean; error?: string };
 }
 
-const STORAGE_KEY = 'tournament_manager_tournaments_v4';
-const LEGACY_STORAGE_KEY = 'tournament_manager_tournaments_v3';
-const GLOBAL_PLAYERS_STORAGE_KEY = 'classic_tetris_global_players';
+import {
+  loadStoredTournaments,
+  loadStoredGlobalPlayers,
+  loadStoredActiveTournamentId,
+  saveStoredTournaments,
+  saveStoredGlobalPlayers,
+  saveStoredActiveTournamentId,
+} from './store/tournamentStorage';
 
 const TournamentContext = createContext<TournamentContextType | null>(null);
 
 export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [tournaments, setTournaments] = useState<Tournament[]>(() => {
-    try {
-      let saved = localStorage.getItem(STORAGE_KEY);
-      if (!saved) {
-        saved = localStorage.getItem(LEGACY_STORAGE_KEY);
-      }
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((t: Tournament & { isVerified?: boolean; qualsClosed?: boolean }) => {
-            const isLocked = Boolean(t.isLocked ?? t.isVerified);
-            const { isVerified: _iv, qualsClosed: _qc, ...rest } = t;
-            const tourney: Tournament = {
-              ...rest,
-              organizationId: rest.organizationId || 'org_ctwc',
-              isLocked,
-            };
-
-            // Auto-heal any FLAT_STAGED tiers generated with the obsolete WR2 seed formula
-            const hasCorruptedFlatStagedTier = tourney.tiers.some(tier => {
-              if (tier.eliminationType === 'DOUBLE' && tier.bracketRouting === 'FLAT_STAGED') {
-                const totalP = tier.playerCount || tier.bracket?.totalPlayers || 0;
-                const fw = tier.flatWidth || 4;
-                const w2m1 = tier.bracket?.matchesById?.[`${tier.id ? `${tier.id}-` : ''}w2-m1`];
-                if (w2m1?.player1?.player?.seed && totalP >= 2 * fw) {
-                  return w2m1.player1.player.seed > totalP - 2 * fw;
-                }
-              }
-              return false;
-            });
-
-            if (hasCorruptedFlatStagedTier) {
-              try {
-                tourney.tiers = generateDraftBracketsForTournament(tourney);
-              } catch {
-                // ignore
-              }
-            }
-
-            // Auto-heal round names to canonical source of truth and sequential match numbers
-            tourney.tiers.forEach(tier => {
-              if (tier.bracket?.rounds) {
-                canonicalizeBracketRounds(tier.bracket.rounds);
-                const matchNums = tier.bracket.rounds.flatMap(r => r.matches.map(m => m.matchNumber));
-                const uniqueNums = new Set(matchNums);
-                const hasDuplicatesOrZero = uniqueNums.size !== matchNums.length || uniqueNums.has(0);
-                if (hasDuplicatesOrZero) {
-                  ensureSequentialMatchNumbers(tier.bracket);
-                }
-              }
-            });
-
-            return tourney;
-          });
-        }
-      }
-    } catch {
-      // ignore parse errors and fallback
-    }
-    return [];
-  });
-
-  const [globalPlayers, setGlobalPlayers] = useState<PlayerProfile[]>(() => {
-    try {
-      const saved = localStorage.getItem(GLOBAL_PLAYERS_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed;
-        }
-      }
-    } catch {
-      // ignore parse errors and fallback
-    }
-    return [];
-  });
-
-  const LAST_ACTIVE_TOURNAMENT_KEY = 'tm_last_active_tournament_id';
-  const [activeTournamentId, setActiveTournamentIdState] = useState<string | null>(() => {
-    try {
-      return localStorage.getItem(LAST_ACTIVE_TOURNAMENT_KEY);
-    } catch {
-      return null;
-    }
-  });
+  const [tournaments, setTournaments] = useState<Tournament[]>(loadStoredTournaments);
+  const [globalPlayers, setGlobalPlayers] = useState<PlayerProfile[]>(loadStoredGlobalPlayers);
+  const [activeTournamentId, setActiveTournamentIdState] = useState<string | null>(loadStoredActiveTournamentId);
 
   const setActiveTournamentId = (id: string | null) => {
     setActiveTournamentIdState(id);
-    try {
-      if (id) {
-        localStorage.setItem(LAST_ACTIVE_TOURNAMENT_KEY, id);
-      } else {
-        localStorage.removeItem(LAST_ACTIVE_TOURNAMENT_KEY);
-      }
-    } catch {
-      // ignore
-    }
+    saveStoredActiveTournamentId(id);
   };
 
   const activeTournament = tournaments.find(
@@ -218,19 +143,11 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(tournaments));
-    } catch {
-      // storage quota or private mode fallback
-    }
+    saveStoredTournaments(tournaments);
   }, [tournaments]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(GLOBAL_PLAYERS_STORAGE_KEY, JSON.stringify(globalPlayers));
-    } catch {
-      // storage quota or private mode fallback
-    }
+    saveStoredGlobalPlayers(globalPlayers);
   }, [globalPlayers]);
 
   const getTournamentBySlug = (slug: string) => {
@@ -922,6 +839,52 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     );
   };
 
+  const swapMatchSlotsAction = (
+    tournamentId: string,
+    tierId: string,
+    payload: {
+      sourceMatchId: string;
+      sourceSlot: 1 | 2;
+      targetMatchId: string;
+      targetSlot: 1 | 2;
+    }
+  ): { success: boolean; error?: string } => {
+    const tournament = tournaments.find(t => t.id === tournamentId);
+    if (!tournament) return { success: false, error: 'Tournament not found' };
+    const tier = tournament.tiers.find(t => t.id === tierId);
+    if (!tier || !tier.bracket) return { success: false, error: 'Tier or bracket not found' };
+
+    // Safety Invariant: cannot swap slots if either match has recorded scores or games
+    const srcRecord = tournament.matchScores?.[payload.sourceMatchId];
+    const tgtRecord = tournament.matchScores?.[payload.targetMatchId];
+
+    const hasSrcScore = srcRecord && (srcRecord.games?.length > 0 || srcRecord.isComplete || Boolean(srcRecord.winnerPlayerId));
+    const hasTgtScore = tgtRecord && (tgtRecord.games?.length > 0 || tgtRecord.isComplete || Boolean(tgtRecord.winnerPlayerId));
+
+    if (hasSrcScore || hasTgtScore) {
+      return {
+        success: false,
+        error: 'Cannot swap slots: Match play or scores have already begun in one of the matches.',
+      };
+    }
+
+    try {
+      const updatedBracket = swapMatchSlots(tier.bracket, payload);
+      setTournaments(prev =>
+        prev.map(t => {
+          if (t.id !== tournamentId) return t;
+          return {
+            ...t,
+            tiers: t.tiers.map(tr => (tr.id === tierId ? { ...tr, bracket: updatedBracket } : tr)),
+          };
+        })
+      );
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to swap match slots' };
+    }
+  };
+
   const forfeitMatch = (
     tournamentId: string,
     tierId: string,
@@ -1316,6 +1279,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         generateFakeGlobalPlayers,
         importPlayersToTournament,
         removePlayerFromTournament,
+        swapMatchSlots: swapMatchSlotsAction,
       }}
     >
       {children}

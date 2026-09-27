@@ -15,6 +15,15 @@ export interface MatchParticipant {
   player: SeededPlayer | null;
   sourceMatchId?: string;
   isBye?: boolean;
+  isManualOverride?: boolean;
+  originalSourceMatchId?: string;
+}
+
+export interface MatchSlotSwapPayload {
+  sourceMatchId: string;
+  sourceSlot: 1 | 2;
+  targetMatchId: string;
+  targetSlot: 1 | 2;
 }
 
 export interface MatchSlotFeeder {

@@ -1,4 +1,4 @@
-import { BracketMatch, BracketStructure, SeededPlayer } from '../types';
+import { BracketMatch, BracketStructure, SeededPlayer, MatchSlotSwapPayload } from '../types';
 
 /**
  * Pure state reducer to advance a match winner through the bracket graph.
@@ -170,6 +170,7 @@ export function advanceMatchWinner(
 /**
  * Pure state reducer to retract a match winner and clear downstream feeder slots.
  * Returns a new immutable BracketStructure with reset match winner state.
+ * Resilient to manual placement overrides (clears player by ID if relocated).
  */
 export function retractMatchWinner(
   bracket: BracketStructure,
@@ -179,6 +180,9 @@ export function retractMatchWinner(
   if (!targetMatch) {
     return bracket;
   }
+
+  const retractedWinnerId = targetMatch.winnerId;
+  const retractedLoserId = targetMatch.loserId;
 
   // Deep clone matches to preserve pure functional immutability
   const updatedMatchesById: Record<string, BracketMatch> = {};
@@ -196,59 +200,114 @@ export function retractMatchWinner(
   updatedMatch.loserId = null;
 
   // Clear downstream slot and cascade if downstream match had also declared a winner
-  const clearDownstream = (m: BracketMatch) => {
-    // 1. Clear winner propagation
-    if (m.nextMatchId && m.nextMatchSlot) {
-      const nextMatch = updatedMatchesById[m.nextMatchId];
-      if (nextMatch) {
-        let clearedPlayer = false;
-        if (m.nextMatchSlot === 1 && nextMatch.player1.sourceMatchId === m.id) {
-          if (nextMatch.player1.player !== null) {
-            nextMatch.player1.player = null;
-            clearedPlayer = true;
-          }
-        } else if (m.nextMatchSlot === 2 && nextMatch.player2.sourceMatchId === m.id) {
-          if (nextMatch.player2.player !== null) {
-            nextMatch.player2.player = null;
-            clearedPlayer = true;
-          }
-        }
+  const clearDownstream = (m: BracketMatch, winnerIdToClear: string | null, loserIdToClear: string | null) => {
+    // 1. Clear winner propagation (both default nextMatchId and any relocated slot)
+    const matchesToCheckForWinner = new Set<string>();
+    if (m.nextMatchId) matchesToCheckForWinner.add(m.nextMatchId);
 
-        if (clearedPlayer && (nextMatch.winnerId || nextMatch.loserId)) {
-          nextMatch.winnerId = null;
-          nextMatch.loserId = null;
-          clearDownstream(nextMatch);
+    // If winner was swapped/moved, also check all matches with the same target round
+    if (winnerIdToClear) {
+      for (const candidate of Object.values(updatedMatchesById)) {
+        if (
+          candidate.player1.player?.id === winnerIdToClear ||
+          candidate.player2.player?.id === winnerIdToClear ||
+          candidate.player1.sourceMatchId === m.id ||
+          candidate.player2.sourceMatchId === m.id
+        ) {
+          matchesToCheckForWinner.add(candidate.id);
         }
+      }
+    }
+
+    for (const nMatchId of matchesToCheckForWinner) {
+      const nextMatch = updatedMatchesById[nMatchId];
+      if (!nextMatch) continue;
+
+      let clearedPlayer = false;
+      if (
+        (m.nextMatchSlot === 1 && nextMatch.player1.sourceMatchId === m.id) ||
+        (winnerIdToClear && nextMatch.player1.player?.id === winnerIdToClear) ||
+        nextMatch.player1.sourceMatchId === m.id
+      ) {
+        if (nextMatch.player1.player !== null) {
+          nextMatch.player1 = { player: null };
+          clearedPlayer = true;
+        }
+      }
+      if (
+        (m.nextMatchSlot === 2 && nextMatch.player2.sourceMatchId === m.id) ||
+        (winnerIdToClear && nextMatch.player2.player?.id === winnerIdToClear) ||
+        nextMatch.player2.sourceMatchId === m.id
+      ) {
+        if (nextMatch.player2.player !== null) {
+          nextMatch.player2 = { player: null };
+          clearedPlayer = true;
+        }
+      }
+
+      if (clearedPlayer && (nextMatch.winnerId || nextMatch.loserId)) {
+        const nextWinnerId = nextMatch.winnerId;
+        const nextLoserId = nextMatch.loserId;
+        nextMatch.winnerId = null;
+        nextMatch.loserId = null;
+        clearDownstream(nextMatch, nextWinnerId, nextLoserId);
       }
     }
 
     // 2. Clear loser propagation (Double Elimination)
-    if (m.loserNextMatchId && m.loserNextMatchSlot) {
-      const loserNextMatch = updatedMatchesById[m.loserNextMatchId];
-      if (loserNextMatch) {
-        let clearedPlayer = false;
-        if (m.loserNextMatchSlot === 1 && loserNextMatch.player1.sourceMatchId === m.id) {
-          if (loserNextMatch.player1.player !== null) {
-            loserNextMatch.player1.player = null;
-            clearedPlayer = true;
-          }
-        } else if (m.loserNextMatchSlot === 2 && loserNextMatch.player2.sourceMatchId === m.id) {
-          if (loserNextMatch.player2.player !== null) {
-            loserNextMatch.player2.player = null;
-            clearedPlayer = true;
-          }
-        }
+    const matchesToCheckForLoser = new Set<string>();
+    if (m.loserNextMatchId) matchesToCheckForLoser.add(m.loserNextMatchId);
 
-        if (clearedPlayer && (loserNextMatch.winnerId || loserNextMatch.loserId)) {
-          loserNextMatch.winnerId = null;
-          loserNextMatch.loserId = null;
-          clearDownstream(loserNextMatch);
+    if (loserIdToClear) {
+      for (const candidate of Object.values(updatedMatchesById)) {
+        if (
+          candidate.player1.player?.id === loserIdToClear ||
+          candidate.player2.player?.id === loserIdToClear ||
+          candidate.player1.sourceMatchId === m.id ||
+          candidate.player2.sourceMatchId === m.id
+        ) {
+          matchesToCheckForLoser.add(candidate.id);
         }
+      }
+    }
+
+    for (const lMatchId of matchesToCheckForLoser) {
+      const loserNextMatch = updatedMatchesById[lMatchId];
+      if (!loserNextMatch) continue;
+
+      let clearedPlayer = false;
+      if (
+        (m.loserNextMatchSlot === 1 && loserNextMatch.player1.sourceMatchId === m.id) ||
+        (loserIdToClear && loserNextMatch.player1.player?.id === loserIdToClear) ||
+        loserNextMatch.player1.sourceMatchId === m.id
+      ) {
+        if (loserNextMatch.player1.player !== null) {
+          loserNextMatch.player1 = { player: null };
+          clearedPlayer = true;
+        }
+      }
+      if (
+        (m.loserNextMatchSlot === 2 && loserNextMatch.player2.sourceMatchId === m.id) ||
+        (loserIdToClear && loserNextMatch.player2.player?.id === loserIdToClear) ||
+        loserNextMatch.player2.sourceMatchId === m.id
+      ) {
+        if (loserNextMatch.player2.player !== null) {
+          loserNextMatch.player2 = { player: null };
+          clearedPlayer = true;
+        }
+      }
+
+      if (clearedPlayer && (loserNextMatch.winnerId || loserNextMatch.loserId)) {
+        const downstreamWinnerId = loserNextMatch.winnerId;
+        const downstreamLoserId = loserNextMatch.loserId;
+        loserNextMatch.winnerId = null;
+        loserNextMatch.loserId = null;
+        clearDownstream(loserNextMatch, downstreamWinnerId, downstreamLoserId);
       }
     }
   };
 
-  clearDownstream(updatedMatch);
+  clearDownstream(updatedMatch, retractedWinnerId, retractedLoserId);
 
   // If retracting Grand Finals Match 1, remove any dynamically generated Reset match
   let grandFinalsResetMatchId = bracket.grandFinalsResetMatchId;
@@ -273,4 +332,108 @@ export function retractMatchWinner(
     matchesById: updatedMatchesById,
   };
 }
+
+/**
+ * Pure state reducer to manually swap or reassign participant slots between matches within the same round.
+ * Used by tournament organizers and floor judges to override bracket placement when unexpected real-world situations arise.
+ */
+export function swapMatchSlots(
+  bracket: BracketStructure,
+  payload: MatchSlotSwapPayload
+): BracketStructure {
+  const { sourceMatchId, sourceSlot, targetMatchId, targetSlot } = payload;
+  const sourceMatch = bracket.matchesById[sourceMatchId];
+  const targetMatch = bracket.matchesById[targetMatchId];
+
+  if (!sourceMatch) {
+    throw new Error(`Source match with id "${sourceMatchId}" not found in bracket.`);
+  }
+  if (!targetMatch) {
+    throw new Error(`Target match with id "${targetMatchId}" not found in bracket.`);
+  }
+
+  // Safety Invariants:
+  // 1. Must be in the exact same round
+  if (sourceMatch.roundNumber !== targetMatch.roundNumber) {
+    throw new Error(
+      `Cannot swap match slots across different rounds: Source round ${sourceMatch.roundNumber} vs Target round ${targetMatch.roundNumber}.`
+    );
+  }
+
+  // 2. Must be in the same stage (e.g. Winners vs Winners, Losers vs Losers)
+  const sourceStage = sourceMatch.stage || 'WINNERS';
+  const targetStage = targetMatch.stage || 'WINNERS';
+  if (sourceStage !== targetStage) {
+    throw new Error(
+      `Cannot swap match slots across different bracket stages: ${sourceStage} vs ${targetStage}.`
+    );
+  }
+
+  // Deep clone matches to preserve pure functional immutability
+  const updatedMatchesById: Record<string, BracketMatch> = {};
+  for (const [id, m] of Object.entries(bracket.matchesById)) {
+    updatedMatchesById[id] = {
+      ...m,
+      player1: { ...m.player1, player: m.player1.player ? { ...m.player1.player } : null },
+      player2: { ...m.player2, player: m.player2.player ? { ...m.player2.player } : null },
+    };
+  }
+
+  const clonedSource = updatedMatchesById[sourceMatchId];
+  const clonedTarget = updatedMatchesById[targetMatchId];
+
+  const srcParticipant = sourceSlot === 1 ? clonedSource.player1 : clonedSource.player2;
+  const tgtParticipant = targetSlot === 1 ? clonedTarget.player1 : clonedTarget.player2;
+
+  const tempSrc = { ...srcParticipant };
+  const tempTgt = { ...tgtParticipant };
+
+  const srcHasPlayer = tempSrc.player !== null;
+  const tgtHasPlayer = tempTgt.player !== null;
+
+  // Swap into source slot
+  if (sourceSlot === 1) {
+    clonedSource.player1 = {
+      ...tempTgt,
+      isManualOverride: tgtHasPlayer ? true : undefined,
+      originalSourceMatchId: tempTgt.originalSourceMatchId || tempTgt.sourceMatchId,
+    };
+  } else {
+    clonedSource.player2 = {
+      ...tempTgt,
+      isManualOverride: tgtHasPlayer ? true : undefined,
+      originalSourceMatchId: tempTgt.originalSourceMatchId || tempTgt.sourceMatchId,
+    };
+  }
+
+  // Swap into target slot
+  if (targetSlot === 1) {
+    clonedTarget.player1 = {
+      ...tempSrc,
+      isManualOverride: srcHasPlayer ? true : undefined,
+      originalSourceMatchId: tempSrc.originalSourceMatchId || tempSrc.sourceMatchId,
+    };
+  } else {
+    clonedTarget.player2 = {
+      ...tempSrc,
+      isManualOverride: srcHasPlayer ? true : undefined,
+      originalSourceMatchId: tempSrc.originalSourceMatchId || tempSrc.sourceMatchId,
+    };
+  }
+
+  // Rebuild rounds array with new match references
+  const updatedRounds = bracket.rounds.map((round) => ({
+    ...round,
+    matches: round.matches
+      .filter((m) => updatedMatchesById[m.id])
+      .map((m) => updatedMatchesById[m.id]),
+  }));
+
+  return {
+    ...bracket,
+    rounds: updatedRounds,
+    matchesById: updatedMatchesById,
+  };
+}
+
 
