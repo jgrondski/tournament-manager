@@ -62,7 +62,7 @@ export const FinalStandingsPage: React.FC = () => {
                 justifyContent: 'center',
                 gap: '1rem',
               }
-            : { flex: 1, padding: '2rem 1.5rem', maxWidth: '1200px', width: '100%', margin: '0 auto' }
+            : { flex: 1, padding: '2rem 1.5rem', maxWidth: '1200px', width: '100%', margin: '0 auto', boxSizing: 'border-box' }
         }
       >
         <FinalStandingsTable tournament={tournament} />

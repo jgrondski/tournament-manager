@@ -6,17 +6,15 @@ import { colorWithAlpha, getContrastingTextColor, getAlternateShade } from '../.
 import { PlayerDetailDrawer } from '../../qualifiers/components/PlayerDetailDrawer';
 import { CountryFlag } from '../../players/flagUtils';
 import { PlaystyleChip } from '../../players/components/PlaystyleChip';
+import { TournamentPageHeader } from '../../../components/TournamentPageHeader';
 import {
   Trophy,
   Layers,
-  Search,
   TrendingUp,
   TrendingDown,
   Minus,
   AlertTriangle,
   Flame,
-  Video,
-  ExternalLink,
 } from 'lucide-react';
 
 interface FinalStandingsTableProps {
@@ -232,80 +230,28 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
   }
 
   return (
-    <div style={{ maxWidth: isObsMode ? '100%' : '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div
+      style={{
+        width: '100%',
+        maxWidth: isObsMode ? '100%' : '1200px',
+        margin: '0 auto',
+        padding: isObsMode ? '1rem' : 0,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '1.5rem',
+        boxSizing: 'border-box',
+      }}
+    >
       {/* Header & Title */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.2rem' }}>
-            <span
-              style={{
-                fontSize: '0.78rem',
-                fontWeight: 700,
-                color: 'var(--color-gold-bright)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.08em',
-              }}
-            >
-              Tournament Standings
-            </span>
-          </div>
-          <h1
-            style={{
-              fontSize: isObsMode ? '1.5rem' : '1.85rem',
-              fontWeight: 800,
-              color: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.65rem',
-              letterSpacing: '-0.02em',
-              margin: 0,
-            }}
-          >
-            <Trophy color="var(--color-gold-bright)" size={isObsMode ? 24 : 28} />
-            {tournament.name}
-          </h1>
-        </div>
-
-        {!isObsMode && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-            {/* Search Bar */}
-            <div style={{ position: 'relative', minWidth: '240px' }}>
-              <Search size={16} color="var(--color-text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-              <input
-                type="text"
-                placeholder="Search player, country, style..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.55rem 0.85rem 0.55rem 2.25rem',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--color-border)',
-                  background: 'var(--color-bg-surface)',
-                  color: 'var(--color-text-primary)',
-                  fontSize: '0.85rem',
-                  outline: 'none',
-                  transition: 'border-color 0.15s ease',
-                }}
-              />
-            </div>
-
-            {/* Direct OBS Overlay Link */}
-            <a
-              href={`/${tournament.slug}/standings?obs=true`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-secondary"
-              title="Open OBS broadcast overlay in new tab (stripped chrome, transparent background)"
-              style={{ fontSize: '0.8rem', padding: '0.5rem 0.85rem', gap: '0.4rem', whiteSpace: 'nowrap' }}
-            >
-              <Video size={15} color="var(--color-gold-bright)" />
-              <span>OBS Overlay</span>
-              <ExternalLink size={13} />
-            </a>
-          </div>
-        )}
-      </div>
+      <TournamentPageHeader
+        eyebrow="Tournament Standings"
+        title={tournament.name}
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder="Search player, country, style..."
+        obsUrl={`/${tournament.slug}/standings?obs=true`}
+        isObsMode={isObsMode}
+      />
 
       {/* Section Filter Pills */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>

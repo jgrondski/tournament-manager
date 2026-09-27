@@ -1,42 +1,28 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Tournament, TournamentTier, QualFormat, PointsThreshold, DEFAULT_POINTS_THRESHOLDS, BracketRouting } from '../types';
+import { Tournament, TournamentTier, QualFormat, PointsThreshold, DEFAULT_POINTS_THRESHOLDS } from '../types';
 import { useTournament } from '../store';
 import {
-  Plus,
-  Trash2,
-  ArrowUp,
-  ArrowDown,
   Save,
   CheckCircle2,
-  Shield,
-  Palette,
-  X,
-  Sparkles,
-  Play,
-  Users,
-  Unlock,
-  ShieldCheck,
   AlertTriangle,
   Lock,
-  Sliders,
-  ChevronDown,
-  Building2,
-  Send,
-  ExternalLink,
+  Unlock,
+  ShieldCheck,
 } from 'lucide-react';
 import { useOrganization } from '../../organizations/store';
 import { generateTraditionalBracket, generateFlatBracket, generateDoubleEliminationBracket, getValidFlatWidths } from '../../bracket/math';
 import { getDefaultTierColors, TierThemeColors } from '../../bracket/colorUtils';
 import { generateDraftBracketsForTournament } from '../../qualifiers/scoring';
-import { BestOfSelect } from '../../bracket/components/BestOfSelect';
-import { BracketThemeEditor } from '../../bracket/components/BracketThemeEditor';
 import { pruneInvalidRoundOverrides } from '../roundOverrides';
-import { ClearableNumberInput } from '../../../components/ClearableNumberInput';
 import { VerifyBracketModal } from './VerifyBracketModal';
 import { PointsThresholdsDrawer } from './PointsThresholdsDrawer';
 
-import { RoundOverridesEditor } from './RoundOverridesEditor';
+import { TournamentInfoSection } from './settings/TournamentInfoSection';
+import { OrgBrandPaletteSection } from './settings/OrgBrandPaletteSection';
+import { TierManagementSection } from './settings/TierManagementSection';
+import { TournamentRosterSection } from './settings/TournamentRosterSection';
+import { DataSimulationSection } from './settings/DataSimulationSection';
+import { AdminFormModals } from './settings/AdminFormModals';
 
 interface TournamentAdminFormProps {
   tournament: Tournament;
@@ -305,38 +291,46 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
         : DEFAULT_POINTS_THRESHOLDS
     );
     setTiers(tournament.tiers || []);
-    setOpenThemes({});
+    setSettingsUnlockError(null);
   };
 
-  // Helper to auto-derive slug from name
   const handleNameChange = (newName: string) => {
     setName(newName);
-    const derived = newName
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/\s+/g, '-');
-    setSlug(derived);
+    const isAutoSlug =
+      slug ===
+      tournament.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)+/g, '');
+    if (isAutoSlug || !slug) {
+      setSlug(
+        newName
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)+/g, '')
+      );
+    }
   };
 
-  // Add Points threshold
   const addThreshold = () => {
-    setPointsConfig(prev => [...prev, { minScore: 500000, points: 10 }]);
+    const nextScore = pointsConfig.length > 0 ? pointsConfig[pointsConfig.length - 1].minScore + 100000 : 500000;
+    const nextPoints = pointsConfig.length > 0 ? pointsConfig[pointsConfig.length - 1].points + 5 : 5;
+    setPointsConfig([...pointsConfig, { minScore: nextScore, points: nextPoints }]);
   };
 
   const updateThreshold = (index: number, field: 'minScore' | 'points', value: number) => {
-    setPointsConfig(prev => {
-      const next = [...prev];
-      next[index] = { ...next[index], [field]: value };
-      return next;
-    });
+    const next = [...pointsConfig];
+    next[index] = {
+      ...next[index],
+      [field]: Math.max(0, value),
+    };
+    setPointsConfig(next);
   };
 
   const removeThreshold = (index: number) => {
-    setPointsConfig(prev => prev.filter((_, i) => i !== index));
+    setPointsConfig(pointsConfig.filter((_, i) => i !== index));
   };
 
-  // Tier Management
   const addTier = () => {
     let newTier: TournamentTier;
     const tierId = `tier_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
@@ -578,52 +572,44 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
 
     saveTiers(tournament.id, updatedTiers);
     setTiers(updatedTiers);
-    return updatedTiers;
+
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+    onSaved?.();
   };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    const result = saveCurrentConfig();
-    if (!result) return;
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
-    if (onSaved) onSaved();
+    if (qualFormat === 'AVERAGE_OF_X') {
+      if (qualAverageCount === undefined || isNaN(qualAverageCount) || qualAverageCount < 1 || qualAverageCount > 10) {
+        setAvgCountError('Attempt count must be an integer between 1 and 10');
+        return;
+      }
+    }
+    saveCurrentConfig();
   };
 
-  const hasRecordedMatches = recordedMatchCount > 0;
-  const hasQualifiers = qualifierCount > 0;
-  const hasTiers = tiers.length > 0;
-
   const handleSeedQualifiers = () => {
-    if (isDirty) {
-      saveCurrentConfig();
-    }
+    saveCurrentConfig();
     seedQualifiers(tournament.id);
-    setSimFeedback('Seeded realistic competitors and qualifier attempts in draft mode.');
+    setSimFeedback('Realistic competitors and qualifier attempts seeded successfully!');
   };
 
   const handleSimulate = () => {
-    if (isDirty) {
-      saveCurrentConfig();
-    }
+    saveCurrentConfig();
     simulateFullTournament(tournament.id);
-    setSimFeedback(
-      hasQualifiers
-        ? 'Built brackets from current qualifiers and simulated all matches to champion!'
-        : 'Seeded qualifiers, locked brackets, and simulated all matches to champion!'
-    );
+    setSimFeedback('Full tournament simulated: qualifiers, locked seeds, and complete match outcomes!');
   };
 
-  // Calculate auto-thresholds for display
-  let runningPlayerCount = 0;
+  // Derive cutoffs
+  let currentStart = 1;
   const tierThresholdBadges = tiers.map(t => {
-    const start = runningPlayerCount + 1;
-    const end = runningPlayerCount + t.playerCount;
-    runningPlayerCount = end;
+    const start = currentStart;
+    const end = currentStart + t.playerCount - 1;
+    currentStart = end + 1;
     return { start, end };
   });
 
-  // Roster helpers
   const totalCapacity = useMemo(() => {
     return tiers.reduce((acc, t) => acc + (t.playerCount || 0), 0);
   }, [tiers]);
@@ -733,1153 +719,74 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
       </div>
 
       {/* Section 1: Tournament Information */}
-      <section
-        style={{
-          background: 'var(--color-bg-surface)',
-          borderRadius: 'var(--radius-lg)',
-          border: '1px solid var(--color-border)',
-          padding: '1rem 1.25rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0.85rem',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>
-          <Shield size={18} color="var(--color-gold-bright)" />
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-            Tournament Details
-          </h2>
-        </div>
+      <TournamentInfoSection
+        name={name}
+        slug={slug}
+        date={date}
+        location={location}
+        qualFormat={qualFormat}
+        qualAverageCount={qualAverageCount}
+        avgCountError={avgCountError}
+        pointsConfig={pointsConfig}
+        isLocked={tournament.isLocked}
+        onNameChange={handleNameChange}
+        onSlugChange={setSlug}
+        onDateChange={setDate}
+        onLocationChange={setLocation}
+        onQualFormatChange={setQualFormat}
+        onQualAverageCountChange={setQualAverageCount}
+        onAvgCountErrorChange={setAvgCountError}
+        onPointsConfigChange={setPointsConfig}
+        onOpenPointsDrawer={() => setIsPointsDrawerOpen(true)}
+      />
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem' }}>
-          <div>
-            <label style={labelStyle}>Tournament Name</label>
-            <input
-              type="text"
-              value={name}
-              onChange={e => handleNameChange(e.target.value)}
-              required
-              style={inputStyle}
-            />
-          </div>
+      {/* Section 2: Organization & Brand Palette */}
+      <OrgBrandPaletteSection
+        selectedOrg={selectedOrg}
+        organizations={organizations}
+        organizationId={organizationId}
+        useOrgBranding={useOrgBranding}
+        discordWebhookUrl={discordWebhookUrl}
+        logoUrl={logoUrl}
+        bannerUrl={bannerUrl}
+        webhookTestStatus={webhookTestStatus}
+        onOrganizationIdChange={setOrganizationId}
+        onUseOrgBrandingChange={setUseOrgBranding}
+        onDiscordWebhookUrlChange={setDiscordWebhookUrl}
+        onLogoUrlChange={setLogoUrl}
+        onBannerUrlChange={setBannerUrl}
+        onApplyOrgColorsToTiers={handleApplyOrgColorsToTiers}
+        onTestDiscordWebhook={handleTestDiscordWebhook}
+      />
 
-          <div>
-            <label style={labelStyle}>URL Slug</label>
-            <input
-              type="text"
-              value={slug}
-              onChange={e => setSlug(e.target.value)}
-              required
-              style={inputStyle}
-            />
-            <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
-              Public routing: /{slug}
-            </span>
-          </div>
+      {/* Section 3: Tier Management */}
+      <TierManagementSection
+        tiers={tiers}
+        openThemes={openThemes}
+        tierThresholdBadges={tierThresholdBadges}
+        onToggleThemeCollapse={toggleThemeCollapse}
+        onAddTier={addTier}
+        onUpdateTier={updateTier}
+        onMoveTier={moveTier}
+        onRequestDeleteTier={(idx, tier) => setTierToDelete({ index: idx, tier })}
+      />
 
-          <div>
-            <label style={labelStyle}>Event Date</label>
-            <input
-              type="text"
-              value={date}
-              onChange={e => setDate(e.target.value)}
-              placeholder="e.g. March 21-22, 2026"
-              style={inputStyle}
-            />
-          </div>
+      {/* Section 4: Tournament Roster Management */}
+      <TournamentRosterSection
+        tournament={tournament}
+        totalCapacity={totalCapacity}
+      />
 
-          <div>
-            <label style={labelStyle}>Location</label>
-            <input
-              type="text"
-              value={location}
-              onChange={e => setLocation(e.target.value)}
-              placeholder="e.g. Kansas City, MO"
-              style={inputStyle}
-            />
-          </div>
-        </div>
-
-        {/* Qualifying Format Controls */}
-        <div style={{ borderTop: '1px solid var(--color-border-subtle)', paddingTop: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem', alignItems: 'center' }}>
-            <div>
-              <label style={labelStyle}>Qualifying Format</label>
-              <select
-                value={qualFormat}
-                onChange={e => {
-                  const newFmt = e.target.value as QualFormat;
-                  setQualFormat(newFmt);
-                  if (newFmt === 'POINTS' && (!pointsConfig || pointsConfig.length === 0)) {
-                    setPointsConfig(DEFAULT_POINTS_THRESHOLDS);
-                  }
-                }}
-                style={inputStyle}
-              >
-                <option value="HIGH_SCORE"># of Maxes</option>
-                <option value="AVERAGE_OF_X">Average of X Attempts</option>
-                <option value="POINTS">Points Threshold System</option>
-              </select>
-            </div>
-
-            {/* Tournament Mode Status Indicator */}
-            <div>
-              <label style={labelStyle}>Tournament Mode</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
-                {!tournament.isLocked ? (
-                  <span className="badge badge-gold" style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem' }}>
-                    <AlertTriangle size={13} /> Qualifiers Mode
-                  </span>
-                ) : (
-                  <span className="badge badge-green" style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem' }}>
-                    <ShieldCheck size={13} /> Match Play Mode
-                  </span>
-                )}
-                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                  {!tournament.isLocked
-                    ? 'Qualifiers active. Brackets dynamically seed.'
-                    : 'Brackets locked. Live match scoring active.'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Conditional Format Config */}
-          {qualFormat === 'AVERAGE_OF_X' && (
-            <div style={{ background: 'var(--color-bg-surface-elevated)', padding: '1rem', borderRadius: 'var(--radius-sm)', maxWidth: '360px' }}>
-              <label style={labelStyle}>Target Attempt Count (X)</label>
-              <ClearableNumberInput
-                min={1}
-                max={10}
-                value={qualAverageCount}
-                onChange={val => {
-                  setQualAverageCount(val);
-                  if (avgCountError) setAvgCountError(null);
-                }}
-                error={avgCountError}
-                onErrorChange={setAvgCountError}
-                style={inputStyle}
-              />
-              <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.35rem', display: 'block' }}>
-                e.g. 2 for Average of 2, 3 for Average of 3
-              </span>
-            </div>
-          )}
-
-          {qualFormat === 'POINTS' && (
-            <div
-              style={{
-                background: 'var(--color-bg-surface-elevated)',
-                padding: '1rem 1.25rem',
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--color-border-subtle)',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                flexWrap: 'wrap',
-                gap: '1rem',
-              }}
-            >
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--color-text-primary)' }}>
-                    Points Threshold System
-                  </span>
-                  <span
-                    style={{
-                      padding: '0.15rem 0.5rem',
-                      borderRadius: 'var(--radius-full)',
-                      background: 'rgba(245, 158, 11, 0.15)',
-                      color: 'var(--color-gold-bright)',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                    }}
-                  >
-                    {pointsConfig.length} {pointsConfig.length === 1 ? 'cutoff' : 'cutoffs'} configured
-                  </span>
-                </div>
-                <p style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', marginTop: '0.25rem', margin: '0.25rem 0 0 0' }}>
-                  Attempts award points non-cumulatively based on highest cutoff reached.
-                  {pointsConfig.length > 0 && (
-                    <span style={{ marginLeft: '0.35rem', color: 'var(--color-text-secondary)' }}>
-                      ({[...pointsConfig].sort((a, b) => b.minScore - a.minScore).slice(0, 4).map(p => `${(p.minScore / 1000).toFixed(0)}k → +${p.points}`).join(', ')}{pointsConfig.length > 4 ? ', ...' : ''})
-                    </span>
-                  )}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setIsPointsDrawerOpen(true)}
-                className="btn btn-secondary"
-                style={{ padding: '0.45rem 0.9rem', fontSize: '0.82rem', gap: '0.4rem', whiteSpace: 'nowrap' }}
-              >
-                <Sliders size={14} color="var(--color-gold-bright)" />
-                Configure Points Cutoffs
-              </button>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Section: Organization & Brand Palette */}
-      <section
-        style={{
-          background: 'var(--color-bg-surface)',
-          borderRadius: 'var(--radius-lg)',
-          border: '1px solid var(--color-border)',
-          padding: '1.25rem 1.5rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1.25rem',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.65rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Building2 size={18} color="var(--color-gold-bright)" />
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-              Host Organization &amp; Branding
-            </h2>
-          </div>
-          {selectedOrg && (
-            <Link
-              to={`/org/${selectedOrg.slug}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                fontSize: '0.78rem',
-                color: 'var(--color-gold-bright)',
-                textDecoration: 'none',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.35rem',
-                fontWeight: 600,
-              }}
-            >
-              <span>View {selectedOrg.shortName} Dashboard</span>
-              <ExternalLink size={12} />
-            </Link>
-          )}
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-          {/* Left Column: Organization Selection & Palette */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div>
-              <label style={labelStyle}>Parent Organization Circuit</label>
-              <select
-                value={organizationId}
-                onChange={e => setOrganizationId(e.target.value)}
-                style={inputStyle}
-              >
-                {organizations.map(org => (
-                  <option key={org.id} value={org.id}>
-                    {org.name} ({org.shortName})
-                  </option>
-                ))}
-              </select>
-              <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '0.25rem', display: 'block' }}>
-                All match scores, career metrics, and qualifying leaderboards roll up to this organization.
-              </span>
-            </div>
-
-            <div style={{ background: 'var(--color-bg-surface-elevated)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border-subtle)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', margin: 0 }}>
-                <input
-                  type="checkbox"
-                  checked={useOrgBranding}
-                  onChange={e => setUseOrgBranding(e.target.checked)}
-                  style={{ width: '16px', height: '16px', accentColor: 'var(--color-gold-bright)', cursor: 'pointer' }}
-                />
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                  Inherit Organization Theme &amp; 5-Color Bracket Palette
-                </span>
-              </label>
-
-              {useOrgBranding && (selectedOrg?.themeColors || selectedOrg?.branding?.themeColors) && (
-                (() => {
-                  const colors = selectedOrg.themeColors || selectedOrg.branding?.themeColors;
-                  return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', paddingTop: '0.25rem' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>
-                        Circuit 5-Color Theme:
-                      </span>
-                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        {[
-                          { label: 'Pri', color: colors?.primaryColor },
-                          { label: 'Sec', color: colors?.secondaryColor },
-                          { label: 'Card', color: colors?.cardColor },
-                          { label: 'Text', color: colors?.textColor },
-                          { label: 'Bg', color: colors?.backgroundColor },
-                        ].map(swatch => (
-                          <div key={swatch.label} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'rgba(0,0,0,0.3)', padding: '0.2rem 0.45rem', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                            <span style={{ width: '12px', height: '12px', borderRadius: '2px', background: swatch.color, border: '1px solid rgba(255,255,255,0.2)' }} />
-                            <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>{swatch.label}</span>
-                          </div>
-                        ))}
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={handleApplyOrgColorsToTiers}
-                        className="btn btn-secondary"
-                        style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', alignSelf: 'flex-start', marginTop: '0.25rem', gap: '0.4rem' }}
-                        title="Copy these 5 colors to all tiers in this tournament"
-                      >
-                        <Palette size={13} color="var(--color-gold-bright)" />
-                        Apply Circuit Palettes to All Tiers
-                      </button>
-                    </div>
-                  );
-                })()
-              )}
-
-              {!useOrgBranding && (
-                <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', margin: 0 }}>
-                  Custom regional mode: Each tier in this tournament will use its own custom colors and media independent of {selectedOrg?.shortName || 'the organization'}.
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Right Column: Logo/Banner Overrides & Discord Webhooks */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-              <div>
-                <label style={labelStyle}>Tournament Logo URL</label>
-                <input
-                  type="text"
-                  value={logoUrl}
-                  onChange={e => setLogoUrl(e.target.value)}
-                  placeholder={selectedOrg?.branding?.logoUrl || 'https://.../logo.png'}
-                  style={inputStyle}
-                />
-                <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
-                  {logoUrl ? 'Custom tournament logo' : `Default: ${selectedOrg?.shortName || 'Org'} logo`}
-                </span>
-              </div>
-              <div>
-                <label style={labelStyle}>Tournament Banner URL</label>
-                <input
-                  type="text"
-                  value={bannerUrl}
-                  onChange={e => setBannerUrl(e.target.value)}
-                  placeholder={selectedOrg?.branding?.bannerUrl || 'https://.../banner.png'}
-                  style={inputStyle}
-                />
-                <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
-                  {bannerUrl ? 'Custom tournament banner' : `Default: ${selectedOrg?.shortName || 'Org'} banner`}
-                </span>
-              </div>
-            </div>
-
-            {/* Discord Webhook Field (Groundwork) */}
-            <div style={{ background: 'var(--color-bg-surface-elevated)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border-subtle)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <label style={{ ...labelStyle, margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <span>Discord Webhook URL</span>
-                  <span style={{ fontSize: '0.65rem', padding: '0.1rem 0.4rem', borderRadius: '4px', background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', fontWeight: 600 }}>
-                    Groundwork
-                  </span>
-                </label>
-              </div>
-
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <input
-                  type="text"
-                  value={discordWebhookUrl}
-                  onChange={e => setDiscordWebhookUrl(e.target.value)}
-                  placeholder={selectedOrg?.discordWebhookUrl ? `Fallback: ${selectedOrg.shortName} Webhook` : 'https://discord.com/api/webhooks/...'}
-                  style={{ ...inputStyle, flex: 1 }}
-                />
-                <button
-                  type="button"
-                  onClick={handleTestDiscordWebhook}
-                  className="btn btn-secondary"
-                  style={{ padding: '0.4rem 0.75rem', fontSize: '0.78rem', whiteSpace: 'nowrap', gap: '0.35rem' }}
-                  title="Test resolve tournament or fallback organization webhook"
-                >
-                  <Send size={13} />
-                  Test
-                </button>
-              </div>
-
-              <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
-                {discordWebhookUrl.trim()
-                  ? 'Active tournament-specific webhook override.'
-                  : selectedOrg?.discordWebhookUrl
-                  ? `Inherited from ${selectedOrg.name} (${selectedOrg.discordWebhookUrl.slice(0, 32)}...)`
-                  : 'No webhook configured. Circuit announcements disabled.'}
-              </span>
-
-              {webhookTestStatus && (
-                <div style={{ fontSize: '0.75rem', color: webhookTestStatus.includes('resolved') ? '#34d399' : '#f87171', fontWeight: 600 }}>
-                  {webhookTestStatus}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Section 2: Tier Management */}
-      <section
-        style={{
-          background: 'var(--color-bg-surface)',
-          borderRadius: 'var(--radius-lg)',
-          border: '1px solid var(--color-border)',
-          padding: '1.5rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1.25rem',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.75rem' }}>
-          <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-              Bracket Tiers
-            </h2>
-            <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-              Organize 1 to N tiered brackets (Gold, Silver, Bronze) with automatic cutoff ranges.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={addTier}
-            className="btn btn-primary"
-            style={{ padding: '0.45rem 0.9rem', fontSize: '0.85rem' }}
-          >
-            <Plus size={16} /> Add Tier
-          </button>
-        </div>
-
-        {/* Tiers List */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {tiers.length === 0 ? (
-            <div
-              style={{
-                padding: '2.5rem 1rem',
-                background: 'var(--color-bg-base)',
-                borderRadius: 'var(--radius-md)',
-                border: '1px dashed var(--color-border)',
-                textAlign: 'center',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '0.75rem',
-              }}
-            >
-              <p style={{ fontSize: '0.95rem', color: 'var(--color-text-secondary)' }}>
-                No bracket tiers configured for this tournament.
-              </p>
-              <button
-                type="button"
-                onClick={addTier}
-                className="btn btn-primary"
-                style={{ padding: '0.45rem 1rem', fontSize: '0.85rem' }}
-              >
-                <Plus size={16} /> Add First Bracket Tier
-              </button>
-            </div>
-          ) : (
-            tiers.map((tier, idx) => {
-              const badge = tierThresholdBadges[idx];
-
-            return (
-              <div
-                key={tier.id}
-                style={{
-                  background: 'var(--color-bg-surface-elevated)',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--color-border)',
-                  borderLeft: `5px solid ${tier.primaryColor || 'var(--color-gold)'}`,
-                  padding: '1.25rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '1rem',
-                }}
-              >
-                {/* Header: Priority, Name, Cutoff Badge & Controls */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <span
-                      style={{
-                        padding: '0.2rem 0.6rem',
-                        borderRadius: 'var(--radius-sm)',
-                        background: 'var(--color-bg-surface-highlight)',
-                        fontWeight: 700,
-                        fontSize: '0.8rem',
-                        color: 'var(--color-text-primary)',
-                      }}
-                    >
-                      Priority #{tier.priority}
-                    </span>
-
-                    {/* Auto-derived cutoff badge */}
-                    <span
-                      style={{
-                        padding: '0.25rem 0.75rem',
-                        borderRadius: 'var(--radius-full)',
-                        background: 'rgba(245, 158, 11, 0.15)',
-                        border: '1px solid rgba(245, 158, 11, 0.3)',
-                        color: 'var(--color-gold-bright)',
-                        fontWeight: 700,
-                        fontSize: '0.8rem',
-                      }}
-                    >
-                      Cutoff: Leaderboard Ranks {badge.start} – {badge.end}
-                    </span>
-                  </div>
-
-                  {/* Move up / down / delete */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                    <button
-                      type="button"
-                      onClick={() => moveTier(idx, 'up')}
-                      disabled={idx === 0}
-                      className="btn btn-secondary"
-                      style={{ padding: '0.25rem 0.5rem', opacity: idx === 0 ? 0.3 : 1 }}
-                      title="Move tier up in priority"
-                    >
-                      <ArrowUp size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => moveTier(idx, 'down')}
-                      disabled={idx === tiers.length - 1}
-                      className="btn btn-secondary"
-                      style={{ padding: '0.25rem 0.5rem', opacity: idx === tiers.length - 1 ? 0.3 : 1 }}
-                      title="Move tier down in priority"
-                    >
-                      <ArrowDown size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTierToDelete({ index: idx, tier })}
-                      className="btn btn-danger"
-                      style={{ padding: '0.25rem 0.5rem' }}
-                      title="Delete bracket tier"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Form Fields Grid: Aligned and robust with minWidth: 0 to prevent overflow */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', alignItems: 'end' }}>
-                  <div style={{ minWidth: 0 }}>
-                    <label style={{ ...labelStyle, height: '1.6rem', display: 'flex', alignItems: 'flex-end', marginBottom: '0.35rem' }}>Tier Name</label>
-                    <input
-                      type="text"
-                      value={tier.name}
-                      onChange={e => updateTier(idx, { name: e.target.value })}
-                      style={inputStyle}
-                    />
-                  </div>
-
-                  <div style={{ minWidth: 0 }}>
-                    <label style={{ ...labelStyle, height: '1.6rem', display: 'flex', alignItems: 'flex-end', marginBottom: '0.35rem' }}>URL Slug</label>
-                    <input
-                      type="text"
-                      value={tier.slug}
-                      onChange={e => updateTier(idx, { slug: e.target.value })}
-                      style={inputStyle}
-                    />
-                  </div>
-
-                  <div style={{ minWidth: 0 }}>
-                    <label style={{ ...labelStyle, height: '1.6rem', display: 'flex', alignItems: 'flex-end', marginBottom: '0.35rem' }}>Elimination Style</label>
-                    <select
-                      value={tier.eliminationType || 'SINGLE'}
-                      onChange={e => updateTier(idx, { eliminationType: e.target.value as 'SINGLE' | 'DOUBLE' })}
-                      style={inputStyle}
-                    >
-                      <option value="SINGLE">Single Elimination</option>
-                      <option value="DOUBLE">Double Elimination</option>
-                    </select>
-                  </div>
-
-                  {tier.eliminationType === 'DOUBLE' ? (
-                    <div style={{ minWidth: 0 }}>
-                      <label style={{ ...labelStyle, height: '1.6rem', display: 'flex', alignItems: 'flex-end', marginBottom: '0.35rem' }}>Bracket Routing</label>
-                      <select
-                        value={tier.bracketRouting || 'TRADITIONAL_TREE'}
-                        onChange={e => {
-                          const routing = e.target.value as BracketRouting;
-                          updateTier(idx, {
-                            bracketRouting: routing,
-                            flatWidth: routing === 'FLAT_STAGED' ? (tier.flatWidth || 4) : undefined,
-                            finalsCutoff: routing === 'ACCELERATED_HYBRID' ? (tier.finalsCutoff || 16) : undefined,
-                          });
-                        }}
-                        style={inputStyle}
-                      >
-                        <option value="TRADITIONAL_TREE">Traditional Tree</option>
-                        <option value="FLAT_STAGED">Flat Staged</option>
-                        <option value="ACCELERATED_HYBRID">Accelerated Hybrid</option>
-                      </select>
-                    </div>
-                  ) : (
-                    <div style={{ minWidth: 0 }}>
-                      <label style={{ ...labelStyle, height: '1.6rem', display: 'flex', alignItems: 'flex-end', marginBottom: '0.35rem' }}>Bracket Routing</label>
-                      <select
-                        value={tier.bracketType}
-                        onChange={e => updateTier(idx, { bracketType: e.target.value as 'TRADITIONAL' | 'FLAT' })}
-                        style={inputStyle}
-                      >
-                        <option value="TRADITIONAL">Traditional Bracket</option>
-                        <option value="FLAT">Flat Bracket</option>
-                      </select>
-                    </div>
-                  )}
-
-                  {tier.eliminationType === 'DOUBLE' && tier.bracketRouting === 'FLAT_STAGED' && (
-                    <div style={{ minWidth: 0 }}>
-                      <label
-                        style={{
-                          ...labelStyle,
-                          height: '1.6rem',
-                          display: 'flex',
-                          alignItems: 'flex-end',
-                          marginBottom: '0.35rem',
-                          whiteSpace: 'nowrap',
-                          textOverflow: 'ellipsis',
-                          overflow: 'hidden'
-                        }}
-                        title="Flat Width (Matches Per Round)"
-                      >
-                        Flat Width
-                      </label>
-                      <select
-                        value={tier.flatWidth || 4}
-                        onChange={e => updateTier(idx, { flatWidth: parseInt(e.target.value, 10) })}
-                        style={{
-                          ...inputStyle,
-                          borderColor: tier.playerCount % (tier.flatWidth || 4) !== 0 ? '#ef4444' : undefined,
-                        }}
-                      >
-                        <option value={4}>4 Wide</option>
-                        <option value={8}>8 Wide</option>
-                      </select>
-                      {tier.playerCount % (tier.flatWidth || 4) !== 0 && (
-                        <div style={{ color: '#ef4444', fontSize: '0.72rem', marginTop: '0.25rem' }}>
-                          Participant count ({tier.playerCount}) must be a multiple of flat width ({tier.flatWidth || 4}).
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {tier.eliminationType === 'DOUBLE' && tier.bracketRouting === 'ACCELERATED_HYBRID' && (
-                    <div style={{ minWidth: 0 }}>
-                      <label
-                        style={{
-                          ...labelStyle,
-                          height: '1.6rem',
-                          display: 'flex',
-                          alignItems: 'flex-end',
-                          marginBottom: '0.35rem',
-                          whiteSpace: 'nowrap',
-                          textOverflow: 'ellipsis',
-                          overflow: 'hidden'
-                        }}
-                        title="Finals Cutoff"
-                      >
-                        Finals Cutoff
-                      </label>
-                      <select
-                        value={tier.finalsCutoff || 16}
-                        onChange={e => updateTier(idx, { finalsCutoff: parseInt(e.target.value, 10) })}
-                        style={inputStyle}
-                      >
-                        <option value={8}>Top 8</option>
-                        <option value={16}>Top 16</option>
-                      </select>
-                    </div>
-                  )}
-
-                  {tier.eliminationType !== 'DOUBLE' && tier.bracketType === 'FLAT' && (
-                    <div style={{ minWidth: 0 }}>
-                      <label
-                        style={{
-                          ...labelStyle,
-                          height: '1.6rem',
-                          display: 'flex',
-                          alignItems: 'flex-end',
-                          marginBottom: '0.35rem',
-                          whiteSpace: 'nowrap',
-                          textOverflow: 'ellipsis',
-                          overflow: 'hidden'
-                        }}
-                        title="Flat Width (Matches Per Round)"
-                      >
-                        Flat Width (Per Round)
-                      </label>
-                      <select
-                        value={tier.flatWidth || getValidFlatWidths(tier.playerCount)[0] || 2}
-                        onChange={e => updateTier(idx, { flatWidth: parseInt(e.target.value, 10) })}
-                        style={inputStyle}
-                      >
-                        {getValidFlatWidths(tier.playerCount).map(w => (
-                          <option key={w} value={w}>
-                            {w}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  <div style={{ minWidth: 0 }}>
-                    <label style={{ ...labelStyle, height: '1.6rem', display: 'flex', alignItems: 'flex-end', marginBottom: '0.35rem' }}>Participant Count</label>
-                    <ClearableNumberInput
-                      min={2}
-                      max={64}
-                      value={tier.playerCount}
-                      onChange={val => updateTier(idx, { playerCount: val ?? 2 })}
-                      style={inputStyle}
-                    />
-                  </div>
-
-                  <div style={{ minWidth: 0 }}>
-                    <label style={{ ...labelStyle, height: '1.6rem', display: 'flex', alignItems: 'flex-end', marginBottom: '0.35rem' }}>Best-of Default</label>
-                    <BestOfSelect
-                      value={tier.bestOf}
-                      onChange={val => updateTier(idx, { bestOf: val })}
-                    />
-                  </div>
-                </div>
-
-                {/* Round-Specific Best-of Overrides */}
-                <RoundOverridesEditor
-                  tier={tier}
-                  onChange={newOverrides => updateTier(idx, { roundBestOfOverrides: newOverrides })}
-                  inputStyle={inputStyle}
-                />
-
-                {/* Bracket Palette & Theming: Controls Above, 3-State Preview Below */}
-                {(() => {
-                  const defaults = getDefaultTierColors(tier);
-                  const priColor = tier.primaryColor || defaults.primaryColor;
-                  const secColor = tier.secondaryColor || defaults.secondaryColor;
-                  const cardBg = tier.cardColor || defaults.cardColor;
-                  const txtColor = tier.textColor || defaults.textColor;
-                  const canvasBg = tier.backgroundColor || defaults.backgroundColor;
-                  const lowerColor = tier.lowerBracketColor || defaults.lowerBracketColor || '#c2410c';
-                  const isThemeOpen = Boolean(openThemes[tier.id]);
-
-                  return (
-                    <div
-                      style={{
-                        marginTop: '1.25rem',
-                        borderRadius: 'var(--radius-md)',
-                        background: 'var(--color-bg-surface)',
-                        border: '1px solid var(--color-border-subtle)',
-                        overflow: 'hidden',
-                        transition: 'all 0.2s ease',
-                      }}
-                    >
-                      {/* Accordion Header Toggle */}
-                      <button
-                        type="button"
-                        onClick={() => toggleThemeCollapse(tier.id)}
-                        style={{
-                          width: '100%',
-                          padding: '0.85rem 1.25rem',
-                          background: isThemeOpen ? 'var(--color-bg-surface)' : 'var(--color-bg-surface-elevated)',
-                          border: 'none',
-                          borderBottom: isThemeOpen ? '1px solid var(--color-border-subtle)' : 'none',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '0.75rem',
-                          textAlign: 'left',
-                          transition: 'background 0.15s ease',
-                        }}
-                        onMouseEnter={e => {
-                          e.currentTarget.style.backgroundColor = 'var(--color-bg-surface-elevated)';
-                        }}
-                        onMouseLeave={e => {
-                          e.currentTarget.style.backgroundColor = isThemeOpen ? 'var(--color-bg-surface)' : 'var(--color-bg-surface-elevated)';
-                        }}
-                        aria-expanded={isThemeOpen}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                            <Palette size={15} color={priColor} />
-                            <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--color-text-primary)' }}>
-                              Bracket Theme & Palette
-                            </span>
-                          </div>
-
-                          {/* Palette Color Swatches Preview */}
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.35rem',
-                              padding: '0.15rem 0.5rem',
-                              background: 'var(--color-bg-base)',
-                              borderRadius: 'var(--radius-full)',
-                              border: '1px solid var(--color-border-subtle)',
-                            }}
-                            title={`Current theme: Primary (${priColor}), Secondary (${secColor}), Card (${cardBg}), Text (${txtColor}), Canvas (${canvasBg}), Lower Bracket (${lowerColor})`}
-                          >
-                            <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: priColor, border: '1px solid rgba(0,0,0,0.3)', flexShrink: 0 }} />
-                            <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: secColor, border: '1px solid rgba(0,0,0,0.3)', flexShrink: 0 }} />
-                            <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: cardBg, border: '1px solid rgba(255,255,255,0.15)', flexShrink: 0 }} />
-                            <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: txtColor, border: '1px solid rgba(0,0,0,0.3)', flexShrink: 0 }} />
-                            <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: canvasBg, border: '1px solid rgba(255,255,255,0.15)', flexShrink: 0 }} />
-                            <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: lowerColor, border: '1px solid rgba(0,0,0,0.3)', flexShrink: 0 }} />
-                            <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginLeft: '0.2rem', fontFamily: 'var(--font-mono)' }}>
-                              {tier.textSize ? `${tier.textSize}` : 'normal'}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
-                            {isThemeOpen ? 'Click to collapse' : 'Click to customize colors & text size'}
-                          </span>
-                          <ChevronDown
-                            size={16}
-                            color="var(--color-text-muted)"
-                            style={{
-                              transform: isThemeOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                              transition: 'transform 0.2s ease',
-                            }}
-                          />
-                        </div>
-                      </button>
-
-                      {/* Accordion Content */}
-                      {isThemeOpen && (
-                        <div
-                          style={{
-                            padding: '1.25rem',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '1.25rem',
-                            animation: 'fadeIn 0.15s ease-out',
-                          }}
-                        >
-                          <BracketThemeEditor
-                            themeColors={{
-                              primaryColor: priColor,
-                              secondaryColor: secColor,
-                              cardColor: cardBg,
-                              textColor: txtColor,
-                              backgroundColor: canvasBg,
-                              lowerBracketColor: lowerColor,
-                            }}
-                            textSize={
-                              tier.textSize === 'compact' || tier.textSize === 'small'
-                                ? 'compact'
-                                : tier.textSize === 'large' || tier.textSize === 'xlarge'
-                                ? 'large'
-                                : 'normal'
-                            }
-                            bestOf={tier.bestOf || 5}
-                            onThemeChange={colors => {
-                              updateTier(idx, {
-                                primaryColor: colors.primaryColor,
-                                secondaryColor: colors.secondaryColor,
-                                cardColor: colors.cardColor,
-                                textColor: colors.textColor,
-                                backgroundColor: colors.backgroundColor,
-                                lowerBracketColor: colors.lowerBracketColor,
-                              });
-                            }}
-                            onTextSizeChange={size => {
-                              updateTier(idx, { textSize: size });
-                            }}
-                            onReset={() => {
-                              const def = getDefaultTierColors({ id: tier.id, slug: tier.slug, priority: tier.priority || (idx + 1) });
-                              updateTier(idx, {
-                                primaryColor: def.primaryColor,
-                                secondaryColor: def.secondaryColor,
-                                cardColor: def.cardColor,
-                                textColor: def.textColor,
-                                backgroundColor: def.backgroundColor,
-                                lowerBracketColor: def.lowerBracketColor,
-                                textSize: 'normal',
-                              });
-                            }}
-                          />
-                        </div>
-                      )}
-                </div>
-              );
-                })()}
-              </div>
-            );
-          }))}
-        </div>
-      </section>
-
-      {/* Section 3: Tournament Roster Management */}
-      <section
-        style={{
-          background: 'var(--color-bg-surface)',
-          borderRadius: 'var(--radius-lg)',
-          border: '1px solid var(--color-border)',
-          padding: '0.85rem 1.25rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '0.75rem',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Users size={18} color="var(--color-gold-bright)" />
-            <h2 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
-              Tournament Competitor Roster
-            </h2>
-          </div>
-          <span
-            style={{
-              padding: '0.2rem 0.6rem',
-              borderRadius: 'var(--radius-full)',
-              background: 'rgba(245, 158, 11, 0.15)',
-              color: 'var(--color-gold-bright)',
-              fontSize: '0.75rem',
-              fontWeight: 700,
-            }}
-          >
-            {(tournament.playersPool || []).length} / {totalCapacity} Capacity Registered
-          </span>
-          <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
-            Manage registrations & pool imports in Register Players.
-          </span>
-        </div>
-
-        <Link
-          to={`/${tournament.slug}/manage/players`}
-          className="btn btn-primary"
-          style={{ padding: '0.4rem 0.85rem', fontSize: '0.82rem', gap: '0.4rem', textDecoration: 'none' }}
-        >
-          <Users size={14} /> Go to Register Players
-        </Link>
-      </section>
-
-      {/* Section 4: Data Management & Simulation */}
-      <section
-        style={{
-          background: 'var(--color-bg-surface)',
-          borderRadius: 'var(--radius-lg)',
-          border: '1px solid var(--color-border)',
-          padding: '1rem 1.25rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0.85rem',
-        }}
-      >
-        <div style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <div>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
-              Data Management & Simulation
-            </h2>
-            <p style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', margin: '0.2rem 0 0 0' }}>
-              Simulate realistic tournament data for end-to-end testing, or reset match records and qualifier submissions.
-            </p>
-          </div>
-        </div>
-
-        {/* Feedback message banner if any */}
-        {simFeedback && (
-          <div
-            style={{
-              padding: '0.6rem 0.85rem',
-              background: 'rgba(34, 197, 94, 0.12)',
-              border: '1px solid rgba(34, 197, 94, 0.4)',
-              borderRadius: 'var(--radius-sm)',
-              color: '#4ade80',
-              fontSize: '0.82rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              animation: 'fadeIn 0.2s ease-out',
-            }}
-          >
-            <CheckCircle2 size={15} />
-            <span>{simFeedback}</span>
-          </div>
-        )}
-
-        {/* Data Status Summary Bar */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
-          <div style={{ padding: '0.55rem 0.85rem', background: 'var(--color-bg-surface-elevated)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>
-              Qualifier Attempts
-            </span>
-            <span style={{ fontSize: '1.2rem', fontWeight: 800, color: qualifierCount > 0 ? 'var(--color-gold-bright)' : 'var(--color-text-secondary)' }}>
-              {qualifierCount}
-            </span>
-          </div>
-          <div style={{ padding: '0.55rem 0.85rem', background: 'var(--color-bg-surface-elevated)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>
-              Recorded Matches
-            </span>
-            <span style={{ fontSize: '1.2rem', fontWeight: 800, color: recordedMatchCount > 0 ? 'var(--color-gold-bright)' : 'var(--color-text-secondary)' }}>
-              {recordedMatchCount}
-            </span>
-          </div>
-        </div>
-
-        {/* Sandbox Simulation & Maintenance Controls Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.85rem' }}>
-          {/* Sandbox Simulation */}
-          <div
-            style={{
-              padding: '0.75rem 0.95rem',
-              background: 'var(--color-bg-surface-elevated)',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--color-border-subtle)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.55rem',
-            }}
-          >
-            <div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                Sandbox Simulation
-              </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                Seed simulated scores or run full tournament matches.
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
-              <button
-                type="button"
-                onClick={handleSeedQualifiers}
-                disabled={hasQualifiers || hasRecordedMatches}
-                className="btn btn-secondary"
-                style={{
-                  padding: '0.4rem 0.85rem',
-                  fontSize: '0.8rem',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  opacity: (hasQualifiers || hasRecordedMatches) ? 0.45 : 1,
-                  cursor: (hasQualifiers || hasRecordedMatches) ? 'not-allowed' : 'pointer',
-                }}
-                title={
-                  hasRecordedMatches
-                    ? 'Match play has begun. Clear match scores or all tournament data to re-seed.'
-                    : hasQualifiers
-                    ? 'Qualifiers have already been seeded. Clear qualifier scores to re-seed.'
-                    : 'Generate realistic competitors and qualifier attempts'
-                }
-              >
-                <Sparkles size={14} style={{ color: 'var(--color-gold-bright)' }} />
-                Seed Qualifiers
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSimulate}
-                disabled={!hasTiers || hasRecordedMatches}
-                className="btn btn-secondary"
-                style={{
-                  padding: '0.4rem 0.85rem',
-                  fontSize: '0.8rem',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  opacity: (!hasTiers || hasRecordedMatches) ? 0.45 : 1,
-                  cursor: (!hasTiers || hasRecordedMatches) ? 'not-allowed' : 'pointer',
-                }}
-                title={
-                  !hasTiers
-                    ? 'Add at least one bracket tier first before simulating tournament matches'
-                    : hasRecordedMatches
-                    ? 'Match results have already been recorded. Clear match scores to simulate again.'
-                    : hasQualifiers
-                    ? 'Lock brackets from current qualifiers and simulate all match results to champion'
-                    : 'Seed qualifiers, lock brackets, and simulate all tournament matches'
-                }
-              >
-                <Play size={14} style={{ color: '#60a5fa' }} />
-                {hasQualifiers ? 'Simulate Matches' : 'Seed & Simulate'}
-              </button>
-            </div>
-          </div>
-
-          {/* Data Maintenance */}
-          <div
-            style={{
-              padding: '0.75rem 0.95rem',
-              background: 'var(--color-bg-surface-elevated)',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--color-border-subtle)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.55rem',
-            }}
-          >
-            <div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                Data Maintenance
-              </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                Clear match results or qualifier submissions.
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
-              <button
-                type="button"
-                onClick={() => setDataActionToConfirm('MATCHES')}
-                disabled={recordedMatchCount === 0}
-                className="btn btn-secondary"
-                style={{
-                  padding: '0.38rem 0.75rem',
-                  fontSize: '0.78rem',
-                  opacity: recordedMatchCount === 0 ? 0.4 : 1,
-                  cursor: recordedMatchCount === 0 ? 'not-allowed' : 'pointer',
-                }}
-                title={recordedMatchCount === 0 ? 'No recorded match scores to clear' : 'Clear all recorded match scores'}
-              >
-                Clear Matches ({recordedMatchCount})
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setDataActionToConfirm('QUALS')}
-                disabled={qualifierCount === 0}
-                className="btn btn-secondary"
-                style={{
-                  padding: '0.38rem 0.75rem',
-                  fontSize: '0.78rem',
-                  opacity: qualifierCount === 0 ? 0.4 : 1,
-                  cursor: qualifierCount === 0 ? 'not-allowed' : 'pointer',
-                }}
-                title={qualifierCount === 0 ? 'No qualifier scores to clear' : 'Clear all qualifier submissions'}
-              >
-                Clear Quals ({qualifierCount})
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setDataActionToConfirm('ALL')}
-                disabled={qualifierCount === 0 && recordedMatchCount === 0}
-                className="btn btn-danger"
-                style={{
-                  padding: '0.38rem 0.75rem',
-                  fontSize: '0.78rem',
-                  opacity: (qualifierCount === 0 && recordedMatchCount === 0) ? 0.4 : 1,
-                  cursor: (qualifierCount === 0 && recordedMatchCount === 0) ? 'not-allowed' : 'pointer',
-                }}
-                title={qualifierCount === 0 && recordedMatchCount === 0 ? 'No data to clear' : 'Clear all tournament data'}
-              >
-                <Trash2 size={13} /> Clear All
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Section 5: Data Management & Simulation */}
+      <DataSimulationSection
+        qualifierCount={qualifierCount}
+        recordedMatchCount={recordedMatchCount}
+        hasTiers={tiers.length > 0}
+        simFeedback={simFeedback}
+        onSeedQualifiers={handleSeedQualifiers}
+        onSimulate={handleSimulate}
+        onRequestDataAction={action => setDataActionToConfirm(action)}
+      />
 
       {/* Save Button Bar */}
       <div
@@ -1953,226 +860,33 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
         </button>
       </div>
 
-      {/* Speedbump Modal for Deleting Bracket Tier */}
-      {tierToDelete && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.75)',
-            backdropFilter: 'blur(6px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: '1rem',
-          }}
-        >
-          <div
-            style={{
-              background: 'var(--color-bg-surface)',
-              borderRadius: 'var(--radius-lg)',
-              border: '1px solid var(--color-red)',
-              maxWidth: '460px',
-              width: '100%',
-              boxShadow: 'var(--shadow-lg)',
-              overflow: 'hidden',
-              animation: 'fadeIn 0.2s ease-out',
-            }}
-          >
-            <div
-              style={{
-                padding: '1.25rem 1.5rem',
-                background: 'var(--color-bg-surface-elevated)',
-                borderBottom: '1px solid var(--color-border)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--color-red)' }}>
-                <Trash2 size={20} />
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                  Delete Bracket Tier
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setTierToDelete(null)}
-                style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '0.25rem' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <p style={{ fontSize: '0.9rem', color: 'var(--color-text-primary)', lineHeight: 1.5 }}>
-                Are you sure you want to delete bracket <strong>{tierToDelete.tier.name}</strong>?
-              </p>
-              {tiers.length === 1 && (
-                <div
-                  style={{
-                    padding: '0.75rem',
-                    background: 'rgba(239, 68, 68, 0.1)',
-                    border: '1px solid rgba(239, 68, 68, 0.3)',
-                    borderRadius: 'var(--radius-sm)',
-                    color: '#f87171',
-                    fontSize: '0.8rem',
-                    lineHeight: 1.4,
-                  }}
-                >
-                  ⚠️ This is the final bracket. Deleting it will leave the tournament with 0 brackets until you add a new tier.
-                </div>
-              )}
-            </div>
-
-            <div
-              style={{
-                padding: '1rem 1.5rem',
-                background: 'var(--color-bg-surface-elevated)',
-                borderTop: '1px solid var(--color-border)',
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '0.75rem',
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => setTierToDelete(null)}
-                className="btn btn-secondary"
-                style={{ padding: '0.5rem 1rem' }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  deleteTier(tierToDelete.index);
-                  setTierToDelete(null);
-                }}
-                className="btn btn-danger"
-                style={{ padding: '0.5rem 1.25rem' }}
-              >
-                Yes, Delete Bracket
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Speedbump Modal for Clearing Tournament Data */}
-      {dataActionToConfirm && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.75)',
-            backdropFilter: 'blur(6px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: '1rem',
-          }}
-        >
-          <div
-            style={{
-              background: 'var(--color-bg-surface)',
-              borderRadius: 'var(--radius-lg)',
-              border: '1px solid var(--color-red)',
-              maxWidth: '480px',
-              width: '100%',
-              boxShadow: 'var(--shadow-lg)',
-              overflow: 'hidden',
-              animation: 'fadeIn 0.2s ease-out',
-            }}
-          >
-            <div
-              style={{
-                padding: '1.25rem 1.5rem',
-                background: 'var(--color-bg-surface-elevated)',
-                borderBottom: '1px solid var(--color-border)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--color-red)' }}>
-                <Trash2 size={20} />
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                  {dataActionToConfirm === 'MATCHES' && 'Clear Match Scores'}
-                  {dataActionToConfirm === 'QUALS' && 'Clear Qualifier Scores'}
-                  {dataActionToConfirm === 'ALL' && 'Clear All Tournament Data'}
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setDataActionToConfirm(null)}
-                style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '0.25rem' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <p style={{ fontSize: '0.9rem', color: 'var(--color-text-primary)', lineHeight: 1.5 }}>
-                {dataActionToConfirm === 'MATCHES' && (
-                  <>Are you sure you want to delete all <strong>{recordedMatchCount} recorded match score(s)</strong> across all tiers? Tournament will revert to Qualifiers Mode.</>
-                )}
-                {dataActionToConfirm === 'QUALS' && (
-                  <>Are you sure you want to delete all <strong>{qualifierCount} qualifier score(s)</strong>? The qualifiers leaderboard will be emptied.</>
-                )}
-                {dataActionToConfirm === 'ALL' && (
-                  <>Are you sure you want to clear <strong>all qualifier and match score data</strong> for this tournament? This will reset the tournament data to a clean slate, allowing you to delete it or re-seed.</>
-                )}
-              </p>
-              <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', lineHeight: 1.4 }}>
-                This action cannot be undone.
-              </p>
-            </div>
-
-            <div
-              style={{
-                padding: '1rem 1.5rem',
-                background: 'var(--color-bg-surface-elevated)',
-                borderTop: '1px solid var(--color-border)',
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '0.75rem',
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => setDataActionToConfirm(null)}
-                className="btn btn-secondary"
-                style={{ padding: '0.5rem 1rem' }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (dataActionToConfirm === 'MATCHES') {
-                    clearMatchScores(tournament.id);
-                    setSimFeedback('Match scores cleared.');
-                  } else if (dataActionToConfirm === 'QUALS') {
-                    clearQualifierScores(tournament.id);
-                    setSimFeedback('Qualifier scores cleared.');
-                  } else if (dataActionToConfirm === 'ALL') {
-                    clearAllTournamentData(tournament.id);
-                    setSimFeedback('All tournament data cleared.');
-                  }
-                  setDataActionToConfirm(null);
-                }}
-                className="btn btn-danger"
-                style={{ padding: '0.5rem 1.25rem' }}
-              >
-                Yes, Clear Data
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modals */}
+      <AdminFormModals
+        tierToDelete={tierToDelete}
+        tiersCount={tiers.length}
+        onConfirmDeleteTier={idx => {
+          deleteTier(idx);
+          setTierToDelete(null);
+        }}
+        onCancelDeleteTier={() => setTierToDelete(null)}
+        dataActionToConfirm={dataActionToConfirm}
+        qualifierCount={qualifierCount}
+        recordedMatchCount={recordedMatchCount}
+        onConfirmDataAction={() => {
+          if (dataActionToConfirm === 'MATCHES') {
+            clearMatchScores(tournament.id);
+            setSimFeedback('Match scores cleared.');
+          } else if (dataActionToConfirm === 'QUALS') {
+            clearQualifierScores(tournament.id);
+            setSimFeedback('Qualifier scores cleared.');
+          } else if (dataActionToConfirm === 'ALL') {
+            clearAllTournamentData(tournament.id);
+            setSimFeedback('All tournament data cleared.');
+          }
+          setDataActionToConfirm(null);
+        }}
+        onCancelDataAction={() => setDataActionToConfirm(null)}
+      />
 
       {/* Points Thresholds Drawer */}
       <PointsThresholdsDrawer
@@ -2193,24 +907,4 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
       )}
     </form>
   );
-};
-
-const labelStyle: React.CSSProperties = {
-  display: 'block',
-  fontSize: '0.8rem',
-  fontWeight: 600,
-  color: 'var(--color-text-secondary)',
-  marginBottom: '0.4rem',
-  textTransform: 'uppercase',
-  letterSpacing: '0.04em',
-};
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '0.6rem 0.85rem',
-  borderRadius: 'var(--radius-sm)',
-  border: '1px solid var(--color-border)',
-  backgroundColor: 'var(--color-bg-base)',
-  color: 'var(--color-text-primary)',
-  fontSize: '0.875rem',
 };

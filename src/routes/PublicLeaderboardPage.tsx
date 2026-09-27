@@ -45,7 +45,7 @@ export const PublicLeaderboardPage: React.FC = () => {
 
   return (
     <TournamentLayout tournament={tournament} activeView="leaderboard">
-      <main style={{ flex: 1, padding: '1rem 0' }}>
+      <main style={{ flex: 1, padding: '2rem 1.5rem', maxWidth: '1200px', width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
         <LeaderboardTable tournament={tournament} />
       </main>
     </TournamentLayout>

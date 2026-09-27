@@ -3,7 +3,8 @@ import { Tournament, PlayerProfile } from '../../tournament/types';
 import { deriveLeaderboard, LeaderboardRankRow, calculatePoints } from '../scoring';
 import { QualifierEntryModal } from './QualifierEntryModal';
 import { PlayerDetailDrawer } from './PlayerDetailDrawer';
-import { Search, Trophy, Plus, Sparkles, ChevronRight, Check, Video, ExternalLink } from 'lucide-react';
+import { TournamentPageHeader } from '../../../components/TournamentPageHeader';
+import { Plus, Sparkles, ChevronRight, Check } from 'lucide-react';
 import { CountryFlag } from '../../players/flagUtils';
 import { PlaystyleChip } from '../../players/components/PlaystyleChip';
 import { getContrastingTextColor, getAlternateShade } from '../../bracket/colorUtils';
@@ -25,9 +26,15 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
   const [selectedRankRow, setSelectedRankRow] = useState<LeaderboardRankRow | undefined>(undefined);
 
   const allRows = deriveLeaderboard(tournament);
-  const filteredRows = allRows.filter(r =>
-    r.player.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredRows = allRows.filter(r => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      r.player.name.toLowerCase().includes(q) ||
+      (r.player.country && r.player.country.toLowerCase().includes(q)) ||
+      (r.player.playstyle && r.player.playstyle.toLowerCase().includes(q))
+    );
+  });
 
   // Calculate cutoff rank boundaries for dividers
   const sortedTiers = [...tournament.tiers].sort((a, b) => a.priority - b.priority);
@@ -50,100 +57,61 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
   return (
     <div
       style={{
-        maxWidth: isObsMode ? '100%' : '1100px',
+        width: '100%',
+        maxWidth: isObsMode ? '100%' : '1200px',
         margin: '0 auto',
-        padding: isObsMode ? '0.5rem' : '1.5rem',
+        padding: isObsMode ? '1rem' : 0,
         display: 'flex',
         flexDirection: 'column',
-        gap: '1.25rem',
+        gap: '1.5rem',
+        boxSizing: 'border-box',
       }}
     >
-      {/* Header with Search & Score Submission Button */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.2rem' }}>
-            <span
-              style={{
-                fontSize: '0.78rem',
-                fontWeight: 700,
-                color: 'var(--color-gold-bright)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.08em',
-              }}
-            >
-              Qualifying Leaderboard
-            </span>
-          </div>
-          <h1 style={{ fontSize: isObsMode ? '1.5rem' : '1.85rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '0.65rem', letterSpacing: '-0.02em', margin: 0 }}>
-            <Trophy color="var(--color-gold-bright)" size={isObsMode ? 24 : 28} />
-            {tournament.name}
-          </h1>
-          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
-            Format: <strong style={{ color: 'var(--color-gold-bright)' }}>{tournament.qualFormat === 'HIGH_SCORE' ? '# of Maxes' : tournament.qualFormat === 'AVERAGE_OF_X' ? `Average of ${targetX} Attempts` : 'Points Threshold System'}</strong>
+      {/* Header with Search, OBS Overlay, and Record Qual Score */}
+      <TournamentPageHeader
+        eyebrow="Qualifying Leaderboard"
+        title={tournament.name}
+        subtitle={
+          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', margin: 0 }}>
+            Format:{' '}
+            <strong style={{ color: 'var(--color-gold-bright)' }}>
+              {tournament.qualFormat === 'HIGH_SCORE'
+                ? '# of Maxes'
+                : tournament.qualFormat === 'AVERAGE_OF_X'
+                ? `Average of ${targetX} Attempts`
+                : 'Points Threshold System'}
+            </strong>
             {tournament.qualFormat === 'AVERAGE_OF_X' && ` (Ao${targetX})`}
             {' • '}
-            {tournament.isLocked ? 'Qualifiers Closed (Match Play in Progress)' : 'Qualifiers Open (Live Running Standings)'}
+            {tournament.isLocked
+              ? 'Qualifiers Closed (Match Play in Progress)'
+              : 'Qualifiers Open (Live Running Standings)'}
           </p>
-        </div>
-
-        {!isObsMode && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-            {/* Competitor Search */}
-            <div style={{ position: 'relative', width: '220px' }}>
-              <Search
-                size={15}
-                style={{
-                  position: 'absolute',
-                  left: '0.65rem',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: 'var(--color-text-muted)',
-                }}
-              />
-              <input
-                type="text"
-                placeholder="Search competitor..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.45rem 0.65rem 0.45rem 2rem',
-                  fontSize: '0.85rem',
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1px solid var(--color-border)',
-                  background: 'var(--color-bg-base)',
-                  color: 'var(--color-text-primary)',
-                }}
-              />
-            </div>
-
-            {/* Direct OBS Overlay Link */}
-            <a
-              href={`/${tournament.slug}/leaderboard?obs=true`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-secondary"
-              title="Open OBS broadcast overlay in new tab (stripped chrome, transparent background)"
-              style={{ fontSize: '0.8rem', padding: '0.45rem 0.75rem', gap: '0.4rem', whiteSpace: 'nowrap' }}
+        }
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder="Search competitor, country, style..."
+        obsUrl={`/${tournament.slug}/leaderboard?obs=true`}
+        action={
+          canManage ? (
+            <button
+              onClick={() => setIsEntryModalOpen(true)}
+              className="btn btn-primary"
+              style={{
+                fontSize: '0.85rem',
+                padding: '0.52rem 0.95rem',
+                gap: '0.45rem',
+                whiteSpace: 'nowrap',
+                fontWeight: 600,
+              }}
             >
-              <Video size={14} color="var(--color-gold-bright)" />
-              <span>OBS Overlay</span>
-              <ExternalLink size={12} />
-            </a>
-
-            {canManage && (
-              <button
-                onClick={() => setIsEntryModalOpen(true)}
-                className="btn btn-primary"
-                style={{ padding: '0.45rem 0.95rem', fontSize: '0.85rem', gap: '0.4rem' }}
-              >
-                <Plus size={16} />
-                Record Qual Submission
-              </button>
-            )}
-          </div>
-        )}
-      </div>
+              <Plus size={16} />
+              <span>Record Qual Score</span>
+            </button>
+          ) : undefined
+        }
+        isObsMode={isObsMode}
+      />
 
       {/* Main Leaderboard Table */}
       <div style={{ background: 'var(--color-bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', overflow: 'hidden' }}>
@@ -186,7 +154,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                 <td colSpan={tableColSpan} style={{ padding: '2.5rem 1.5rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                   {searchTerm
                     ? `No competitors found matching "${searchTerm}".`
-                    : 'No competitors registered yet. Register competitors in Settings or click "Record Qual Submission" to add a player.'}
+                    : 'No competitors registered yet. Register competitors in Settings or click "Record Qual Score" to add a player.'}
                 </td>
               </tr>
             ) : (
