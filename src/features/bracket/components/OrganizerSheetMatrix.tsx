@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Tournament, TournamentTier, MatchScoreRecord, PlayerProfile } from '../../tournament/types';
-import { BracketMatch, isMatchPlayable } from '../types';
+import { BracketMatch, isMatchPlayable, canonicalizeBracketRounds } from '../types';
 import { MatchScoreDrawer } from './MatchScoreDrawer';
 import { colorWithAlpha } from '../colorUtils';
 import { Filter, Check, ChevronDown, Clock, CheckCircle2, Sparkles } from 'lucide-react';
@@ -54,7 +54,12 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
   };
 
   // Available rounds in this tier
-  const allRounds = tier.bracket.rounds;
+  const allRounds = useMemo(() => {
+    if (tier.bracket?.rounds) {
+      canonicalizeBracketRounds(tier.bracket.rounds);
+    }
+    return tier.bracket?.rounds || [];
+  }, [tier.bracket?.rounds]);
   const roundNames = useMemo(() => allRounds.map(r => r.name), [allRounds]);
 
   const [selectedRoundFilter, setSelectedRoundFilter] = useState<'ALL' | 'IN_PROGRESS' | 'COMPLETE' | string[]>('ALL');
@@ -365,7 +370,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
 
                           {/* Round Name (RowSpan 2) */}
                           <td rowSpan={2} style={{ ...tdMergedStyle, borderTop: borderTopStyle, color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>
-                            {match.stage === 'GRAND_FINALS_RESET' ? 'Grand Finals' : (round.shortName || round.name)}
+                            {match.stage === 'GRAND_FINALS_RESET' ? 'Grand Finals Reset' : round.name}
                           </td>
 
                           {/* Best Of (RowSpan 2) */}

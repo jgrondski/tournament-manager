@@ -9,6 +9,7 @@ import {
   QualifierSubmission,
 } from './types';
 import { advanceMatchWinner, retractMatchWinner, ensureSequentialMatchNumbers } from '../bracket/math';
+import { canonicalizeBracketRounds } from '../bracket/types';
 import { generateDraftBracketsForTournament } from '../qualifiers/scoring';
 import {
   generateSimulatedQualifiers,
@@ -145,9 +146,10 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
               }
             }
 
-            // Auto-heal any tiers with non-sequential or duplicate match numbers
+            // Auto-heal round names to canonical source of truth and sequential match numbers
             tourney.tiers.forEach(tier => {
               if (tier.bracket?.rounds) {
+                canonicalizeBracketRounds(tier.bracket.rounds);
                 const matchNums = tier.bracket.rounds.flatMap(r => r.matches.map(m => m.matchNumber));
                 const uniqueNums = new Set(matchNums);
                 const hasDuplicatesOrZero = uniqueNums.size !== matchNums.length || uniqueNums.has(0);
@@ -207,6 +209,13 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const activeTournament = tournaments.find(
     t => t.id === activeTournamentId || t.slug === activeTournamentId
   );
+  if (activeTournament) {
+    activeTournament.tiers.forEach(tier => {
+      if (tier.bracket?.rounds) {
+        canonicalizeBracketRounds(tier.bracket.rounds);
+      }
+    });
+  }
 
   useEffect(() => {
     try {
@@ -225,7 +234,15 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [globalPlayers]);
 
   const getTournamentBySlug = (slug: string) => {
-    return tournaments.find(t => t.slug === slug || t.id === slug);
+    const t = tournaments.find(t => t.slug === slug || t.id === slug);
+    if (t) {
+      t.tiers.forEach(tier => {
+        if (tier.bracket?.rounds) {
+          canonicalizeBracketRounds(tier.bracket.rounds);
+        }
+      });
+    }
+    return t;
   };
 
   const getTierBySlug = (tournamentSlug: string, tierSlug: string) => {
@@ -233,6 +250,9 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (!tournament) return undefined;
     const tier = tournament.tiers.find(t => t.slug === tierSlug || t.id === tierSlug);
     if (!tier) return undefined;
+    if (tier.bracket?.rounds) {
+      canonicalizeBracketRounds(tier.bracket.rounds);
+    }
     return { tournament, tier };
   };
 

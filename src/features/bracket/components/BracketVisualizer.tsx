@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { BracketStructure, BracketMatch, isMatchPlayable, SeededPlayer, BracketRound } from '../types';
+import { BracketStructure, BracketMatch, isMatchPlayable, SeededPlayer, BracketRound, canonicalizeBracketRounds } from '../types';
 import { Tournament, TournamentTier, PlayerProfile } from '../../tournament/types';
 import { MatchScoreDrawer } from './MatchScoreDrawer';
 import {
@@ -101,7 +101,7 @@ export const getInboundChip = (
   _lowerBracketColor = '#c2410c'
 ): MicroChipData | null => {
   // Finals Rule: Suppress all incoming and outgoing routing chips for Grand Finals,
-  // Grand Finals Reset, and Championship Finals (connecting lines already represent these paths).
+  // Grand Finals Reset, and Finals (connecting lines already represent these paths).
   const isChampOpening = Boolean(isPhase2OpeningRound || match.roundIdentifier === 'CHAMP_R1');
   if (
     !isChampOpening &&
@@ -153,26 +153,26 @@ export const getInboundChip = (
       const fallbackSrc = poMatches[mIdx];
       const targetId = srcMatch?.id || slot?.sourceMatchId || fallbackSrc?.id;
       const mNum = srcMatch?.matchNumber ?? fallbackSrc?.matchNumber ?? (mIdx + 1);
-      return buildAHChip('LB', mNum, 'Qualifier', 'Lower Bracket Round 4 (Play-Offs)', targetId);
+      return buildAHChip('LB', mNum, 'Qualifier', 'Lower Bracket R4', targetId);
     }
   }
 
   if (isAcceleratedHybrid) {
-    // Lower Bracket Round 4 (PO):
-    // Slot 1: Inter-pod jump from Upper Bracket Round 2 (PRE_W2)
-    // Slot 2: Incoming horizontal connector line from 2C -> Hide chip
+    // Lower Bracket R4 (PO):
+    // Slot 1: Inter-pod jump from Upper Bracket R2 (PRE_W2)
+    // Slot 2: Incoming horizontal connector line from Lower Bracket R3 (2C) -> Hide chip
     if (match.roundIdentifier === 'PO') {
       if (slotNum === 1) {
         const preW2Matches = Object.values(bracket.matchesById).filter(m => m.roundIdentifier === 'PRE_W2');
         const fallbackSrc = preW2Matches[mIdx];
         const targetId = srcMatch?.id || slot?.sourceMatchId || fallbackSrc?.id;
         const mNum = srcMatch?.matchNumber ?? fallbackSrc?.matchNumber ?? (mIdx + 1);
-        return buildAHChip('UB', mNum, 'Winner', 'Upper Bracket Round 2', targetId);
+        return buildAHChip('UB', mNum, 'Winner', 'Upper Bracket R2', targetId);
       }
       return null;
     }
 
-    // Lower Bracket Round 3 (2C):
+    // Lower Bracket R3 (2C):
     // Slot 1: Incoming horizontal connector line from PRE_L2 -> Hide chip
     // Slot 2: Inter-pod jump from Accelerated Round losers (AR)
     if (match.roundIdentifier === '2C') {
@@ -186,25 +186,25 @@ export const getInboundChip = (
       return null;
     }
 
-    // Lower Bracket Round 2 (PRE_L2):
+    // Lower Bracket R2 (PRE_L2):
     // Slot 1: Incoming horizontal connector line from PRE_L1 -> Hide chip
-    // Slot 2: Inter-pod jump from Upper Bracket Round 1 losers (PRE_W1)
+    // Slot 2: Inter-pod jump from Upper Bracket R1 losers (PRE_W1)
     if (match.roundIdentifier === 'PRE_L2') {
       if (slotNum === 2) {
         const mNum = srcMatch?.matchNumber ?? (mIdx + 1);
-        return buildAHChip('UB', mNum, 'Dropped', 'Upper Bracket Round 1', srcId);
+        return buildAHChip('UB', mNum, 'Dropped', 'Upper Bracket R1', srcId);
       }
       return null;
     }
 
-    // Lower Bracket Round 1 (PRE_L1):
-    // Both slots entered from Upper Bracket Round 1 losers (PRE_W1 - inter-pod jump)
+    // Lower Bracket R1 (PRE_L1):
+    // Both slots entered from Upper Bracket R1 losers (PRE_W1 - inter-pod jump)
     if (match.roundIdentifier === 'PRE_L1') {
       const mNum = srcMatch?.matchNumber ?? (mIdx + 1);
-      return buildAHChip('UB', mNum, 'Dropped', 'Upper Bracket Round 1', srcId);
+      return buildAHChip('UB', mNum, 'Dropped', 'Upper Bracket R1', srcId);
     }
 
-    // Upper Bracket Round 2 (PRE_W2): Incoming visual SVG connector line from PRE_W1 -> Hide chip
+    // Upper Bracket R2 (PRE_W2): Incoming visual SVG connector line from PRE_W1 -> Hide chip
     if (match.roundIdentifier === 'PRE_W2') {
       return null;
     }
@@ -259,7 +259,7 @@ export const getOutboundChip = (
   lowerBracketColor = '#c2410c'
 ): MicroChipData | null => {
   // Finals Rule: Suppress all incoming and outgoing routing chips for Grand Finals,
-  // Grand Finals Reset, and Championship Finals (connecting lines already represent these paths).
+  // Grand Finals Reset, and Finals (connecting lines already represent these paths).
   if (
     match.stage === 'GRAND_FINALS' ||
     match.stage === 'GRAND_FINALS_RESET' ||
@@ -389,7 +389,7 @@ export const getOutboundChip = (
           const lbPalette = ACCELERATED_HYBRID_POD_PALETTE.LB;
           return {
             text: lbNum ? `${lbNum}` : '',
-            tooltip: `Drops to Lower Bracket Round 3${lbNum ? ` (Match #${lbNum})` : ''}`,
+            tooltip: `Drops to Lower Bracket R3${lbNum ? ` (Match #${lbNum})` : ''}`,
             bg: lbPalette.bgTranslucent,
             color: lbPalette.text,
             border: `1px solid ${lbPalette.border}88`,
@@ -404,7 +404,7 @@ export const getOutboundChip = (
         const lbPalette = ACCELERATED_HYBRID_POD_PALETTE.LB;
         return {
           text: lbNum ? `${lbNum}` : '',
-          tooltip: `Drops to Lower Bracket Round 3 on defeat${lbNum ? ` (Match #${lbNum})` : ''}`,
+          tooltip: `Drops to Lower Bracket R3 on defeat${lbNum ? ` (Match #${lbNum})` : ''}`,
           bg: lbPalette.bgTranslucent,
           color: lbPalette.text,
           border: `1px solid ${lbPalette.border}88`,
@@ -453,8 +453,8 @@ export const getOutboundChip = (
       return null;
     }
 
-    // 3. Upper Bracket Round 2 (PRE_W2):
-    // Winner: advances to Lower Bracket Round 4 (Play-Offs PO) -> "► LB-[MatchNumber]"
+    // 3. Upper Bracket R2 (PRE_W2):
+    // Winner: advances to Lower Bracket R4 (PO) -> "► LB-[MatchNumber]"
     // Loser: eliminated -> no chip
     if (match.roundIdentifier === 'PRE_W2') {
       if (isComplete && isThisSlotWinner) {
@@ -462,7 +462,7 @@ export const getOutboundChip = (
         const lbPalette = ACCELERATED_HYBRID_POD_PALETTE.LB;
         return {
           text: destMatch?.matchNumber ? `${destMatch.matchNumber}` : '',
-          tooltip: `Advances to Lower Bracket Round 4 (Play-Offs${destMatch?.matchNumber ? ` - Match #${destMatch.matchNumber}` : ''})`,
+          tooltip: `Advances to Lower Bracket R4${destMatch?.matchNumber ? ` - Match #${destMatch.matchNumber}` : ''}`,
           bg: lbPalette.bgTranslucent,
           color: lbPalette.text,
           border: `1px solid ${lbPalette.border}88`,
@@ -893,6 +893,9 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
   };
 
   const bracket: BracketStructure = tier.bracket;
+  if (bracket?.rounds) {
+    canonicalizeBracketRounds(bracket.rounds);
+  }
   const rounds = bracket?.rounds || [];
   const tierDefaults = getDefaultTierColors(tier);
   const primaryColor = tier.primaryColor || tierDefaults.primaryColor;
@@ -945,7 +948,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
     [rounds]
   );
 
-  // Phase 2: Top C Championship Finals (Round of C, QF, SF, Finals)
+  // Phase 2: Top C Finals (Round of C, QF, SF, Finals)
   const championshipRounds = useMemo(
     () => (rounds || []).filter((r) => r.phase === 'CHAMPIONSHIP'),
     [rounds]
@@ -1353,10 +1356,11 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
 
         {/* Round Headers */}
         {targetLayout.roundHeaders.map((header) => {
+          const nameLower = header.name.trim().toLowerCase();
           const isFinals =
-            header.isFinals ||
-            header.name.toLowerCase().includes('finals') ||
-            header.name.toLowerCase().includes('grand finals');
+            nameLower === 'finals' ||
+            nameLower === 'grand finals' ||
+            nameLower === 'grand finals reset';
           const roundObj = targetRounds.find((r) => r.roundNumber === header.roundNumber);
           const firstMatch = roundObj?.matches?.[0];
           const isLosersRound =
@@ -1537,21 +1541,21 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
               }
               if (match.roundIdentifier === '2C') {
                 return fallbackNumber === 1
-                  ? `Winner of Lower R2 M#${mIdx + 1}`
-                  : `Loser of Accel M#${p2SourceNum || mIdx + 1}`;
+                  ? `Winner of Lower Bracket R2 M#${mIdx + 1}`
+                  : `Loser of Accelerated Round M#${p2SourceNum || mIdx + 1}`;
               }
               if (match.roundIdentifier === 'PO') {
                 return fallbackNumber === 1
-                  ? `Winner of Upper R2 M#${mIdx + 1}`
-                  : `Winner of 2nd Chance M#${mIdx + 1}`;
+                  ? `Winner of Upper Bracket R2 M#${mIdx + 1}`
+                  : `Winner of Lower Bracket R3 M#${mIdx + 1}`;
               }
               if (match.roundIdentifier === 'PRE_L1') {
-                return `Loser of Upper R1`;
+                return `Loser of Upper Bracket R1`;
               }
               if (match.roundIdentifier === 'PRE_L2') {
                 return fallbackNumber === 1
-                  ? `Winner of Lower R1 M#${mIdx + 1}`
-                  : `Loser of Upper R2`;
+                  ? `Winner of Lower Bracket R1 M#${mIdx + 1}`
+                  : `Loser of Upper Bracket R1`;
               }
               if (!slot.sourceMatchId) return 'TBD';
               const src = bracket.matchesById[slot.sourceMatchId];
@@ -1617,8 +1621,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
               round.name?.toLowerCase().includes('loser') ||
               round.name?.toLowerCase().includes('lower') ||
               round.name?.startsWith('LR') ||
-              round.name?.includes('(L)') ||
-              round.shortName?.toLowerCase().includes('(l)');
+              round.name?.includes('(L)');
             const branchAccentColor = isAcceleratedHybrid
               ? getMatchBranchColor(match, lowerBracketColor)
               : isDoubleElim && isLoserMatch
@@ -2770,7 +2773,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                   <div style={{ height: '2px', flex: 1, background: `linear-gradient(to left, transparent, ${primaryColor}88)` }} />
                 </div>
 
-                {/* Stage 2: Top C Championship Finals */}
+                {/* Stage 2: Top C Finals */}
                 <div style={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.85rem' }}>
                     <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: primaryColor, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
@@ -2880,7 +2883,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
             <div style={{ height: '2px', flex: 1, background: `linear-gradient(to left, transparent, ${primaryColor}88)` }} />
           </div>
 
-          {/* Stage 2: Top C Championship Finals */}
+          {/* Stage 2: Top C Finals */}
           <div style={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.85rem' }}>
               <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: primaryColor, textTransform: 'uppercase', letterSpacing: '0.08em' }}>

@@ -1,7 +1,6 @@
 import { Tournament, TournamentTier, MatchScoreRecord, Playstyle } from './types';
-import { SeededPlayer, BracketMatch } from '../bracket/types';
+import { SeededPlayer, BracketMatch, canonicalizeBracketRounds, getCanonicalRoundName } from '../bracket/types';
 import { deriveLeaderboard, LeaderboardRankRow } from '../qualifiers/scoring';
-import { getRoundName } from '../bracket/math/seed-utils';
 
 export interface StandingsPlacement {
   rankLabel: string; // "1st Place", "2nd Place", "3rd Place", "4th Place"...
@@ -239,11 +238,149 @@ export function calculateTierStandings(
   tier: TournamentTier,
   matchScores: Record<string, MatchScoreRecord>
 ): StandingsPlacement[] {
+  if (tier.bracket?.rounds) {
+    canonicalizeBracketRounds(tier.bracket.rounds);
+  }
   const rounds = tier.bracket.rounds;
   if (rounds.length === 0) return [];
 
   const placements: StandingsPlacement[] = [];
   const placedPlayerIds = new Set<string>();
+
+  const isAcceleratedHybrid =
+    tier.bracket?.bracketRouting === 'ACCELERATED_HYBRID' ||
+    tier.bracketRouting === 'ACCELERATED_HYBRID' ||
+    tier.bracket?.rounds.some((r) => r.roundIdentifier === 'AR' || r.phase === 'CHAMPIONSHIP');
+
+  if (isAcceleratedHybrid) {
+    // 1. Finals match is the single match of the final championship round
+    const finalsRound = rounds[rounds.length - 1];
+    const finalsMatch = finalsRound?.matches[0];
+
+    if (finalsMatch) {
+      const record = matchScores[finalsMatch.id];
+      const p1 = finalsMatch.player1.player;
+      const p2 = finalsMatch.player2.player;
+      const winnerId = record?.winnerPlayerId || finalsMatch.winnerId;
+
+      if (winnerId && (winnerId === p1?.id || winnerId === p2?.id)) {
+        const champ = winnerId === p1?.id ? p1 : p2;
+        const runnerUp = winnerId === p1?.id ? p2 : p1;
+
+        if (champ && !placedPlayerIds.has(champ.id)) {
+          placements.push({
+            rankLabel: '1st Place (Champion)',
+            rankNumber: 1,
+            player: champ,
+            status: 'champion',
+          });
+          placedPlayerIds.add(champ.id);
+        }
+
+        if (runnerUp && !placedPlayerIds.has(runnerUp.id)) {
+          placements.push({
+            rankLabel: '2nd Place (Runner-up)',
+            rankNumber: 2,
+            player: runnerUp,
+            status: 'runner_up',
+          });
+          placedPlayerIds.add(runnerUp.id);
+        }
+      }
+    }
+
+    // 2. Elimination rounds in reverse chronological order:
+    // Exclude AR (Accelerated Round: non-elimination, losers drop to 2C),
+    // PRE_W* (Pre-Merge Upper: non-elimination, losers drop to Pre-Merge Lower),
+    // and finalsRound (handled above).
+    const earlierRounds = rounds.filter(
+      (r) =>
+        r !== finalsRound &&
+        r.roundIdentifier !== 'AR' &&
+        !r.roundIdentifier?.startsWith('PRE_W')
+    );
+
+    let currentRankCounter = 3;
+
+    for (let rIdx = earlierRounds.length - 1; rIdx >= 0; rIdx--) {
+      const round = earlierRounds[rIdx];
+      const roundLosers: Array<{
+        player: SeededPlayer;
+        exitGameWins: number;
+        avgLossScore: number;
+        seed: number;
+        status: StandingsPlacement['status'];
+      }> = [];
+
+      let status: StandingsPlacement['status'] = 'participant';
+      if (round.phase === 'CHAMPIONSHIP' || round.roundIdentifier?.startsWith('CHAMP_')) {
+        const champRounds = rounds.filter(
+          (r) => r.phase === 'CHAMPIONSHIP' || r.roundIdentifier?.startsWith('CHAMP_')
+        );
+        const champIndex = champRounds.indexOf(round);
+        const roundsFromChampFinals = champRounds.length - 1 - champIndex;
+        if (roundsFromChampFinals === 1) status = 'semifinalist';
+        else if (roundsFromChampFinals === 2) status = 'quarterfinalist';
+      }
+
+      for (const match of round.matches) {
+        if (match.isBye) continue;
+        const record = matchScores[match.id];
+        const loserId = record?.loserPlayerId || match.loserId;
+        const p1 = match.player1.player;
+        const p2 = match.player2.player;
+        const loser = loserId === p1?.id ? p1 : loserId === p2?.id ? p2 : null;
+        const winner = loserId === p1?.id ? p2 : loserId === p2?.id ? p1 : null;
+
+        if (loser && !placedPlayerIds.has(loser.id)) {
+          let exitWins = 0;
+          let avgLoss = 0;
+
+          if (record) {
+            const details = calculateExitDetails(
+              record,
+              match.bestOf || tier.bestOf,
+              tier.bestOf,
+              loser.id,
+              winner,
+              getCanonicalRoundName(round.name, round.roundIdentifier),
+              match
+            );
+            exitWins = details.playerWins;
+            avgLoss = details.avgLossScore;
+          }
+
+          roundLosers.push({
+            player: loser,
+            exitGameWins: exitWins,
+            avgLossScore: avgLoss,
+            seed: loser.seed || 999,
+            status,
+          });
+          placedPlayerIds.add(loser.id);
+        }
+      }
+
+      // Sort round losers by intra-round exit tiebreaker
+      roundLosers.sort((a, b) => {
+        if (b.exitGameWins !== a.exitGameWins) return b.exitGameWins - a.exitGameWins;
+        if (b.avgLossScore !== a.avgLossScore) return b.avgLossScore - a.avgLossScore;
+        return a.seed - b.seed;
+      });
+
+      for (const loserItem of roundLosers) {
+        placements.push({
+          rankLabel: getRankOrdinal(currentRankCounter),
+          rankNumber: currentRankCounter,
+          player: loserItem.player,
+          status: loserItem.status,
+        });
+        currentRankCounter++;
+      }
+    }
+
+    return placements;
+  }
 
   if (tier.eliminationType === 'DOUBLE') {
     // 1. Grand Finals Match (check reset first, then GF1)
@@ -322,7 +459,7 @@ export function calculateTierStandings(
           let avgLoss = 0;
 
           if (record) {
-            const details = calculateExitDetails(record, match.bestOf || tier.bestOf, tier.bestOf, loser.id, winner, round.shortName || round.name, match);
+            const details = calculateExitDetails(record, match.bestOf || tier.bestOf, tier.bestOf, loser.id, winner, getCanonicalRoundName(round.name, round.roundIdentifier), match);
             exitWins = details.playerWins;
             avgLoss = details.avgLossScore;
           }
@@ -407,7 +544,7 @@ export function calculateTierStandings(
   for (let rIdx = rounds.length - 2; rIdx >= 0; rIdx--) {
     const round = rounds[rIdx];
     const roundsFromFinals = rounds.length - 1 - rIdx;
-    const roundName = getRoundName(round.roundNumber, rounds.length, round.matches.length);
+    const roundName = getCanonicalRoundName(round.name, round.roundIdentifier);
 
     const roundLosers: Array<{
       player: SeededPlayer;
@@ -502,15 +639,23 @@ export function calculateGlobalStandings(tournament: Tournament): GlobalStanding
 
   // 2. Process each tier sequentially
   for (const tier of sortedTiers) {
+    if (tier.bracket?.rounds) {
+      canonicalizeBracketRounds(tier.bracket.rounds);
+    }
     const rounds = tier.bracket.rounds;
     if (rounds.length === 0) continue;
 
     const tierPlacedIds = new Set<string>();
 
+    const isAcceleratedHybrid =
+      tier.bracket?.bracketRouting === 'ACCELERATED_HYBRID' ||
+      tier.bracketRouting === 'ACCELERATED_HYBRID' ||
+      tier.bracket?.rounds.some((r) => r.roundIdentifier === 'AR' || r.phase === 'CHAMPIONSHIP');
+
     // A. Finals Round (Champion and Runner-up)
     const finalsRound = rounds[rounds.length - 1];
     let finalsMatch = finalsRound?.matches[0];
-    if (tier.eliminationType === 'DOUBLE') {
+    if (!isAcceleratedHybrid && tier.eliminationType === 'DOUBLE') {
       const gfResetMatch = Object.values(tier.bracket.matchesById).find(
         (m) => m.stage === 'GRAND_FINALS_RESET' || m.roundIdentifier === 'GF_RESET'
       );
@@ -569,9 +714,10 @@ export function calculateGlobalStandings(tournament: Tournament): GlobalStanding
           const champWins = isChampP1 ? (record?.player1Wins || 0) : (record?.player2Wins || 0);
           const oppWins = isChampP1 ? (record?.player2Wins || 0) : (record?.player1Wins || 0);
 
+          const finalsRoundName = getCanonicalRoundName(finalsRound.name, finalsRound.roundIdentifier);
           const exitDetails: ExitMatchDetails = {
             matchId: finalsMatch.id,
-            roundName: 'Finals',
+            roundName: finalsRoundName,
             scoreDisplay: `${champWins}–${oppWins}`,
             playerWins: champWins,
             opponentWins: oppWins,
@@ -608,8 +754,9 @@ export function calculateGlobalStandings(tournament: Tournament): GlobalStanding
         // Runner-up
         if (runnerUp && !placedPlayerIds.has(runnerUp.id)) {
           const stats = calculatePlayerStats(tournament, runnerUp.id);
+          const finalsRoundName = getCanonicalRoundName(finalsRound.name, finalsRound.roundIdentifier);
           const exitDetails = record
-            ? calculateExitDetails(record, finalsMatch.bestOf || tier.bestOf, tier.bestOf, runnerUp.id, champ, 'Finals', finalsMatch)
+            ? calculateExitDetails(record, finalsMatch.bestOf || tier.bestOf, tier.bestOf, runnerUp.id, champ, finalsRoundName, finalsMatch)
             : undefined;
           const qualRank = qualRankMap.get(runnerUp.id);
           const finalRank = currentRank++;
@@ -627,7 +774,7 @@ export function calculateGlobalStandings(tournament: Tournament): GlobalStanding
               playstyle: runnerUpProfile?.playstyle,
             },
             tier,
-            eliminationRound: 'Finals',
+            eliminationRound: finalsRoundName,
             exitDetails,
             stats,
             qualScore: qualScoreMap.get(runnerUp.id),
@@ -643,17 +790,20 @@ export function calculateGlobalStandings(tournament: Tournament): GlobalStanding
     }
 
     // B. Earlier Elimination Rounds
-    const earlierRounds =
-      tier.eliminationType === 'DOUBLE'
-        ? tier.bracket.rounds.filter((r) => r.stage === 'LOSERS' || r.roundIdentifier?.startsWith('L'))
-        : rounds.slice(0, rounds.length - 1);
+    const earlierRounds = isAcceleratedHybrid
+      ? rounds.filter(
+          (r) =>
+            r !== finalsRound &&
+            r.roundIdentifier !== 'AR' &&
+            !r.roundIdentifier?.startsWith('PRE_W')
+        )
+      : tier.eliminationType === 'DOUBLE'
+      ? tier.bracket.rounds.filter((r) => r.stage === 'LOSERS' || r.roundIdentifier?.startsWith('L'))
+      : rounds.slice(0, rounds.length - 1);
 
     for (let rIdx = earlierRounds.length - 1; rIdx >= 0; rIdx--) {
       const round = earlierRounds[rIdx];
-      const roundName =
-        tier.eliminationType === 'DOUBLE'
-          ? (round.shortName || round.name)
-          : getRoundName(round.roundNumber, rounds.length, round.matches.length);
+      const roundName = getCanonicalRoundName(round.name, round.roundIdentifier);
       const eliminatedInRound: EliminatedCompetitor[] = [];
 
       for (const match of round.matches) {

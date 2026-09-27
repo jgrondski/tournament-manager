@@ -379,53 +379,63 @@ describe('Double Elimination Bracket Generators', () => {
       const arRound = bracket.rounds.find((r) => r.roundIdentifier === 'AR');
       expect(arRound).toBeDefined();
       expect(arRound!.matches.length).toBe(8);
+      expect(arRound!.name).toBe('Accelerated Round');
 
       // Phase 1: Pre-Merge Double Elimination for seeds 17..48 (32 players)
       // Upper Round 1 (16 matches) -> Upper Round 2 (8 matches / Halting Upper)
       const preW1 = bracket.rounds.find((r) => r.roundIdentifier === 'PRE_W1');
       expect(preW1).toBeDefined();
       expect(preW1!.matches.length).toBe(16);
+      expect(preW1!.name).toBe('Upper Bracket R1');
 
       const preW2 = bracket.rounds.find((r) => r.roundIdentifier === 'PRE_W2');
       expect(preW2).toBeDefined();
       expect(preW2!.matches.length).toBe(8);
+      expect(preW2!.name).toBe('Upper Bracket R2');
 
       // Lower Round 1 (8 matches) -> Lower Round 2 (8 matches / Halting Lower)
       const preL1 = bracket.rounds.find((r) => r.roundIdentifier === 'PRE_L1');
       expect(preL1).toBeDefined();
       expect(preL1!.matches.length).toBe(8);
+      expect(preL1!.name).toBe('Lower Bracket R1');
 
       const preL2 = bracket.rounds.find((r) => r.roundIdentifier === 'PRE_L2');
       expect(preL2).toBeDefined();
       expect(preL2!.matches.length).toBe(8);
+      expect(preL2!.name).toBe('Lower Bracket R2');
 
       // 2nd Chance Round: 8 Lower survivors (Slot A) vs 8 Accelerated losers (Slot B)
       const secondChanceRound = bracket.rounds.find((r) => r.roundIdentifier === '2C');
       expect(secondChanceRound).toBeDefined();
       expect(secondChanceRound!.matches.length).toBe(8);
+      expect(secondChanceRound!.name).toBe('Lower Bracket R3');
 
       // Play-Offs: 8 Upper qualifiers (Slot A) vs 8 2nd Chance winners (Slot B)
       const playOffRound = bracket.rounds.find((r) => r.roundIdentifier === 'PO');
       expect(playOffRound).toBeDefined();
       expect(playOffRound!.matches.length).toBe(8);
+      expect(playOffRound!.name).toBe('Lower Bracket R4');
 
       // Phase 2: Clean 16-player Single-Elimination tree (Round of 16 -> Quarters -> Semis -> Finals)
       const champR1 = bracket.rounds.find((r) => r.roundIdentifier === 'CHAMP_R1');
       expect(champR1).toBeDefined();
       expect(champR1!.matches.length).toBe(8);
+      expect(champR1!.name).toBe('Round of 16');
 
       const champR2 = bracket.rounds.find((r) => r.roundIdentifier === 'CHAMP_R2');
       expect(champR2).toBeDefined();
       expect(champR2!.matches.length).toBe(4);
+      expect(champR2!.name).toBe('Quarterfinals');
 
       const champR3 = bracket.rounds.find((r) => r.roundIdentifier === 'CHAMP_R3');
       expect(champR3).toBeDefined();
       expect(champR3!.matches.length).toBe(2);
+      expect(champR3!.name).toBe('Semifinals');
 
       const champFinals = bracket.rounds.find((r) => r.roundIdentifier === 'CHAMP_R4');
       expect(champFinals).toBeDefined();
       expect(champFinals!.matches.length).toBe(1);
-      expect(champFinals!.name).toBe('Championship Finals');
+      expect(champFinals!.name).toBe('Finals');
 
       // Verify Phase & subTrack tagging across all constituent stages
       arRound!.matches.forEach((m) => {
@@ -601,7 +611,7 @@ describe('Double Elimination Bracket Generators', () => {
   });
 
   describe('Double Elimination Round Naming & Prioritization', () => {
-    it('names rounds prioritizing Quarters, Semis, Finals, Top 6 and full words on bracket with shortName for tables', () => {
+    it('names rounds prioritizing Quarters, Semis, Finals, and Top 6 as the canonical source of truth', () => {
       const players = createPlayers(16);
       const bracket = generateFlatDoubleElim(players, 4);
 
@@ -611,33 +621,21 @@ describe('Double Elimination Bracket Generators', () => {
 
       // Winners rounds: W1, W2, Winners Quarters, Winners Semis, Winners Finals
       expect(wRounds[0].name).toBe('Round 1 (Winners)');
-      expect(wRounds[0].shortName).toBe('Round 1 (W)');
       expect(wRounds[1].name).toBe('Round 2 (Winners)');
-      expect(wRounds[1].shortName).toBe('Round 2 (W)');
       expect(wRounds[2].name).toBe('Winners Quarters');
-      expect(wRounds[2].shortName).toBe('Quarters (W)');
       expect(wRounds[3].name).toBe('Winners Semis');
-      expect(wRounds[3].shortName).toBe('Semis (W)');
       expect(wRounds[4].name).toBe('Winners Finals');
-      expect(wRounds[4].shortName).toBe('Finals (W)');
 
       // Losers rounds: Round 1 (Losers), Round 2 (Losers), Loser's Top 6, Loser's Quarters, Loser's Semis, Loser's Finals
       expect(lRounds[0].name).toBe('Round 1 (Losers)');
-      expect(lRounds[0].shortName).toBe('Round 1 (L)');
       expect(lRounds[1].name).toBe('Round 2 (Losers)');
-      expect(lRounds[1].shortName).toBe('Round 2 (L)');
       expect(lRounds[2].name).toBe("Loser's Top 6");
-      expect(lRounds[2].shortName).toBe('Top 6');
       expect(lRounds[3].name).toBe("Loser's Quarters");
-      expect(lRounds[3].shortName).toBe('Quarters (L)');
       expect(lRounds[4].name).toBe("Loser's Semis");
-      expect(lRounds[4].shortName).toBe('Semis (L)');
       expect(lRounds[5].name).toBe("Loser's Finals");
-      expect(lRounds[5].shortName).toBe('Finals (L)');
 
       // Finals
       expect(gfRound.name).toBe('Finals');
-      expect(gfRound.shortName).toBe('Finals');
 
       // Verify Finals matchNumber is sequential (30), NOT match #2
       const gfMatch = gfRound.matches[0];
@@ -657,7 +655,6 @@ describe('Double Elimination Bracket Generators', () => {
       expect(wRounds[2].name).toBe('Winners Finals');
 
       expect(lRounds[0].name).toBe("Loser's Top 6");
-      expect(lRounds[0].shortName).toBe('Top 6');
       expect(lRounds[1].name).toBe("Loser's Quarters");
       expect(lRounds[2].name).toBe("Loser's Semis");
       expect(lRounds[3].name).toBe("Loser's Finals");

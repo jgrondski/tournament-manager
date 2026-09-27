@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Tournament, TournamentTier, PlayerProfile } from '../../tournament/types';
-import { BracketMatch, isMatchPlayable } from '../types';
+import { BracketMatch, isMatchPlayable, canonicalizeBracketRounds } from '../types';
 import { MatchScoreDrawer } from './MatchScoreDrawer';
 import { colorWithAlpha } from '../colorUtils';
 import { Clock, CheckCircle2, ChevronRight, Lock } from 'lucide-react';
@@ -20,7 +20,12 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
   const [hoveredPlayerKey, setHoveredPlayerKey] = useState<string | null>(null);
   const [hoveredMatchId, setHoveredMatchId] = useState<string | null>(null);
 
-  const rounds = tier.bracket.rounds;
+  const rounds = React.useMemo(() => {
+    if (tier.bracket?.rounds) {
+      canonicalizeBracketRounds(tier.bracket.rounds);
+    }
+    return tier.bracket?.rounds || [];
+  }, [tier.bracket?.rounds]);
   const isDoubleElim = tier.eliminationType === 'DOUBLE';
 
   const visibleRounds = React.useMemo(() => {
@@ -28,9 +33,29 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
       return rounds;
     }
     return rounds.filter((r) => {
-      if (selectedStage === 'WINNERS') return r.stage === 'WINNERS' || r.roundIdentifier?.startsWith('W');
-      if (selectedStage === 'LOSERS') return r.stage === 'LOSERS' || r.roundIdentifier?.startsWith('L');
-      if (selectedStage === 'GRAND_FINALS') return r.stage === 'GRAND_FINALS' || r.roundIdentifier?.startsWith('GF');
+      if (selectedStage === 'WINNERS') {
+        return (
+          (r.stage === 'WINNERS' || r.roundIdentifier?.startsWith('W') || r.roundIdentifier === 'AR' || r.roundIdentifier?.startsWith('PRE_W')) &&
+          r.roundIdentifier !== 'PO'
+        );
+      }
+      if (selectedStage === 'LOSERS') {
+        return (
+          r.stage === 'LOSERS' ||
+          r.roundIdentifier?.startsWith('L') ||
+          r.roundIdentifier?.startsWith('PRE_L') ||
+          r.roundIdentifier === '2C' ||
+          r.roundIdentifier === 'PO'
+        );
+      }
+      if (selectedStage === 'GRAND_FINALS') {
+        return (
+          r.stage === 'GRAND_FINALS' ||
+          r.roundIdentifier?.startsWith('GF') ||
+          r.phase === 'CHAMPIONSHIP' ||
+          r.roundIdentifier?.startsWith('CHAMP')
+        );
+      }
       return true;
     });
   }, [rounds, isDoubleElim, selectedStage]);
@@ -163,19 +188,26 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
             >
               {/* Card Top */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span
-                  style={{
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    padding: '0.2rem 0.55rem',
-                    borderRadius: 'var(--radius-sm)',
-                    background: colorWithAlpha(primaryColor, 0.15, 'var(--color-gold-bg)'),
-                    color: primaryColor,
-                    border: `1px solid ${colorWithAlpha(primaryColor, 0.4, 'var(--color-gold)')}`,
-                  }}
-                >
-                  Match #{match.matchNumber}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span
+                    style={{
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      padding: '0.2rem 0.55rem',
+                      borderRadius: 'var(--radius-sm)',
+                      background: colorWithAlpha(primaryColor, 0.15, 'var(--color-gold-bg)'),
+                      color: primaryColor,
+                      border: `1px solid ${colorWithAlpha(primaryColor, 0.4, 'var(--color-gold)')}`,
+                    }}
+                  >
+                    Match #{match.matchNumber}
+                  </span>
+                  {currentRound?.name && (
+                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+                      {currentRound.name}
+                    </span>
+                  )}
+                </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   {!tournament.isLocked ? (
                     <span className="badge badge-muted" title="Scores locked during Qualifiers Mode">

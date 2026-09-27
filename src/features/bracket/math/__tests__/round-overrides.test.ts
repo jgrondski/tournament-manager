@@ -89,7 +89,7 @@ describe('Round Best-of Overrides & Bo99 Support', () => {
         roundBestOfOverrides: {
           1: 1,  // Prelim Round 1: Bo1
           3: 5,  // Championship SF: Bo5
-          4: 7,  // Championship Finals: Bo7
+          4: 7,  // Finals: Bo7
         },
       });
 

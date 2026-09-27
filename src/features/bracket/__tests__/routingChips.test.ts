@@ -275,7 +275,7 @@ describe('Unified Embedded Routing Chips & Disconnected Routing Rules', () => {
       // Outbound chips in Phase 2 are suppressed (all advance via SVG lines)
       expect(getOutboundChip(1, champR1!, true, true, false, 16, bracket)).toBeNull();
 
-      // Finals Rule: Championship Finals matches suppress all chips
+      // Finals Rule: Finals matches suppress all chips
       const champFinal = Object.values(bracket.matchesById).find(
         (m) => m.phase === 'CHAMPIONSHIP' && m.roundIdentifier !== 'CHAMP_R1'
       );

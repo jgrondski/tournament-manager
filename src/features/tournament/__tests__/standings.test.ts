@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { calculateTierStandings, calculateGlobalStandings } from '../standings';
-import { generateTraditionalBracket, advanceMatchWinner } from '../../bracket/math';
+import { generateTraditionalBracket, advanceMatchWinner, generateAcceleratedHybrid } from '../../bracket/math';
 import { Tournament, TournamentTier, MatchScoreRecord, PlayerProfile } from '../types';
+import { runFullSimulation } from '../simulation';
 
 const makePlayer = (id: string, name: string, overrides: Partial<PlayerProfile> = {}): PlayerProfile => ({
   id,
@@ -1129,6 +1130,149 @@ describe('Final Standings Rollup Engine', () => {
       // Delta (p4) is 4th
       expect(tierStandings[3].player.id).toBe('p4');
       expect(tierStandings[3].rankNumber).toBe(4);
+    });
+
+    it('correctly calculates full standings for an Accelerated Hybrid bracket without place jumps or missing contenders', () => {
+      const players: PlayerProfile[] = Array.from({ length: 48 }, (_, i) => ({
+        id: `ah-p${i + 1}`,
+        name: `Competitor ${i + 1}`,
+        personalBest: 1000000 - i * 10000,
+        playstyle: 'Rolling' as const,
+      }));
+
+      const seededPlayers = players.map((p, i) => ({
+        id: p.id,
+        name: p.name,
+        seed: i + 1,
+      }));
+
+      const bracket = generateAcceleratedHybrid(seededPlayers, 16, { tierId: 'gold', bestOf: 3 });
+
+      const goldTier: TournamentTier = {
+        id: 'gold',
+        slug: 'gold',
+        name: 'Gold',
+        priority: 1,
+        bracketType: 'TRADITIONAL',
+        eliminationType: 'DOUBLE',
+        bracketRouting: 'ACCELERATED_HYBRID',
+        playerCount: 48,
+        bestOf: 3,
+        finalsCutoff: 16,
+        bracket,
+        isLocked: true,
+      };
+
+      // Also create a second tier (Silver) with 4 players to test that Silver immediately follows Gold at rank 49
+      const silverPlayers: PlayerProfile[] = Array.from({ length: 4 }, (_, i) => ({
+        id: `silver-p${i + 1}`,
+        name: `Silver Competitor ${i + 1}`,
+        personalBest: 500000 - i * 10000,
+        playstyle: 'DAS' as const,
+      }));
+
+      const silverSeededPlayers = silverPlayers.map((p, i) => ({
+        id: p.id,
+        name: p.name,
+        seed: i + 1,
+      }));
+
+      const silverTier: TournamentTier = {
+        id: 'silver',
+        slug: 'silver',
+        name: 'Silver',
+        priority: 2,
+        bracketType: 'TRADITIONAL',
+        eliminationType: 'SINGLE',
+        playerCount: 4,
+        bestOf: 3,
+        bracket: generateTraditionalBracket(silverSeededPlayers, { tierId: 'silver', bestOf: 3 }),
+        isLocked: true,
+      };
+
+      const tournament: Tournament = {
+        id: 'ah-tourney',
+        organizationId: 'org-test',
+        slug: 'ah-tourney',
+        name: 'Accelerated Hybrid Open',
+        date: '2026-09-26',
+        location: 'Arena',
+        qualFormat: 'HIGH_SCORE',
+        isLocked: false,
+        tiers: [goldTier, silverTier],
+        matchScores: {},
+        playersPool: [...players, ...silverPlayers],
+        qualifierSubmissions: [
+          ...players.map((p, i) => ({
+            id: `sub-gold-${i + 1}`,
+            tournamentId: 'ah-tourney',
+            playerId: p.id,
+            score: 1100000 - i * 10000,
+            submittedAt: Date.now() + i,
+          })),
+          ...silverPlayers.map((p, i) => ({
+            id: `sub-silver-${i + 1}`,
+            tournamentId: 'ah-tourney',
+            playerId: p.id,
+            score: 500000 - i * 10000,
+            submittedAt: Date.now() + 100 + i,
+          })),
+        ],
+        tournamentPlayers: {},
+      };
+
+      const simulated = runFullSimulation(tournament);
+      const goldSim = simulated.tiers[0];
+
+      // Test calculateTierStandings
+      const tierStandings = calculateTierStandings(goldSim, simulated.matchScores);
+      expect(tierStandings).toHaveLength(48);
+      expect(tierStandings[0].rankNumber).toBe(1);
+      expect(tierStandings[0].status).toBe('champion');
+      expect(tierStandings[1].rankNumber).toBe(2);
+      expect(tierStandings[1].status).toBe('runner_up');
+      expect(tierStandings[2].rankNumber).toBe(3);
+      expect(tierStandings[2].status).toBe('semifinalist');
+      expect(tierStandings[3].rankNumber).toBe(4);
+      expect(tierStandings[3].status).toBe('semifinalist');
+      expect(tierStandings[4].status).toBe('quarterfinalist');
+      expect(tierStandings[7].status).toBe('quarterfinalist');
+
+      // Test calculateGlobalStandings
+      const globalStandings = calculateGlobalStandings(simulated);
+      expect(globalStandings).toHaveLength(52); // 48 Gold + 4 Silver
+
+      // Ranks 1 to 48 must be continuous, all in Gold tier, none dumped into "Bracket Participant"
+      for (let i = 0; i < 48; i++) {
+        expect(globalStandings[i].finalRank).toBe(i + 1);
+        expect(globalStandings[i].tier?.id).toBe('gold');
+        expect(globalStandings[i].eliminationRound).not.toBe('Bracket Participant');
+      }
+
+      // Check stages reached
+      expect(globalStandings[0].eliminationRound).toBe('Champion');
+      expect(globalStandings[1].eliminationRound).toBe('Finals');
+      expect(globalStandings[2].eliminationRound).toBe('Semifinals');
+      expect(globalStandings[3].eliminationRound).toBe('Semifinals');
+      expect(globalStandings[4].eliminationRound).toBe('Quarterfinals');
+      expect(globalStandings[7].eliminationRound).toBe('Quarterfinals');
+      expect(globalStandings[8].eliminationRound).toBe('Round of 16');
+      expect(globalStandings[15].eliminationRound).toBe('Round of 16');
+      expect(globalStandings[16].eliminationRound).toBe('Lower Bracket R4');
+      expect(globalStandings[23].eliminationRound).toBe('Lower Bracket R4');
+      expect(globalStandings[24].eliminationRound).toBe('Lower Bracket R3');
+      expect(globalStandings[31].eliminationRound).toBe('Lower Bracket R3');
+      expect(globalStandings[32].eliminationRound).toBe('Lower Bracket R2');
+      expect(globalStandings[39].eliminationRound).toBe('Lower Bracket R2');
+      expect(globalStandings[40].eliminationRound).toBe('Lower Bracket R1');
+      expect(globalStandings[47].eliminationRound).toBe('Lower Bracket R1');
+
+      // Silver tier must start immediately at Rank 49!
+      expect(globalStandings[48].finalRank).toBe(49);
+      expect(globalStandings[48].tier?.id).toBe('silver');
+      expect(globalStandings[49].finalRank).toBe(50);
+      expect(globalStandings[50].finalRank).toBe(51);
+      expect(globalStandings[51].finalRank).toBe(52);
     });
   });
 });

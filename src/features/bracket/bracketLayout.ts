@@ -1375,17 +1375,13 @@ export function calculateDoubleElimSplitLayout(
       }
     }
 
-    // Adjust Losers Finals header Y closer to match
-    const lfMatch = losersRounds[lColCount - 1]?.matches[0];
-    const lfPos = lfMatch ? matchPositions[lfMatch.id] : undefined;
-    if (lfPos) {
-      const lfHeader = roundHeaders.find(
-        (h) => h.roundNumber === losersRounds[lColCount - 1]?.roundNumber
-      );
-      if (lfHeader) {
-        lfHeader.y = Math.max(headerY, lfPos.y - config.baseRowHeight);
-        lfHeader.isFinals = true;
-      }
+    // Line up Losers Finals header with the rest of the Loser's headers
+    const lfHeader = roundHeaders.find(
+      (h) => h.roundNumber === losersRounds[lColCount - 1]?.roundNumber
+    );
+    if (lfHeader) {
+      lfHeader.y = headerY;
+      lfHeader.isFinals = true;
     }
   }
 
@@ -2084,17 +2080,13 @@ export function calculateDoubleEliminationBracketLayout(
       .map((m) => (matchPositions[m.id] ? matchPositions[m.id].y + matchPositions[m.id].height : 0));
     losersMaxY = Math.max(...losersBottoms, losersMatchesStartY + config.matchHeight);
 
-    // Adjust Losers Finals header Y closer to match
-    const lfMatch = losersRounds[losersRounds.length - 1]?.matches[0];
-    const lfPos = lfMatch ? matchPositions[lfMatch.id] : undefined;
-    if (lfPos) {
-      const lfHeader = roundHeaders.find(
-        (h) => h.roundNumber === losersRounds[losersRounds.length - 1]?.roundNumber
-      );
-      if (lfHeader) {
-        lfHeader.y = Math.max(losersHeaderY, lfPos.y - config.baseRowHeight);
-        lfHeader.isFinals = true;
-      }
+    // Line up Losers Finals header with the rest of the Loser's headers
+    const lfHeader = roundHeaders.find(
+      (h) => h.roundNumber === losersRounds[losersRounds.length - 1]?.roundNumber
+    );
+    if (lfHeader) {
+      lfHeader.y = losersHeaderY;
+      lfHeader.isFinals = true;
     }
   }
 
@@ -3253,7 +3245,7 @@ export function calculateAcceleratedHybridAccelLayout(
   if (arRound) {
     roundHeaders.push({
       roundNumber: arRound.roundNumber,
-      name: 'Round 1',
+      name: arRound.name,
       x: col0X,
       y: upperHeaderY,
       width: config.matchWidth,
@@ -3341,7 +3333,7 @@ export function calculateAcceleratedHybridPreMergeUpperLayout(
     const r = preUpperRounds[0];
     roundHeaders.push({
       roundNumber: r.roundNumber,
-      name: 'Round 1',
+      name: r.name,
       x: col0X,
       y: headerY,
       width: config.matchWidth,
@@ -3367,7 +3359,7 @@ export function calculateAcceleratedHybridPreMergeUpperLayout(
     const r = preUpperRounds[1];
     roundHeaders.push({
       roundNumber: r.roundNumber,
-      name: 'Round 2',
+      name: r.name,
       x: col1X,
       y: headerY,
       width: config.matchWidth,
@@ -3772,7 +3764,7 @@ export function calculateAcceleratedHybridLowerBracketLayout(
     const colX = config.paddingLeft + rIdx * colStep;
     roundHeaders.push({
       roundNumber: round.roundNumber,
-      name: `Round ${rIdx + 1}`,
+      name: round.name,
       x: colX,
       y: headerY,
       width: config.matchWidth,

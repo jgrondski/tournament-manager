@@ -425,7 +425,7 @@ describe('bracketLayout calculation engine', () => {
       expect(pos.height).toBeGreaterThan(0);
     });
 
-    // Champion plaque is positioned to the right of Championship Finals
+    // Champion plaque is positioned to the right of Finals
     const finalsMatch = bracket.rounds.find(r => r.roundIdentifier === 'CHAMP_R4')!.matches[0];
     const finalsPos = layout.matchPositions[finalsMatch.id];
     expect(layout.championPosition.x).toBeGreaterThan(finalsPos.x);
@@ -481,11 +481,10 @@ describe('bracketLayout calculation engine', () => {
     expect(wfPos.y - wfHeader.y).toBe(112);
     expect(wfHeader.isFinals).toBe(true);
 
-    // Losers Finals header should sit about one match height above Losers Finals match
-    const lfMatch = bracket.rounds.find((r) => r.name === "Loser's Finals")!.matches[0];
-    const lfPos = layout.matchPositions[lfMatch.id];
+    // Losers Finals header lines up with the rest of the Loser's headers
     const lfHeader = layout.roundHeaders.find((h) => h.name === "Loser's Finals")!;
-    expect(lfPos.y - lfHeader.y).toBe(112);
+    const lR1Header = layout.roundHeaders.find((h) => h.name === "Round 1 (Losers)")!;
+    expect(lfHeader.y).toBe(lR1Header.y);
     expect(lfHeader.isFinals).toBe(true);
   });
 
@@ -640,7 +639,7 @@ describe('bracketLayout calculation engine', () => {
       // 4 single-elimination rounds (Round of 16, QF, SF, Finals)
       expect(p2Layout.roundHeaders).toHaveLength(4);
       expect(p2Layout.roundHeaders[0].name).toBe('Round of 16');
-      expect(p2Layout.roundHeaders[3].name).toBe('Championship Finals');
+      expect(p2Layout.roundHeaders[3].name).toBe('Finals');
 
       // All matches in Phase 2 have phase === 'CHAMPIONSHIP'
       Object.keys(p2Layout.matchPositions).forEach((mId) => {
@@ -672,7 +671,7 @@ describe('bracketLayout calculation engine', () => {
       expect(accelLayout.stageHeaders).toHaveLength(1);
       expect(accelLayout.stageHeaders![0].title).toBe('Accelerated Round');
       expect(accelLayout.roundHeaders).toHaveLength(1);
-      expect(accelLayout.roundHeaders[0].name).toBe('Round 1');
+      expect(accelLayout.roundHeaders[0].name).toBe('Accelerated Round');
 
       // 8 AR matches (for 16 cutoff)
       const arRound = hybridBracket.rounds.find((r) => r.roundIdentifier === 'AR')!;
@@ -747,8 +746,8 @@ describe('bracketLayout calculation engine', () => {
       expect(upperLayout.stageHeaders).toHaveLength(1);
       expect(upperLayout.stageHeaders![0].title).toBe('Upper Bracket');
       expect(upperLayout.roundHeaders).toHaveLength(2);
-      expect(upperLayout.roundHeaders[0].name).toBe('Round 1');
-      expect(upperLayout.roundHeaders[1].name).toBe('Round 2');
+      expect(upperLayout.roundHeaders[0].name).toBe('Upper Bracket R1');
+      expect(upperLayout.roundHeaders[1].name).toBe('Upper Bracket R2');
 
       // Col 0: Upper R1 (16 matches)
       const r1 = hybridBracket.rounds.find((r) => r.roundIdentifier === 'PRE_W1')!;
@@ -788,8 +787,8 @@ describe('bracketLayout calculation engine', () => {
       expect(lowerLayout.stageHeaders).toHaveLength(1);
       expect(lowerLayout.stageHeaders![0].title).toBe('Pre-Merge Lower Bracket');
       expect(lowerLayout.roundHeaders).toHaveLength(2);
-      expect(lowerLayout.roundHeaders[0].name).toBe('Pre-Merge Lower R1');
-      expect(lowerLayout.roundHeaders[1].name).toBe('Pre-Merge Lower R2');
+      expect(lowerLayout.roundHeaders[0].name).toBe('Lower Bracket R1');
+      expect(lowerLayout.roundHeaders[1].name).toBe('Lower Bracket R2');
 
       // Col 0: Lower R1 (8 matches)
       const l1 = hybridBracket.rounds.find((r) => r.roundIdentifier === 'PRE_L1')!;
@@ -829,8 +828,8 @@ describe('bracketLayout calculation engine', () => {
       expect(reClimbLayout.stageHeaders).toHaveLength(1);
       expect(reClimbLayout.stageHeaders![0].title).toBe('Re-Climb Stage (2nd Chance & Play-Offs)');
       expect(reClimbLayout.roundHeaders).toHaveLength(2);
-      expect(reClimbLayout.roundHeaders[0].name).toBe('2nd Chance Round');
-      expect(reClimbLayout.roundHeaders[1].name).toBe('Play-Offs');
+      expect(reClimbLayout.roundHeaders[0].name).toBe('Lower Bracket R3');
+      expect(reClimbLayout.roundHeaders[1].name).toBe('Lower Bracket R4');
 
       // Col 0: 2nd Chance (8 matches)
       const sc = hybridBracket.rounds.find((r) => r.roundIdentifier === '2C')!;
@@ -870,10 +869,10 @@ describe('bracketLayout calculation engine', () => {
       expect(lowerLayout.stageHeaders).toHaveLength(1);
       expect(lowerLayout.stageHeaders![0].title).toBe('Lower Bracket');
       expect(lowerLayout.roundHeaders).toHaveLength(4);
-      expect(lowerLayout.roundHeaders[0].name).toBe('Round 1');
-      expect(lowerLayout.roundHeaders[1].name).toBe('Round 2');
-      expect(lowerLayout.roundHeaders[2].name).toBe('Round 3');
-      expect(lowerLayout.roundHeaders[3].name).toBe('Round 4');
+      expect(lowerLayout.roundHeaders[0].name).toBe('Lower Bracket R1');
+      expect(lowerLayout.roundHeaders[1].name).toBe('Lower Bracket R2');
+      expect(lowerLayout.roundHeaders[2].name).toBe('Lower Bracket R3');
+      expect(lowerLayout.roundHeaders[3].name).toBe('Lower Bracket R4');
 
       // Verify all 4 rounds have 8 matches placed in ascending column X coordinates
       const r1Matches = hybridBracket.rounds.find((r) => r.roundIdentifier === 'PRE_L1')!.matches;
@@ -903,12 +902,12 @@ describe('bracketLayout calculation engine', () => {
       expect(lowerLayout.championPath).toBeUndefined();
     });
 
-    it('positions Championship Finals header about one match height above finals match with isFinals = true', () => {
+    it('positions Finals header about one match height above finals match with isFinals = true', () => {
       const p2Layout = calculateAcceleratedHybridPhase2Layout(hybridBracket);
-      const finalsRound = hybridBracket.rounds.find((r) => r.name === 'Championship Finals' || r.roundIdentifier === 'CHAMP_R4')!;
+      const finalsRound = hybridBracket.rounds.find((r) => r.name === 'Finals' || r.roundIdentifier === 'CHAMP_R4')!;
       const finalsMatch = finalsRound.matches[0];
       const finalsPos = p2Layout.matchPositions[finalsMatch.id];
-      const finalsHeader = p2Layout.roundHeaders.find((h) => h.name === 'Championship Finals')!;
+      const finalsHeader = p2Layout.roundHeaders.find((h) => h.name === 'Finals')!;
 
       expect(finalsHeader).toBeDefined();
       expect(finalsHeader.isFinals).toBe(true);

@@ -76,7 +76,8 @@ export function populateDagSlots(match: BracketMatch) {
 
 /**
  * Assigns human-friendly canonical round names prioritizing Quarters, Semis, Finals, and Top 6.
- * Provides full names for bracket cards and headers, and shortName for table views.
+ * Assigns canonical round names to Double Elimination rounds.
+ * These names serve as the single source of truth across the entire app (brackets, standings, judge, master sheet).
  */
 export function applyDoubleElimRoundNames(
   winnersRounds: BracketRound[],
@@ -89,16 +90,12 @@ export function applyDoubleElimRoundNames(
     const fromEnd = W - 1 - i;
     if (fromEnd === 0) {
       round.name = 'Winners Finals';
-      round.shortName = 'Finals (W)';
     } else if (fromEnd === 1) {
       round.name = 'Winners Semis';
-      round.shortName = 'Semis (W)';
     } else if (fromEnd === 2) {
       round.name = 'Winners Quarters';
-      round.shortName = 'Quarters (W)';
     } else {
       round.name = `Round ${i + 1} (Winners)`;
-      round.shortName = `Round ${i + 1} (W)`;
     }
   }
 
@@ -108,24 +105,18 @@ export function applyDoubleElimRoundNames(
     const fromEnd = L - 1 - j;
     if (fromEnd === 0) {
       round.name = "Loser's Finals";
-      round.shortName = 'Finals (L)';
     } else if (fromEnd === 1) {
       round.name = "Loser's Semis";
-      round.shortName = 'Semis (L)';
     } else if (fromEnd === 2) {
       round.name = "Loser's Quarters";
-      round.shortName = 'Quarters (L)';
     } else if (fromEnd === 3 && round.matches.length <= 2) {
       round.name = "Loser's Top 6";
-      round.shortName = 'Top 6';
     } else {
       round.name = `Round ${j + 1} (Losers)`;
-      round.shortName = `Round ${j + 1} (L)`;
     }
   }
 
   grandFinalsRound.name = 'Finals';
-  grandFinalsRound.shortName = 'Finals';
 }
 
 /**
@@ -655,7 +646,7 @@ export function generateTraditionalDoubleElim(
 
   gf1Match.matchNumber = globalMatchNum++;
 
-  // Apply canonical round names (Full names for bracket visualizer, shortName for tables)
+  // Apply canonical round names (Source of truth for all views)
   applyDoubleElimRoundNames(winnersRounds, losersRounds, grandFinalsRound);
 
   const allRounds = [...winnersRounds, ...losersRounds, grandFinalsRound];
@@ -1257,7 +1248,7 @@ export function generateFlatDoubleElim(
 
   gf1Match.matchNumber = globalMatchNum++;
 
-  // Apply canonical round names (Full names for bracket visualizer, shortName for tables)
+  // Apply canonical round names (Source of truth for all views)
   applyDoubleElimRoundNames(winnersRounds, losersRounds, grandFinalsRound);
 
   const allRounds = [...winnersRounds, ...losersRounds, grandFinalsRound];
@@ -1469,7 +1460,7 @@ export function generateAcceleratedHybrid(
     keptWinners.forEach((r, idx) => {
       const roundIdent = `PRE_W${idx + 1}`;
       r.roundIdentifier = roundIdent;
-      r.name = `Pre-Merge Upper R${idx + 1}`;
+      r.name = `Upper Bracket R${idx + 1}`;
       r.stage = 'WINNERS';
       r.phase = 'QUALIFIERS';
       r.roundNumber = roundNumberCounter++;
@@ -1492,7 +1483,7 @@ export function generateAcceleratedHybrid(
     keptLosers.forEach((r, idx) => {
       const roundIdent = `PRE_L${idx + 1}`;
       r.roundIdentifier = roundIdent;
-      r.name = `Pre-Merge Lower R${idx + 1}`;
+      r.name = `Lower Bracket R${idx + 1}`;
       r.stage = 'LOSERS';
       r.phase = 'QUALIFIERS';
       r.roundNumber = roundNumberCounter++;
@@ -1591,7 +1582,7 @@ export function generateAcceleratedHybrid(
 
   const secondChanceRound: BracketRound = {
     roundNumber: scRoundNumber,
-    name: '2nd Chance Round',
+    name: `Lower Bracket R${preMergeLowerRounds.length + 1}`,
     stage: 'LOSERS',
     phase: 'QUALIFIERS',
     roundIdentifier: '2C',
@@ -1622,7 +1613,7 @@ export function generateAcceleratedHybrid(
     const match: BracketMatch = {
       id,
       tierId,
-      stage: 'WINNERS',
+      stage: 'LOSERS',
       phase: 'QUALIFIERS',
       subTrack: 'RE_CLIMB',
       roundIdentifier: 'PO',
@@ -1653,8 +1644,8 @@ export function generateAcceleratedHybrid(
 
   const playOffRound: BracketRound = {
     roundNumber: poRoundNumber,
-    name: 'Play-Offs',
-    stage: 'WINNERS',
+    name: `Lower Bracket R${preMergeLowerRounds.length + 2}`,
+    stage: 'LOSERS',
     phase: 'QUALIFIERS',
     roundIdentifier: 'PO',
     matches: playOffMatches,
@@ -1692,7 +1683,7 @@ export function generateAcceleratedHybrid(
     r.roundIdentifier = roundIdent;
     r.name =
       rIdx === champBracket.rounds.length - 1
-        ? 'Championship Finals'
+        ? 'Finals'
         : rIdx === champBracket.rounds.length - 2
         ? 'Semifinals'
         : rIdx === champBracket.rounds.length - 3
@@ -1766,7 +1757,7 @@ export function generateAcceleratedHybrid(
  * Routes to:
  * - 'TRADITIONAL_TREE' (default): Traditional binary-tree double elimination
  * - 'FLAT_STAGED': AIE / CTWC DAS flat double elimination with fixed rails
- * - 'ACCELERATED_HYBRID': CTWC 2026 accelerated hybrid qualification + championship finals
+ * - 'ACCELERATED_HYBRID': CTWC 2026 accelerated hybrid qualification + finals
  */
 export function generateDoubleEliminationBracket(
   players: SeededPlayer[],
