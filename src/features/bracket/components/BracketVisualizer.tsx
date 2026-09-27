@@ -10,6 +10,7 @@ import {
   getAlternateShade,
   getTextScale,
   getDefaultTierColors,
+  colorWithAlpha,
 } from '../colorUtils';
 import {
   calculateBracketLayout,
@@ -79,14 +80,52 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
   const combinedContentRef = useRef<HTMLDivElement>(null);
   const [measuredCombinedDim, setMeasuredCombinedDim] = useState<{ w: number; h: number } | null>(null);
 
+  const journeyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const handleSlotHover = (matchId: string | null, slotNum: 1 | 2 | null) => {
+    if (journeyTimeoutRef.current) {
+      clearTimeout(journeyTimeoutRef.current);
+      journeyTimeoutRef.current = null;
+    }
     if (!matchId || !slotNum || !bracket) {
       setHoveredAncestry(null);
       return;
     }
-    const ancestry = findAncestors(matchId, slotNum, bracket, tournament.matchScores, championPlayer?.id);
-    setHoveredAncestry(ancestry);
+    journeyTimeoutRef.current = setTimeout(() => {
+      const ancestry = findAncestors(matchId, slotNum, bracket, tournament.matchScores, championPlayer?.id);
+      setHoveredAncestry(ancestry);
+    }, 200);
   };
+
+  const handleChampHover = (champPlayerId?: string | null) => {
+    if (journeyTimeoutRef.current) {
+      clearTimeout(journeyTimeoutRef.current);
+      journeyTimeoutRef.current = null;
+    }
+    if (!champPlayerId || !bracket) {
+      setHoveredAncestry(null);
+      return;
+    }
+    journeyTimeoutRef.current = setTimeout(() => {
+      const journey = findPlayerJourney(
+        champPlayerId,
+        null,
+        null,
+        bracket,
+        tournament.matchScores,
+        championPlayer?.id
+      );
+      setHoveredAncestry(journey);
+    }, 200);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (journeyTimeoutRef.current) {
+        clearTimeout(journeyTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const fitContainerRef = useRef<HTMLDivElement>(null);
 
@@ -905,6 +944,15 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
               ? `1.5px solid ${primaryColor}`
               : `1.5px solid ${secondaryColor}`;
 
+            const cardBorderTop = baseCardBorder;
+            const cardBorderBottom = baseCardBorder;
+            const cardBorderLeft = branchAccentColor
+              ? `4px solid ${hoveredAncestry && !isCardInAncestry ? `${branchAccentColor}55` : branchAccentColor}`
+              : baseCardBorder;
+            const cardBorderRight = branchAccentColor
+              ? `4px solid ${hoveredAncestry && !isCardInAncestry ? `${branchAccentColor}55` : branchAccentColor}`
+              : baseCardBorder;
+
             const p1NameColor = getHighlightedPlayerNameColor({
               isHighlightActive,
               isTargetSlot: isP1Target,
@@ -1014,7 +1062,10 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                     height: '100%',
                     background: effectiveCardBg,
                     borderRadius: '5px',
-                    border: baseCardBorder,
+                    borderTop: cardBorderTop,
+                    borderBottom: cardBorderBottom,
+                    borderLeft: cardBorderLeft,
+                    borderRight: cardBorderRight,
                     boxShadow: isFocusedMatch
                       ? `0 0 0 3px ${primaryColor}, 0 0 35px ${primaryColor}dd, 0 0 70px ${primaryColor}66`
                       : hoveredAncestry
@@ -1454,20 +1505,8 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
           >
             {/* Plaque Box */}
             <div
-              onMouseEnter={() => {
-                if (targetChampPlayer?.id) {
-                  const journey = findPlayerJourney(
-                    targetChampPlayer.id,
-                    null,
-                    null,
-                    bracket,
-                    tournament.matchScores,
-                    championPlayer?.id
-                  );
-                  setHoveredAncestry(journey);
-                }
-              }}
-              onMouseLeave={() => setHoveredAncestry(null)}
+              onMouseEnter={() => handleChampHover(targetChampPlayer?.id)}
+              onMouseLeave={() => handleChampHover(null)}
               style={{
                 width: '100%',
                 height: `${targetLayout.championPosition.height}px`,
@@ -1769,6 +1808,74 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
         flexDirection: 'column',
       }}
     >
+      {/* Tournament Name and Bracket Tier Header for OBS & In-Bracket Display */}
+      <div
+        id="bracket-broadcast-header"
+        style={{
+          width: '100%',
+          padding: isObsMode ? '0.65rem 1.25rem' : '0.75rem 1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.75rem',
+          zIndex: 35,
+          borderBottom: isObsMode && chromaHex ? 'none' : `1px solid ${colorWithAlpha(primaryColor, 0.25, 'var(--color-border)')}`,
+          background: isObsMode && chromaHex ? 'transparent' : 'rgba(15, 18, 26, 0.82)',
+          backdropFilter: isObsMode && chromaHex ? 'none' : 'blur(10px)',
+          WebkitBackdropFilter: isObsMode && chromaHex ? 'none' : 'blur(10px)',
+          boxSizing: 'border-box',
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Trophy size={isObsMode ? 18 : 20} color="var(--color-gold-bright)" />
+            <span
+              style={{
+                fontSize: isObsMode ? '1.3rem' : '1.45rem',
+                fontWeight: 800,
+                color: '#ffffff',
+                letterSpacing: '-0.02em',
+                lineHeight: 1.2,
+              }}
+            >
+              {tournament.name}
+            </span>
+          </div>
+
+          <span
+            style={{
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              padding: '0.18rem 0.65rem',
+              borderRadius: 'var(--radius-full)',
+              background: colorWithAlpha(primaryColor, 0.22),
+              color: primaryColor,
+              border: `1px solid ${colorWithAlpha(primaryColor, 0.5)}`,
+            }}
+          >
+            {tier.name}
+          </span>
+
+          <span
+            style={{
+              fontSize: '0.78rem',
+              fontWeight: 600,
+              color: 'var(--color-text-muted)',
+            }}
+          >
+            {isAcceleratedHybrid
+              ? 'Accelerated Hybrid'
+              : tier.eliminationType === 'DOUBLE'
+              ? 'Double Elimination'
+              : 'Single Elimination'}
+          </span>
+        </div>
+      </div>
+
       {/* Sticky Stage Navigation Bar for Accelerated Hybrid Tournaments */}
       {isAcceleratedHybrid && !isObsMode && (
         <div

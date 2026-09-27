@@ -160,7 +160,7 @@ export const ManageSheetPage: React.FC = () => {
         </Link>
       </div>
 
-      <main style={{ flex: 1, padding: '1.25rem 2rem', maxWidth: '1120px', width: '100%', margin: '0 auto', overflowX: 'auto' }}>
+      <main style={{ flex: 1, padding: '1.25rem 2rem', maxWidth: '100%', width: '100%', margin: '0 auto', overflowX: 'auto' }}>
         <OrganizerSheetMatrix
           tournament={tournament}
           tier={tier}

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTournament } from '../features/tournament/store';
 import { TournamentLayout } from '../components/TournamentLayout';
 import { TournamentAdminForm } from '../features/tournament/components/TournamentAdminForm';
-import { AlertTriangle, X } from 'lucide-react';
+import { AlertTriangle, X, Settings } from 'lucide-react';
 
 export const ManageTournamentSettingsPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -54,7 +54,27 @@ export const ManageTournamentSettingsPage: React.FC = () => {
       activeView="settings"
       onNavigate={handleNavigateAttempt}
     >
-      <main style={{ flex: 1, padding: '2rem 1.5rem', maxWidth: '1100px', width: '100%', margin: '0 auto' }}>
+      <main style={{ flex: 1, padding: '2rem 1.5rem', maxWidth: '1100px', width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.2rem' }}>
+            <span
+              style={{
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                color: 'var(--color-gold-bright)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+              }}
+            >
+              Tournament Administration &amp; Configuration
+            </span>
+          </div>
+          <h1 style={{ fontSize: '1.85rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '0.65rem', letterSpacing: '-0.02em', margin: 0 }}>
+            <Settings color="var(--color-gold-bright)" size={28} />
+            {tournament.name}
+          </h1>
+        </div>
+
         <TournamentAdminForm
           tournament={tournament}
           onDirtyChange={setIsDirty}

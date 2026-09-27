@@ -6,8 +6,9 @@ import {
   colorWithAlpha,
   getDefaultTierColors,
   getAlternateShade,
+  getContrastingTextColor,
 } from '../colorUtils';
-import { Filter, Check, ChevronDown, Clock, CheckCircle2, Search } from 'lucide-react';
+import { Filter, Check, ChevronDown, Clock, CheckCircle2, Search, Trophy } from 'lucide-react';
 import { PlayerDetailDrawer } from '../../qualifiers/components/PlayerDetailDrawer';
 import { CountryFlag } from '../../players/flagUtils';
 
@@ -157,6 +158,132 @@ export function getEffectiveRoundGameCount(
   return { inheritedBestOf, effectiveGameCount };
 }
 
+export type SheetDensitySize = 'xs' | 'sm' | 'md' | 'lg';
+
+export interface SheetSizeTokens {
+  colMatch: number;
+  colGamesWon: number;
+  colGame: number;
+  colComplete: number;
+  competitorLeftPad: number;
+  countrySeedWidth: number;
+  thPadding: string;
+  tdPadding: string;
+  tdMergedPadding: string;
+  gameCellPadding: string;
+  fontSizeTable: string;
+  fontSizeTh: string;
+  fontSizeMatchNum: string;
+  fontSizeSeed: string;
+  fontSizePlayerName: string;
+  fontSizeGamesWon: string;
+  fontSizeGameScore: string;
+  fontSizeStatusBadge: string;
+  flagSize: string;
+  bannerPadding: string;
+  fontSizeRoundTitle: string;
+  fontSizeRoundMeta: string;
+}
+
+export const SHEET_SIZE_CONFIG: Record<SheetDensitySize, SheetSizeTokens> = {
+  xs: {
+    colMatch: 44,
+    colGamesWon: 86,
+    colGame: 72,
+    colComplete: 74,
+    competitorLeftPad: 58,
+    countrySeedWidth: 42,
+    thPadding: '0.28rem 0.45rem',
+    tdPadding: '0.16rem 0.45rem',
+    tdMergedPadding: '0.16rem 0.45rem',
+    gameCellPadding: '0.16rem 0.25rem',
+    fontSizeTable: '0.74rem',
+    fontSizeTh: '0.65rem',
+    fontSizeMatchNum: '0.65rem',
+    fontSizeSeed: '0.58rem',
+    fontSizePlayerName: '0.76rem',
+    fontSizeGamesWon: '0.78rem',
+    fontSizeGameScore: '0.72rem',
+    fontSizeStatusBadge: '0.62rem',
+    flagSize: '0.85rem',
+    bannerPadding: '0.32rem 0.7rem',
+    fontSizeRoundTitle: '0.74rem',
+    fontSizeRoundMeta: '0.65rem',
+  },
+  sm: {
+    colMatch: 52,
+    colGamesWon: 100,
+    colGame: 86,
+    colComplete: 86,
+    competitorLeftPad: 72,
+    countrySeedWidth: 50,
+    thPadding: '0.42rem 0.65rem',
+    tdPadding: '0.24rem 0.6rem',
+    tdMergedPadding: '0.24rem 0.6rem',
+    gameCellPadding: '0.24rem 0.35rem',
+    fontSizeTable: '0.82rem',
+    fontSizeTh: '0.72rem',
+    fontSizeMatchNum: '0.72rem',
+    fontSizeSeed: '0.65rem',
+    fontSizePlayerName: '0.84rem',
+    fontSizeGamesWon: '0.88rem',
+    fontSizeGameScore: '0.80rem',
+    fontSizeStatusBadge: '0.7rem',
+    flagSize: '0.95rem',
+    bannerPadding: '0.45rem 0.85rem',
+    fontSizeRoundTitle: '0.82rem',
+    fontSizeRoundMeta: '0.72rem',
+  },
+  md: {
+    colMatch: 62,
+    colGamesWon: 114,
+    colGame: 98,
+    colComplete: 98,
+    competitorLeftPad: 82,
+    countrySeedWidth: 58,
+    thPadding: '0.55rem 0.8rem',
+    tdPadding: '0.34rem 0.75rem',
+    tdMergedPadding: '0.34rem 0.75rem',
+    gameCellPadding: '0.32rem 0.45rem',
+    fontSizeTable: '0.92rem',
+    fontSizeTh: '0.8rem',
+    fontSizeMatchNum: '0.82rem',
+    fontSizeSeed: '0.72rem',
+    fontSizePlayerName: '0.96rem',
+    fontSizeGamesWon: '1.02rem',
+    fontSizeGameScore: '0.92rem',
+    fontSizeStatusBadge: '0.78rem',
+    flagSize: '1.15rem',
+    bannerPadding: '0.58rem 1rem',
+    fontSizeRoundTitle: '0.94rem',
+    fontSizeRoundMeta: '0.8rem',
+  },
+  lg: {
+    colMatch: 72,
+    colGamesWon: 130,
+    colGame: 112,
+    colComplete: 112,
+    competitorLeftPad: 96,
+    countrySeedWidth: 66,
+    thPadding: '0.7rem 0.95rem',
+    tdPadding: '0.46rem 0.9rem',
+    tdMergedPadding: '0.46rem 0.9rem',
+    gameCellPadding: '0.44rem 0.55rem',
+    fontSizeTable: '1.04rem',
+    fontSizeTh: '0.88rem',
+    fontSizeMatchNum: '0.92rem',
+    fontSizeSeed: '0.8rem',
+    fontSizePlayerName: '1.1rem',
+    fontSizeGamesWon: '1.18rem',
+    fontSizeGameScore: '1.04rem',
+    fontSizeStatusBadge: '0.86rem',
+    flagSize: '1.32rem',
+    bannerPadding: '0.72rem 1.15rem',
+    fontSizeRoundTitle: '1.06rem',
+    fontSizeRoundMeta: '0.88rem',
+  },
+};
+
 export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tournament, tier }) => {
   const [selectedMatch, setSelectedMatch] = useState<{ match: BracketMatch; roundName: string } | null>(null);
   const [hoveredMatchId, setHoveredMatchId] = useState<string | null>(null);
@@ -165,6 +292,30 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
   const [isPlayerDrawerOpen, setIsPlayerDrawerOpen] = useState(false);
   const [hoveredPlayerKey, setHoveredPlayerKey] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Page-level Size Density Toggle ('xs' | 'sm' | 'md' | 'lg')
+  const [sheetSize, setSheetSize] = useState<SheetDensitySize>(() => {
+    try {
+      const saved = localStorage.getItem('tm_master_sheet_size');
+      if (saved === 'xs' || saved === 'sm' || saved === 'md' || saved === 'lg') {
+        return saved;
+      }
+    } catch {
+      // ignore
+    }
+    return 'md';
+  });
+
+  const handleSizeChange = (newSize: SheetDensitySize) => {
+    setSheetSize(newSize);
+    try {
+      localStorage.setItem('tm_master_sheet_size', newSize);
+    } catch {
+      // ignore
+    }
+  };
+
+  const sizeTokens = SHEET_SIZE_CONFIG[sheetSize];
 
   // Adjustable Competitor Column Width (Google Sheets style resizable)
   const [competitorColWidth, setCompetitorColWidth] = useState<number>(() => {
@@ -350,14 +501,33 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
   };
 
   const maxTableWidth = useMemo(() => {
-    if (filteredRounds.length === 0) return 52 + competitorColWidth + 100 + (3 * 86) + 86 + 2;
+    const { colMatch, colGamesWon, colGame, colComplete } = sizeTokens;
+    if (filteredRounds.length === 0) {
+      return colMatch + competitorColWidth + colGamesWon + (3 * colGame) + colComplete + 2;
+    }
     return Math.max(
       ...filteredRounds.map(r => {
         const { effectiveGameCount } = getEffectiveRoundGameCount(r, tier, tournament.matchScores);
-        return 52 + competitorColWidth + 100 + (effectiveGameCount * 86) + 86 + 2;
+        return colMatch + competitorColWidth + colGamesWon + (effectiveGameCount * colGame) + colComplete + 2;
       })
     );
-  }, [filteredRounds, tournament.matchScores, tier, competitorColWidth]);
+  }, [filteredRounds, tournament.matchScores, tier, competitorColWidth, sizeTokens]);
+
+  const currentThStyle: React.CSSProperties = {
+    ...thStyle,
+    padding: sizeTokens.thPadding,
+    fontSize: sizeTokens.fontSizeTh,
+  };
+
+  const currentTdStyle: React.CSSProperties = {
+    ...tdStyle,
+    padding: sizeTokens.tdPadding,
+  };
+
+  const currentTdMergedStyle: React.CSSProperties = {
+    ...tdMergedStyle,
+    padding: sizeTokens.tdMergedPadding,
+  };
 
   return (
     <div
@@ -372,6 +542,59 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
         boxSizing: 'border-box',
       }}
     >
+      {/* Tournament Name & Bracket Header - Left-aligned with the table */}
+      <div
+        style={{
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-start',
+          marginBottom: '0.4rem',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.2rem' }}>
+          <span
+            style={{
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              color: 'var(--color-gold-bright)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+            }}
+          >
+            Master Organizer Sheet
+          </span>
+          <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>•</span>
+          <span
+            style={{
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+              color: tier.primaryColor || 'var(--color-gold-bright)',
+            }}
+          >
+            {tier.name}
+          </span>
+        </div>
+        <h1
+          style={{
+            fontSize: '1.85rem',
+            fontWeight: 800,
+            color: '#ffffff',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.65rem',
+            letterSpacing: '-0.02em',
+            margin: 0,
+            lineHeight: 1.2,
+          }}
+        >
+          <Trophy color="var(--color-gold-bright)" size={28} />
+          {tournament.name}
+        </h1>
+      </div>
+
       {/* Top Filter & Telemetry Bar */}
       <div
         style={{
@@ -550,6 +773,58 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
             )}
           </div>
         </div>
+
+        {/* Size Density Toggle (XS / S / M / L) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexShrink: 0 }}>
+          <span
+            style={{
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              color: 'var(--color-text-muted)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+            }}
+          >
+            Size:
+          </span>
+          <div
+            style={{
+              display: 'inline-flex',
+              padding: '2px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'var(--color-bg-base)',
+              border: `1px solid ${colorWithAlpha(secondaryColor, 0.5, 'var(--color-border)')}`,
+              gap: '2px',
+            }}
+          >
+            {(['xs', 'sm', 'md', 'lg'] as const).map(s => {
+              const isCurrent = sheetSize === s;
+              const label = s === 'xs' ? 'XS' : s === 'sm' ? 'S' : s === 'md' ? 'M' : 'L';
+              const title = s === 'xs' ? 'Extra Small' : s === 'sm' ? 'Small (Default)' : s === 'md' ? 'Medium' : 'Large';
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => handleSizeChange(s)}
+                  title={`View size: ${title}`}
+                  style={{
+                    padding: '0.2rem 0.55rem',
+                    borderRadius: '2px',
+                    border: 'none',
+                    fontSize: '0.72rem',
+                    fontWeight: isCurrent ? 800 : 600,
+                    background: isCurrent ? primaryColor : 'transparent',
+                    color: isCurrent ? getContrastingTextColor(primaryColor) : 'var(--color-text-secondary)',
+                    cursor: isCurrent ? 'default' : 'pointer',
+                    transition: 'all 0.12s ease',
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {/* Main Sheet Matrix Cards */}
@@ -608,7 +883,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                 {/* Clean Round Divider Banner with Left-Only Accent Border */}
                 <div
                   style={{
-                    padding: '0.45rem 0.85rem',
+                    padding: sizeTokens.bannerPadding,
                     background: 'var(--color-bg-base)',
                     borderBottom: '1px solid var(--color-border)',
                     borderLeft: `4px solid ${roundAccentColor}`,
@@ -623,7 +898,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                     <span
                       style={{
                         fontWeight: 800,
-                        fontSize: '0.82rem',
+                        fontSize: sizeTokens.fontSizeRoundTitle,
                         color: 'var(--color-text-primary)',
                         letterSpacing: '0.04em',
                         textTransform: 'uppercase',
@@ -633,7 +908,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                     </span>
                     <span
                       style={{
-                        fontSize: '0.7rem',
+                        fontSize: sizeTokens.fontSizeRoundMeta,
                         padding: '0.12rem 0.45rem',
                         borderRadius: 'var(--radius-sm)',
                         background: 'rgba(255, 255, 255, 0.06)',
@@ -645,14 +920,14 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                     >
                       Best of {inheritedBestOf}
                     </span>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
+                    <span style={{ fontSize: sizeTokens.fontSizeRoundMeta, color: 'var(--color-text-muted)' }}>
                       • {round.filteredMatches.length} {round.filteredMatches.length === 1 ? 'Match' : 'Matches'}
                     </span>
                   </div>
                   <span
                     className="tabular-nums"
                     style={{
-                      fontSize: '0.72rem',
+                      fontSize: sizeTokens.fontSizeRoundMeta,
                       fontWeight: 600,
                       padding: '0.12rem 0.5rem',
                       borderRadius: 'var(--radius-full)',
@@ -671,6 +946,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                     style={{
                       ...tableStyle,
                       width: '100%',
+                      fontSize: sizeTokens.fontSizeTable,
                     }}
                   >
                     <thead>
@@ -680,15 +956,15 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                           borderBottom: `2px solid ${colorWithAlpha(secondaryColor, 0.6, 'var(--color-border)')}`,
                         }}
                       >
-                        <th style={{ ...thStyle, width: '52px', minWidth: '52px', maxWidth: '52px', textAlign: 'center', color: textColor }}>Match #</th>
+                        <th style={{ ...currentThStyle, width: `${sizeTokens.colMatch}px`, minWidth: `${sizeTokens.colMatch}px`, maxWidth: `${sizeTokens.colMatch}px`, textAlign: 'center', color: textColor }}>Match #</th>
                         <th
                           style={{
-                            ...thStyle,
+                            ...currentThStyle,
                             width: `${competitorColWidth}px`,
                             minWidth: `${competitorColWidth}px`,
                             maxWidth: `${competitorColWidth}px`,
                             textAlign: 'left',
-                            paddingLeft: '72px',
+                            paddingLeft: `${sizeTokens.competitorLeftPad}px`,
                             color: textColor,
                             position: 'relative',
                             userSelect: isResizingCol ? 'none' : 'auto',
@@ -731,24 +1007,23 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                             />
                           </div>
                         </th>
-                        <th style={{ ...thStyle, width: '100px', minWidth: '100px', maxWidth: '100px', textAlign: 'center', paddingRight: '14px', color: textColor }}>Games Won</th>
+                        <th style={{ ...currentThStyle, width: `${sizeTokens.colGamesWon}px`, minWidth: `${sizeTokens.colGamesWon}px`, maxWidth: `${sizeTokens.colGamesWon}px`, textAlign: 'center', paddingRight: '14px', color: textColor }}>Games Won</th>
                         {gameNumbers.map((gNum) => (
                           <th
                             key={gNum}
                             style={{
-                              ...thStyle,
-                              width: '86px',
-                              minWidth: '86px',
-                              maxWidth: '86px',
+                              ...currentThStyle,
+                              width: `${sizeTokens.colGame}px`,
+                              minWidth: `${sizeTokens.colGame}px`,
+                              maxWidth: `${sizeTokens.colGame}px`,
                               textAlign: 'center',
-                              padding: '0.42rem 0.25rem',
                               color: textColor,
                             }}
                           >
                             Game {gNum}
                           </th>
                         ))}
-                        <th style={{ ...thStyle, width: '86px', minWidth: '86px', maxWidth: '86px', textAlign: 'center', padding: '0.42rem 0.3rem', color: textColor }}>Complete</th>
+                        <th style={{ ...currentThStyle, width: `${sizeTokens.colComplete}px`, minWidth: `${sizeTokens.colComplete}px`, maxWidth: `${sizeTokens.colComplete}px`, textAlign: 'center', color: textColor }}>Complete</th>
                       </tr>
                     </thead>
 
@@ -843,21 +1118,21 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                               <td
                                 rowSpan={2}
                                 style={{
-                                  ...tdMergedStyle,
+                                  ...currentTdMergedStyle,
                                   borderTop: topBorder,
                                   borderBottom: botBorder,
                                   borderLeft: leftBorder,
                                   boxShadow: matchNumShadow,
                                   textAlign: 'center',
                                   fontWeight: 700,
-                                  width: '52px',
-                                  minWidth: '52px',
-                                  maxWidth: '52px',
+                                  width: `${sizeTokens.colMatch}px`,
+                                  minWidth: `${sizeTokens.colMatch}px`,
+                                  maxWidth: `${sizeTokens.colMatch}px`,
                                 }}
                               >
                                 <span
                                   style={{
-                                    fontSize: '0.72rem',
+                                    fontSize: sizeTokens.fontSizeMatchNum,
                                     padding: '0.12rem 0.4rem',
                                     borderRadius: 'var(--radius-sm)',
                                     fontWeight: 700,
@@ -874,7 +1149,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                               </td>
 
                               {/* Player 1 Seed & Competitor Info */}
-                              <td style={{ ...tdStyle, borderTop: topBorder, borderBottom: midBorder, boxShadow: row1Shadow, width: `${competitorColWidth}px`, minWidth: `${competitorColWidth}px`, maxWidth: `${competitorColWidth}px`, textAlign: 'left' }}>
+                              <td style={{ ...currentTdStyle, borderTop: topBorder, borderBottom: midBorder, boxShadow: row1Shadow, width: `${competitorColWidth}px`, minWidth: `${competitorColWidth}px`, maxWidth: `${competitorColWidth}px`, textAlign: 'left' }}>
                                 <div
                                   onClick={(e) => {
                                     if (p1?.id) {
@@ -900,12 +1175,12 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                                   }}
                                   title={p1?.id ? "View competitor tournament profile" : undefined}
                                 >
-                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', width: '50px', flexShrink: 0 }}>
-                                    {p1?.country && <CountryFlag country={p1.country} />}
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', width: `${sizeTokens.countrySeedWidth}px`, flexShrink: 0 }}>
+                                    {p1?.country && <CountryFlag country={p1.country} style={{ fontSize: sizeTokens.flagSize, lineHeight: 1 }} />}
                                     {p1?.seed && (
                                       <span
                                         style={{
-                                          fontSize: '0.65rem',
+                                          fontSize: sizeTokens.fontSizeSeed,
                                           padding: '0.06rem 0.28rem',
                                           borderRadius: 'var(--radius-sm)',
                                           background: colorWithAlpha(matchAccentColor, 0.12, 'rgba(255, 255, 255, 0.08)'),
@@ -923,7 +1198,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                                   <span
                                     style={{
                                       fontWeight: isComplete ? (p1IsWinner ? 800 : 400) : (p1IsWinner ? 700 : 500),
-                                      fontSize: '0.82rem',
+                                      fontSize: sizeTokens.fontSizePlayerName,
                                       color: hoveredPlayerKey === `p1-${match.id}`
                                         ? primaryColor
                                         : p1IsWinner
@@ -964,17 +1239,17 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                               {/* Player 1 Games Won Score */}
                               <td
                                 style={{
-                                  ...tdStyle,
+                                  ...currentTdStyle,
                                   borderTop: topBorder,
                                   borderBottom: midBorder,
                                   boxShadow: row1Shadow,
                                   textAlign: 'center',
                                   paddingRight: '14px',
                                   fontWeight: p1IsWinner ? 800 : 600,
-                                  fontSize: '0.85rem',
-                                  width: '100px',
-                                  minWidth: '100px',
-                                  maxWidth: '100px',
+                                  fontSize: sizeTokens.fontSizeGamesWon,
+                                  width: `${sizeTokens.colGamesWon}px`,
+                                  minWidth: `${sizeTokens.colGamesWon}px`,
+                                  maxWidth: `${sizeTokens.colGamesWon}px`,
                                 }}
                               >
                                 <span
@@ -1013,15 +1288,15 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                                   <td
                                     key={gNum}
                                     style={{
-                                      ...tdStyle,
+                                      ...currentTdStyle,
                                       borderTop: topBorder,
                                       borderBottom: midBorder,
                                       boxShadow: row1Shadow,
                                       textAlign: 'right',
-                                      padding: '0.24rem 0.35rem',
-                                      width: '86px',
-                                      minWidth: '86px',
-                                      maxWidth: '86px',
+                                      padding: sizeTokens.gameCellPadding,
+                                      width: `${sizeTokens.colGame}px`,
+                                      minWidth: `${sizeTokens.colGame}px`,
+                                      maxWidth: `${sizeTokens.colGame}px`,
                                       color: isBeyondBestOf ? 'var(--color-text-muted)' : 'var(--color-text-primary)',
                                     }}
                                   >
@@ -1038,7 +1313,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                                           color: p1WonGame ? matchAccentColor : 'var(--color-text-primary)',
                                           opacity: isLoserScore ? 0.45 : 1,
                                           fontWeight: p1WonGame ? 700 : 400,
-                                          fontSize: '0.78rem',
+                                          fontSize: sizeTokens.fontSizeGameScore,
                                           fontFamily: 'var(--font-mono)',
                                           border: p1WonGame ? `1px solid ${colorWithAlpha(matchAccentColor, 0.38, 'transparent')}` : '1px solid transparent',
                                           display: 'inline-block',
@@ -1058,16 +1333,15 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                               <td
                                 rowSpan={2}
                                 style={{
-                                  ...tdMergedStyle,
+                                  ...currentTdMergedStyle,
                                   borderTop: topBorder,
                                   borderBottom: botBorder,
                                   borderRight: rightBorder,
                                   boxShadow: completeShadow,
                                   textAlign: 'center',
-                                  padding: '0.24rem 0.4rem',
-                                  width: '86px',
-                                  minWidth: '86px',
-                                  maxWidth: '86px',
+                                  width: `${sizeTokens.colComplete}px`,
+                                  minWidth: `${sizeTokens.colComplete}px`,
+                                  maxWidth: `${sizeTokens.colComplete}px`,
                                 }}
                               >
                                 {status.type === 'complete' && (
@@ -1092,7 +1366,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                                 {status.type === 'in_progress' && (
                                   <span
                                     style={{
-                                      fontSize: '0.7rem',
+                                      fontSize: sizeTokens.fontSizeStatusBadge,
                                       fontWeight: 700,
                                       padding: '0.12rem 0.45rem',
                                       borderRadius: 'var(--radius-full)',
@@ -1122,7 +1396,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                                   <span
                                     style={{
                                       color: 'var(--color-text-muted)',
-                                      fontSize: '0.75rem',
+                                      fontSize: sizeTokens.fontSizeStatusBadge,
                                       opacity: 0.35,
                                     }}
                                     title="Waiting"
@@ -1153,7 +1427,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                               }}
                             >
                               {/* Player 2 Seed & Competitor Info */}
-                              <td style={{ ...tdStyle, borderBottom: botBorder, boxShadow: row2Shadow, width: `${competitorColWidth}px`, minWidth: `${competitorColWidth}px`, maxWidth: `${competitorColWidth}px`, textAlign: 'left' }}>
+                              <td style={{ ...currentTdStyle, borderBottom: botBorder, boxShadow: row2Shadow, width: `${competitorColWidth}px`, minWidth: `${competitorColWidth}px`, maxWidth: `${competitorColWidth}px`, textAlign: 'left' }}>
                                 <div
                                   onClick={(e) => {
                                     if (p2?.id) {
@@ -1179,12 +1453,12 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                                   }}
                                   title={p2?.id ? "View competitor tournament profile" : undefined}
                                 >
-                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', width: '50px', flexShrink: 0 }}>
-                                    {p2?.country && <CountryFlag country={p2.country} />}
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', width: `${sizeTokens.countrySeedWidth}px`, flexShrink: 0 }}>
+                                    {p2?.country && <CountryFlag country={p2.country} style={{ fontSize: sizeTokens.flagSize, lineHeight: 1 }} />}
                                     {p2?.seed && (
                                       <span
                                         style={{
-                                          fontSize: '0.65rem',
+                                          fontSize: sizeTokens.fontSizeSeed,
                                           padding: '0.06rem 0.28rem',
                                           borderRadius: 'var(--radius-sm)',
                                           background: colorWithAlpha(matchAccentColor, 0.12, 'rgba(255, 255, 255, 0.08)'),
@@ -1202,7 +1476,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                                   <span
                                     style={{
                                       fontWeight: isComplete ? (p2IsWinner ? 800 : 400) : (p2IsWinner ? 700 : 500),
-                                      fontSize: '0.82rem',
+                                      fontSize: sizeTokens.fontSizePlayerName,
                                       color: hoveredPlayerKey === `p2-${match.id}`
                                         ? primaryColor
                                         : p2IsWinner
@@ -1243,16 +1517,16 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                               {/* Player 2 Games Won Score */}
                               <td
                                 style={{
-                                  ...tdStyle,
+                                  ...currentTdStyle,
                                   borderBottom: botBorder,
                                   boxShadow: row2Shadow,
                                   textAlign: 'center',
                                   paddingRight: '14px',
                                   fontWeight: p2IsWinner ? 800 : 600,
-                                  fontSize: '0.85rem',
-                                  width: '100px',
-                                  minWidth: '100px',
-                                  maxWidth: '100px',
+                                  fontSize: sizeTokens.fontSizeGamesWon,
+                                  width: `${sizeTokens.colGamesWon}px`,
+                                  minWidth: `${sizeTokens.colGamesWon}px`,
+                                  maxWidth: `${sizeTokens.colGamesWon}px`,
                                 }}
                               >
                                 <span
@@ -1291,14 +1565,14 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                                   <td
                                     key={gNum}
                                     style={{
-                                      ...tdStyle,
+                                      ...currentTdStyle,
                                       borderBottom: botBorder,
                                       boxShadow: row2Shadow,
                                       textAlign: 'right',
-                                      padding: '0.24rem 0.35rem',
-                                      width: '86px',
-                                      minWidth: '86px',
-                                      maxWidth: '86px',
+                                      padding: sizeTokens.gameCellPadding,
+                                      width: `${sizeTokens.colGame}px`,
+                                      minWidth: `${sizeTokens.colGame}px`,
+                                      maxWidth: `${sizeTokens.colGame}px`,
                                       color: isBeyondBestOf ? 'var(--color-text-muted)' : 'var(--color-text-primary)',
                                     }}
                                   >
@@ -1315,7 +1589,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                                           color: p2WonGame ? matchAccentColor : 'var(--color-text-primary)',
                                           opacity: isLoserScore ? 0.45 : 1,
                                           fontWeight: p2WonGame ? 700 : 400,
-                                          fontSize: '0.78rem',
+                                          fontSize: sizeTokens.fontSizeGameScore,
                                           fontFamily: 'var(--font-mono)',
                                           border: p2WonGame ? `1px solid ${colorWithAlpha(matchAccentColor, 0.38, 'transparent')}` : '1px solid transparent',
                                           display: 'inline-block',

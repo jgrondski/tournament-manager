@@ -68,8 +68,19 @@ export const BracketTierBar: React.FC<BracketTierBarProps> = ({
         userSelect: 'none',
       }}
     >
-      {/* Left: Tier Filter Chips */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+      {/* Left: Tournament Name & Tier Filter Chips */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <span style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-gold-bright)', lineHeight: 1 }}>
+            Tournament
+          </span>
+          <span style={{ fontSize: '1.05rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em', lineHeight: 1.25 }}>
+            {tournament.name}
+          </span>
+        </div>
+
+        <div style={{ height: '22px', width: '1px', background: 'var(--color-border)', margin: '0 0.15rem' }} />
+
         <span
           style={{
             fontSize: '0.7rem',

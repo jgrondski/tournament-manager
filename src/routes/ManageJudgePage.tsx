@@ -161,6 +161,21 @@ export const ManageJudgePage: React.FC = () => {
       </div>
 
       <main style={{ flex: 1, padding: '0.75rem 0.5rem', width: '100%', maxWidth: '520px', margin: '0 auto', boxSizing: 'border-box' }}>
+        <div style={{ marginBottom: '0.85rem', padding: '0 0.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.15rem' }}>
+            <span style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-gold-bright)' }}>
+              Judge's Score Sheet
+            </span>
+            <span style={{ color: 'var(--color-text-muted)', fontSize: '0.7rem' }}>•</span>
+            <span style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: tier.primaryColor || 'var(--color-gold-bright)' }}>
+              {tier.name}
+            </span>
+          </div>
+          <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#ffffff', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.25 }}>
+            {tournament.name}
+          </h1>
+        </div>
+
         <MatchCardFeed
           tournament={tournament}
           tier={tier}

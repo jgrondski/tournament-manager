@@ -66,19 +66,33 @@ export const OBSHubPage: React.FC = () => {
         {/* Hub Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1.25rem' }}>
           <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.2rem' }}>
+              <span
+                style={{
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  color: 'var(--color-gold-bright)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                }}
+              >
+                Broadcast &amp; OBS Studio Hub
+              </span>
+            </div>
             <h1
               style={{
-                fontSize: '1.65rem',
+                fontSize: '1.85rem',
                 fontWeight: 800,
-                color: 'var(--color-text-primary)',
+                color: '#ffffff',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.65rem',
+                letterSpacing: '-0.02em',
                 margin: 0,
               }}
             >
-              <Video color="var(--color-gold-bright)" size={26} />
-              Broadcast & OBS Studio
+              <Video color="var(--color-gold-bright)" size={28} />
+              {tournament.name}
             </h1>
             <p style={{ fontSize: '0.88rem', color: 'var(--color-text-muted)', margin: '0.35rem 0 0 0', maxWidth: '650px' }}>
               Clean, transparent browser sources tailored for OBS Studio, vMix, and Twitch streams. Click any card to copy the URL or test in a popout window.

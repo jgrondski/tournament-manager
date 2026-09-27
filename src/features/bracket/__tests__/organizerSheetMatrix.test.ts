@@ -4,6 +4,7 @@ import {
   getAbbreviatedRoundName,
   getInheritedRoundBestOf,
   getEffectiveRoundGameCount,
+  SHEET_SIZE_CONFIG,
 } from '../components/OrganizerSheetMatrix';
 import { BracketMatch } from '../types';
 import { MatchScoreRecord, TournamentTier } from '../../tournament/types';
@@ -239,3 +240,40 @@ describe('OrganizerSheetMatrix - Dynamic Round Best-Of & Game Columns', () => {
     expect(res.effectiveGameCount).toBe(5);
   });
 });
+
+describe('OrganizerSheetMatrix - SHEET_SIZE_CONFIG', () => {
+  it('provides complete configurations for xs, sm, md, and lg densities', () => {
+    const densities = ['xs', 'sm', 'md', 'lg'] as const;
+    for (const d of densities) {
+      expect(SHEET_SIZE_CONFIG[d]).toBeDefined();
+      expect(SHEET_SIZE_CONFIG[d].colMatch).toBeGreaterThan(0);
+      expect(SHEET_SIZE_CONFIG[d].colGamesWon).toBeGreaterThan(0);
+      expect(SHEET_SIZE_CONFIG[d].colGame).toBeGreaterThan(0);
+      expect(SHEET_SIZE_CONFIG[d].colComplete).toBeGreaterThan(0);
+      expect(SHEET_SIZE_CONFIG[d].fontSizePlayerName).toBeDefined();
+      expect(SHEET_SIZE_CONFIG[d].thPadding).toBeDefined();
+      expect(SHEET_SIZE_CONFIG[d].tdPadding).toBeDefined();
+    }
+  });
+
+  it('maintains strict progressive scaling across density tiers', () => {
+    const { xs, sm, md, lg } = SHEET_SIZE_CONFIG;
+    // Col widths scale progressively
+    expect(xs.colMatch).toBeLessThan(sm.colMatch);
+    expect(sm.colMatch).toBeLessThan(md.colMatch);
+    expect(md.colMatch).toBeLessThan(lg.colMatch);
+
+    expect(xs.colGamesWon).toBeLessThan(sm.colGamesWon);
+    expect(sm.colGamesWon).toBeLessThan(md.colGamesWon);
+    expect(md.colGamesWon).toBeLessThan(lg.colGamesWon);
+
+    expect(xs.colGame).toBeLessThan(sm.colGame);
+    expect(sm.colGame).toBeLessThan(md.colGame);
+    expect(md.colGame).toBeLessThan(lg.colGame);
+
+    expect(xs.colComplete).toBeLessThan(sm.colComplete);
+    expect(sm.colComplete).toBeLessThan(md.colComplete);
+    expect(md.colComplete).toBeLessThan(lg.colComplete);
+  });
+});
+

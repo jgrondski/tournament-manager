@@ -218,6 +218,22 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
         {/* Header */}
         <div style={headerStyle}>
           <div>
+            {/* Prominently displayed Tournament Name */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.35rem' }}>
+              <Trophy size={13} color="var(--color-gold-bright)" />
+              <span
+                style={{
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  color: 'var(--color-gold-bright)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                }}
+              >
+                {tournament.name}
+              </span>
+            </div>
+
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
               {/* Final Place Badge (if determined) */}
               {finalPlace !== '—' && (

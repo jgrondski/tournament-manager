@@ -115,12 +115,25 @@ export const ManageTournamentPlayersPage: React.FC = () => {
         {/* Header Section */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
-            <h1 style={{ fontSize: '1.6rem', fontWeight: 700, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <Users color="var(--color-gold-bright)" size={26} />
-              Tournament Competitor Roster
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.2rem' }}>
+              <span
+                style={{
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  color: 'var(--color-gold-bright)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                }}
+              >
+                Competitor Roster
+              </span>
+            </div>
+            <h1 style={{ fontSize: '1.85rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '0.65rem', letterSpacing: '-0.02em', margin: 0 }}>
+              <Users color="var(--color-gold-bright)" size={28} />
+              {tournament.name}
             </h1>
-            <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
-              Manage registered competitors for <strong style={{ color: 'var(--color-text-primary)' }}>{tournament.name}</strong>. Players registered here can submit qualifier scores and seed into tournament brackets.
+            <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', marginTop: '0.35rem' }}>
+              Manage registered competitors and seeding for this tournament. Players registered here can submit qualifier scores and seed into tournament brackets.
             </p>
           </div>
 

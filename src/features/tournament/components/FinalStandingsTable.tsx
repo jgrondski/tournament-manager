@@ -8,10 +8,8 @@ import { CountryFlag } from '../../players/flagUtils';
 import { PlaystyleChip } from '../../players/components/PlaystyleChip';
 import {
   Trophy,
-  User,
   Layers,
   Search,
-  Swords,
   TrendingUp,
   TrendingDown,
   Minus,
@@ -56,11 +54,6 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
 
   // Derive summary metrics
   const totalCompetitors = globalRows.length;
-  const championRow = globalRows.find(r => r.finalRank === 1);
-  const champThemeColor = championRow?.tier?.primaryColor || tournament.tiers[0]?.primaryColor || 'var(--color-gold-bright)';
-  const completedMatchesCount = useMemo(() => {
-    return Object.values(tournament.matchScores || {}).filter(m => m.isComplete).length;
-  }, [tournament.matchScores]);
 
   // Section / Tier counts for filter chips
   const tierCounts = useMemo(() => {
@@ -241,15 +234,36 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
   return (
     <div style={{ maxWidth: isObsMode ? '100%' : '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Header & Title */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: isObsMode ? '1.45rem' : '1.65rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '0.65rem', letterSpacing: '-0.01em' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.2rem' }}>
+            <span
+              style={{
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                color: 'var(--color-gold-bright)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+              }}
+            >
+              Tournament Standings
+            </span>
+          </div>
+          <h1
+            style={{
+              fontSize: isObsMode ? '1.5rem' : '1.85rem',
+              fontWeight: 800,
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.65rem',
+              letterSpacing: '-0.02em',
+              margin: 0,
+            }}
+          >
             <Trophy color="var(--color-gold-bright)" size={isObsMode ? 24 : 28} />
-            Tournament Standings
+            {tournament.name}
           </h1>
-          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginTop: '0.25rem', maxWidth: '650px', lineHeight: 1.5 }}>
-            Official global tournament rankings determined through bracket completion and the Competitive Intra-Round Exit Tiebreaker engine.
-          </p>
         </div>
 
         {!isObsMode && (
@@ -291,179 +305,6 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
             </a>
           </div>
         )}
-      </div>
-
-      {/* Overview Stat Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-        {/* Champion Card */}
-        <div
-          style={{
-            background: championRow
-              ? `linear-gradient(135deg, ${colorWithAlpha(champThemeColor, 0.16, 'rgba(245, 158, 11, 0.16)')} 0%, ${colorWithAlpha(champThemeColor, 0.04, 'rgba(245, 158, 11, 0.04)')} 100%)`
-              : 'var(--color-bg-surface)',
-            border: championRow ? `1px solid ${colorWithAlpha(champThemeColor, 0.4, 'rgba(245, 158, 11, 0.4)')}` : '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '1.1rem 1.25rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem',
-            boxShadow: championRow ? `0 0 15px ${colorWithAlpha(champThemeColor, 0.12, 'rgba(245, 158, 11, 0.12)')}` : 'none',
-          }}
-        >
-          <div
-            style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '50%',
-              background: championRow ? colorWithAlpha(champThemeColor, 0.2, 'rgba(245, 158, 11, 0.2)') : 'var(--color-bg-surface-elevated)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: championRow ? champThemeColor : 'var(--color-text-muted)',
-              flexShrink: 0,
-            }}
-          >
-            <Trophy size={22} />
-          </div>
-          <div style={{ overflow: 'hidden' }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Tournament Champion
-            </div>
-            <div
-              style={{
-                fontSize: '1.1rem',
-                fontWeight: 800,
-                color: championRow ? champThemeColor : 'var(--color-text-secondary)',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-              }}
-            >
-              {championRow ? (
-                <>
-                  <CountryFlag country={championRow.player.country} />
-                  <span>{championRow.player.name}</span>
-                </>
-              ) : (
-                'In Progress'
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Total Competitors */}
-        <div
-          style={{
-            background: 'var(--color-bg-surface)',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '1.1rem 1.25rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem',
-          }}
-        >
-          <div
-            style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '50%',
-              background: 'rgba(56, 189, 248, 0.12)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#38bdf8',
-              flexShrink: 0,
-            }}
-          >
-            <User size={22} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Total Competitors
-            </div>
-            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ffffff' }} className="tabular-nums">
-              {totalCompetitors}
-            </div>
-          </div>
-        </div>
-
-        {/* Completed Matches */}
-        <div
-          style={{
-            background: 'var(--color-bg-surface)',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '1.1rem 1.25rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem',
-          }}
-        >
-          <div
-            style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '50%',
-              background: 'rgba(168, 85, 247, 0.12)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#c084fc',
-              flexShrink: 0,
-            }}
-          >
-            <Swords size={22} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Completed Matches
-            </div>
-            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ffffff' }} className="tabular-nums">
-              {completedMatchesCount}
-            </div>
-          </div>
-        </div>
-
-        {/* Tiers Active */}
-        <div
-          style={{
-            background: 'var(--color-bg-surface)',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '1.1rem 1.25rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem',
-          }}
-        >
-          <div
-            style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '50%',
-              background: 'rgba(16, 185, 129, 0.12)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#34d399',
-              flexShrink: 0,
-            }}
-          >
-            <Layers size={22} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Tournament Tiers
-            </div>
-            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ffffff' }} className="tabular-nums">
-              {tournament.tiers.length}
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Section Filter Pills */}
@@ -772,87 +613,78 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
 
                         {/* 2. Competitor Info */}
                         <td style={tdStyle}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
-                              <CountryFlag country={row.player.country} />
-                              <button
-                                type="button"
-                                onClick={() => handlePlayerClick(row.player.id, row.player.name, row.player.country, row.player.playstyle)}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
+                            <CountryFlag country={row.player.country} style={{ fontSize: '1.25rem', lineHeight: 1 }} />
+                            <button
+                              type="button"
+                              onClick={() => handlePlayerClick(row.player.id, row.player.name, row.player.country, row.player.playstyle)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                padding: 0,
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                fontWeight: 700,
+                                color: '#ffffff',
+                                fontSize: '1rem',
+                                textDecoration: 'none',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                transition: 'color 0.15s ease',
+                              }}
+                              onMouseEnter={e => {
+                                e.currentTarget.style.color = tierColor;
+                                e.currentTarget.style.textDecoration = 'underline';
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.color = '#ffffff';
+                                e.currentTarget.style.textDecoration = 'none';
+                              }}
+                              title="View player tournament profile"
+                            >
+                              {row.player.name}
+                            </button>
+
+                            {row.player.playstyle && (
+                              <PlaystyleChip style={row.player.playstyle} size="md" />
+                            )}
+
+                            {isOverallChamp && (
+                              <span
                                 style={{
-                                  background: 'none',
-                                  border: 'none',
-                                  padding: 0,
-                                  cursor: 'pointer',
-                                  textAlign: 'left',
-                                  fontWeight: 600,
-                                  color: '#ffffff',
-                                  fontSize: '0.88rem',
-                                  textDecoration: 'none',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 700,
+                                  padding: '0.12rem 0.45rem',
+                                  borderRadius: 'var(--radius-sm)',
+                                  background: colorWithAlpha(tierColor, 0.18, 'rgba(255, 255, 255, 0.08)'),
+                                  color: tierColor,
+                                  border: `1px solid ${colorWithAlpha(tierColor, 0.4, 'rgba(255, 255, 255, 0.2)')}`,
                                   display: 'inline-flex',
                                   alignItems: 'center',
-                                  transition: 'color 0.15s ease',
+                                  gap: '0.25rem',
                                 }}
-                                onMouseEnter={e => {
-                                  e.currentTarget.style.color = tierColor;
-                                  e.currentTarget.style.textDecoration = 'underline';
-                                }}
-                                onMouseLeave={e => {
-                                  e.currentTarget.style.color = '#ffffff';
-                                  e.currentTarget.style.textDecoration = 'none';
-                                }}
-                                title="View player tournament profile"
                               >
-                                {row.player.name}
-                              </button>
+                                <Trophy size={12} /> Champion
+                              </span>
+                            )}
 
-                              {row.player.playstyle && (
-                                <PlaystyleChip style={row.player.playstyle} />
-                              )}
-
-                              {isOverallChamp && (
-                                <span
-                                  style={{
-                                    fontSize: '0.68rem',
-                                    fontWeight: 700,
-                                    padding: '0.1rem 0.4rem',
-                                    borderRadius: 'var(--radius-sm)',
-                                    background: colorWithAlpha(tierColor, 0.18, 'rgba(255, 255, 255, 0.08)'),
-                                    color: tierColor,
-                                    border: `1px solid ${colorWithAlpha(tierColor, 0.4, 'rgba(255, 255, 255, 0.2)')}`,
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '0.2rem',
-                                  }}
-                                >
-                                  <Trophy size={11} /> Champion
-                                </span>
-                              )}
-
-                              {isTierChamp && (
-                                <span
-                                  style={{
-                                    fontSize: '0.68rem',
-                                    fontWeight: 700,
-                                    padding: '0.1rem 0.4rem',
-                                    borderRadius: 'var(--radius-sm)',
-                                    background: colorWithAlpha(tierColor, 0.18, 'rgba(255, 255, 255, 0.08)'),
-                                    color: tierColor,
-                                    border: `1px solid ${colorWithAlpha(tierColor, 0.4, 'rgba(255, 255, 255, 0.2)')}`,
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '0.2rem',
-                                  }}
-                                >
-                                  <Trophy size={11} /> {row.tier?.name} Winner
-                                </span>
-                              )}
-                            </div>
-
-                            {/* Tier seed info if bracket player */}
-                            {row.player.tierSeed && (
-                              <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
-                                Bracket Seed #{row.player.tierSeed}
-                              </div>
+                            {isTierChamp && (
+                              <span
+                                style={{
+                                  fontSize: '0.72rem',
+                                  fontWeight: 700,
+                                  padding: '0.12rem 0.45rem',
+                                  borderRadius: 'var(--radius-sm)',
+                                  background: colorWithAlpha(tierColor, 0.18, 'rgba(255, 255, 255, 0.08)'),
+                                  color: tierColor,
+                                  border: `1px solid ${colorWithAlpha(tierColor, 0.4, 'rgba(255, 255, 255, 0.2)')}`,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem',
+                                }}
+                              >
+                                <Trophy size={12} /> {row.tier?.name} Winner
+                              </span>
                             )}
                           </div>
                         </td>
@@ -1037,14 +869,9 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
                         {/* 8. Overall Game Average */}
                         <td style={{ ...tdStyle, textAlign: 'right', paddingRight: '1.25rem' }}>
                           {row.stats.overallGameAvg > 0 ? (
-                            <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                              <span className="tabular-nums" style={{ fontWeight: 700, color: row.tier ? tierColor : 'var(--color-gold-bright)', fontSize: '0.95rem' }}>
-                                {row.stats.overallGameAvg.toLocaleString()}
-                              </span>
-                              <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>
-                                {row.stats.totalGamesWithScore} {row.stats.totalGamesWithScore === 1 ? 'game' : 'games'}
-                              </span>
-                            </div>
+                            <span className="tabular-nums" style={{ fontWeight: 700, color: row.tier ? tierColor : 'var(--color-gold-bright)', fontSize: '0.95rem' }}>
+                              {row.stats.overallGameAvg.toLocaleString()}
+                            </span>
                           ) : (
                             <span style={{ color: 'var(--color-text-muted)' }}>—</span>
                           )}
