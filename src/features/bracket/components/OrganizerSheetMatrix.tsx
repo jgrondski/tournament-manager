@@ -2,17 +2,95 @@ import React, { useState, useMemo } from 'react';
 import { Tournament, TournamentTier, MatchScoreRecord, PlayerProfile } from '../../tournament/types';
 import { BracketMatch, isMatchPlayable, canonicalizeBracketRounds } from '../types';
 import { MatchScoreDrawer } from './MatchScoreDrawer';
-import { colorWithAlpha } from '../colorUtils';
-import { Filter, Check, ChevronDown, Clock, CheckCircle2, Sparkles } from 'lucide-react';
+import {
+  colorWithAlpha,
+  getDefaultTierColors,
+  getAlternateShade,
+} from '../colorUtils';
+import { Filter, Check, ChevronDown, Clock, CheckCircle2, Search } from 'lucide-react';
 import { PlayerDetailDrawer } from '../../qualifiers/components/PlayerDetailDrawer';
+import { CountryFlag } from '../../players/flagUtils';
 
 interface OrganizerSheetMatrixProps {
   tournament: Tournament;
   tier: TournamentTier;
 }
 
+/**
+ * Returns clean abbreviated round names (e.g. R16, QF, SF, F, R1, LR2, WR3, GF, GFR).
+ */
+export function getAbbreviatedRoundName(name: string, roundIdentifier?: string): string {
+  const ident = roundIdentifier?.toUpperCase()?.trim();
+  if (ident === 'GFR' || ident === 'GF_RESET') return 'GFR';
+  if (ident === 'GF') return 'GF';
+  if (ident === 'WF') return 'WF';
+  if (ident === 'LF') return 'LF';
+  if (ident === 'WSF') return 'WSF';
+  if (ident === 'LSF') return 'LSF';
+  if (ident === 'WQF') return 'WQF';
+  if (ident === 'LQF') return 'LQF';
+  if (ident === 'AR') return 'AR';
+  if (ident === '2C') return '2C';
+  if (ident === 'PO') return 'PO';
+  if (ident === 'PRE_W1') return 'WR1';
+  if (ident === 'PRE_W2') return 'WR2';
+  if (ident === 'PRE_L1') return 'LR1';
+  if (ident === 'PRE_L2') return 'LR2';
+  if (ident === 'CHAMP_R1') return 'R16';
+  if (ident === 'CHAMP_R2') return 'QF';
+  if (ident === 'CHAMP_R3') return 'SF';
+  if (ident === 'CHAMP_R4') return 'F';
+  if (ident && /^W\d+$/i.test(ident)) return `WR${ident.slice(1)}`;
+  if (ident && /^L\d+$/i.test(ident)) return `LR${ident.slice(1)}`;
+  if (ident && /^R\d+$/i.test(ident)) return ident;
+
+  const raw = (name || '').trim();
+  const lower = raw.toLowerCase();
+
+  if (lower.includes('grand finals reset') || lower.includes('grand final reset')) return 'GFR';
+  if (lower.includes('grand finals') || lower.includes('grand final')) return 'GF';
+
+  if (lower.includes('winners finals') || lower.includes('winner finals')) return 'WF';
+  if (lower.includes('winners semifinals') || lower.includes('winner semifinals') || lower.includes('winners semi-finals') || lower.includes('winners semi finals')) return 'WSF';
+  if (lower.includes('winners quarterfinals') || lower.includes('winner quarterfinals') || lower.includes('winners quarter-finals') || lower.includes('winners quarter finals')) return 'WQF';
+
+  if (lower.includes('losers finals') || lower.includes('loser finals')) return 'LF';
+  if (lower.includes('losers semifinals') || lower.includes('loser semifinals') || lower.includes('losers semi-finals') || lower.includes('losers semi finals')) return 'LSF';
+  if (lower.includes('losers quarterfinals') || lower.includes('loser quarterfinals') || lower.includes('losers quarter-finals') || lower.includes('losers quarter finals')) return 'LQF';
+
+  // Matches "Winners Round 1", "Winners Rd 1", "Upper Bracket R1", "Upper Bracket Round 1", etc.
+  const wrMatch = lower.match(/(?:winners|upper bracket|upper)\s+(?:round|rd|r)\s*(\d+)/i);
+  if (wrMatch) return `WR${wrMatch[1]}`;
+
+  // Matches "Losers Round 1", "Losers Rd 1", "Lower Bracket R1", "Lower Bracket Round 1", etc.
+  const lrMatch = lower.match(/(?:losers|lower bracket|lower)\s+(?:round|rd|r)\s*(\d+)/i);
+  if (lrMatch) return `LR${lrMatch[1]}`;
+
+  if (lower.includes('accelerated round') || lower === 'accel round' || lower === 'accel' || lower === 'ar') return 'AR';
+  if (lower.includes('second chance') || lower.includes('2nd chance') || lower === '2c') return '2C';
+  if (lower.includes('play-off') || lower.includes('playoffs') || lower.includes('playoff') || lower === 'po') return 'PO';
+
+  if (lower === 'championship finals' || lower === 'finals' || lower === 'championship final' || lower === 'final') return 'F';
+  if (lower === 'championship semifinals' || lower === 'semifinals' || lower === 'semi-finals' || lower === 'semi finals') return 'SF';
+  if (lower === 'championship quarterfinals' || lower === 'quarterfinals' || lower === 'quarter-finals' || lower === 'quarter finals') return 'QF';
+
+  const rofMatch = lower.match(/round of\s*(\d+)/i);
+  if (rofMatch) {
+    const num = parseInt(rofMatch[1], 10);
+    if (num === 2) return 'F';
+    if (num === 4) return 'SF';
+    if (num === 8) return 'QF';
+    return `R${num}`;
+  }
+
+  const rMatch = lower.match(/round\s*(\d+)/i);
+  if (rMatch) return `R${rMatch[1]}`;
+
+  return raw;
+}
+
 // Compute status for any match
-function getMatchStatus(match: BracketMatch, record?: MatchScoreRecord, defaultBestOf: number = 5) {
+export function getMatchStatus(match: BracketMatch, record?: MatchScoreRecord, defaultBestOf: number = 5) {
   const currentBestOf = record?.bestOf || match.bestOf || defaultBestOf;
   const threshold = Math.ceil(currentBestOf / 2);
   const p1Wins = record?.player1Wins || 0;
@@ -32,6 +110,53 @@ function getMatchStatus(match: BracketMatch, record?: MatchScoreRecord, defaultB
   return { label: 'Not Started', type: 'not_started' as const };
 }
 
+/**
+ * Determines the default inherited bestOf for a round based on tier round overrides,
+ * match initial bestOf, or tier.bestOf default.
+ */
+export function getInheritedRoundBestOf(
+  round: { roundNumber: number; roundIdentifier?: string; name: string; matches?: BracketMatch[] },
+  tier: TournamentTier
+): number {
+  const overrides = tier.roundBestOfOverrides || {};
+  if (round.roundNumber in overrides) {
+    return Number(overrides[round.roundNumber]);
+  }
+  if (round.roundIdentifier && round.roundIdentifier in overrides) {
+    return Number(overrides[round.roundIdentifier]);
+  }
+  if (round.name in overrides) {
+    return Number(overrides[round.name]);
+  }
+  return round.matches?.[0]?.bestOf || tier.bestOf || 5;
+}
+
+/**
+ * Calculates the number of game columns to render for a round:
+ * Defaults to inheritedBestOf. If any match in the round has a match-level override
+ * (from matchScores or match.bestOf) that is greater than inheritedBestOf,
+ * expands to the largest match override in that round.
+ */
+export function getEffectiveRoundGameCount(
+  round: { roundNumber: number; roundIdentifier?: string; name: string; matches?: BracketMatch[] },
+  tier: TournamentTier,
+  matchScores: Record<string, MatchScoreRecord | undefined> = {}
+): { inheritedBestOf: number; effectiveGameCount: number } {
+  const inheritedBestOf = getInheritedRoundBestOf(round, tier);
+  let maxMatchBestOf = inheritedBestOf;
+
+  for (const m of round.matches || []) {
+    const record = matchScores[m.id];
+    const mBestOf = record?.bestOf || m.bestOf || inheritedBestOf;
+    if (mBestOf > maxMatchBestOf) {
+      maxMatchBestOf = mBestOf;
+    }
+  }
+
+  const effectiveGameCount = Math.max(inheritedBestOf, maxMatchBestOf);
+  return { inheritedBestOf, effectiveGameCount };
+}
+
 export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tournament, tier }) => {
   const [selectedMatch, setSelectedMatch] = useState<{ match: BracketMatch; roundName: string } | null>(null);
   const [hoveredMatchId, setHoveredMatchId] = useState<string | null>(null);
@@ -39,13 +164,21 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
   const [selectedPlayerForDrawer, setSelectedPlayerForDrawer] = useState<PlayerProfile | null>(null);
   const [isPlayerDrawerOpen, setIsPlayerDrawerOpen] = useState(false);
   const [hoveredPlayerKey, setHoveredPlayerKey] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const primaryColor = tier.primaryColor || '#f59e0b';
+  // Bracket color themes from tier
+  const defaults = getDefaultTierColors(tier);
+  const primaryColor = tier.primaryColor || defaults.primaryColor || '#f59e0b';
+  const secondaryColor = tier.secondaryColor || defaults.secondaryColor || '#705b33';
+  const cardColor = tier.cardColor || defaults.cardColor || '#161922';
+  const textColor = tier.textColor || defaults.textColor || '#94A3B8';
+  const lowerBracketColor = tier.lowerBracketColor || defaults.lowerBracketColor || '#c2410c';
 
-  const handlePlayerClick = (pId: string, pName: string) => {
+  const handlePlayerClick = (pId: string, pName: string, country?: string) => {
     const profile = (tournament.playersPool || []).find(p => p.id === pId) || {
       id: pId,
       name: pName,
+      country,
       personalBest: 0,
       playstyle: 'DAS',
     };
@@ -64,20 +197,28 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
 
   const [selectedRoundFilter, setSelectedRoundFilter] = useState<'ALL' | 'IN_PROGRESS' | 'COMPLETE' | string[]>('ALL');
 
-  // Filtered rounds and matches
+  // Filtered rounds and matches with search query support
   const filteredRounds = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
     return allRounds
       .map(round => {
         const matches = round.matches.filter(m => {
           const record = tournament.matchScores[m.id];
           const status = getMatchStatus(m, record);
 
-          if (selectedRoundFilter === 'ALL') return true;
-          if (selectedRoundFilter === 'IN_PROGRESS') return status.type === 'in_progress';
-          if (selectedRoundFilter === 'COMPLETE') return status.type === 'complete';
-          if (Array.isArray(selectedRoundFilter)) {
-            return selectedRoundFilter.includes(round.name);
+          if (selectedRoundFilter === 'IN_PROGRESS' && status.type !== 'in_progress') return false;
+          if (selectedRoundFilter === 'COMPLETE' && status.type !== 'complete') return false;
+          if (Array.isArray(selectedRoundFilter) && !selectedRoundFilter.includes(round.name)) return false;
+
+          if (query) {
+            const p1Name = m.player1.player?.name?.toLowerCase() || '';
+            const p2Name = m.player2.player?.name?.toLowerCase() || '';
+            const matchNum = String(m.matchNumber);
+            if (!p1Name.includes(query) && !p2Name.includes(query) && !matchNum.includes(query)) {
+              return false;
+            }
           }
+
           return true;
         });
 
@@ -87,15 +228,13 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
         };
       })
       .filter(round => round.filteredMatches.length > 0);
-  }, [allRounds, tournament.matchScores, selectedRoundFilter]);
+  }, [allRounds, tournament.matchScores, selectedRoundFilter, searchTerm]);
 
   // Round telemetry
   const telemetry = useMemo(() => {
     let total = 0;
     let completed = 0;
     let inProgress = 0;
-    let topScore = 0;
-    let topScorer = '';
 
     for (const round of allRounds) {
       for (const m of round.matches) {
@@ -105,21 +244,10 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
         const status = getMatchStatus(m, rec);
         if (status.type === 'complete') completed++;
         if (status.type === 'in_progress') inProgress++;
-
-        rec?.games.forEach(g => {
-          if (g.player1Points && g.player1Points > topScore) {
-            topScore = g.player1Points;
-            topScorer = m.player1.player?.name || 'Player 1';
-          }
-          if (g.player2Points && g.player2Points > topScore) {
-            topScore = g.player2Points;
-            topScorer = m.player2.player?.name || 'Player 2';
-          }
-        });
       }
     }
 
-    return { total, completed, inProgress, topScore, topScorer };
+    return { total, completed, inProgress };
   }, [allRounds, tournament.matchScores]);
 
   const toggleRoundFilter = (roundName: string) => {
@@ -135,36 +263,111 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
     }
   };
 
+  const maxTableWidth = useMemo(() => {
+    if (filteredRounds.length === 0) return 676;
+    return Math.max(
+      ...filteredRounds.map(r => {
+        const { effectiveGameCount } = getEffectiveRoundGameCount(r, tier, tournament.matchScores);
+        return 52 + 180 + 100 + (effectiveGameCount * 86) + 86;
+      })
+    );
+  }, [filteredRounds, tournament.matchScores, tier]);
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.85rem',
+        width: `${maxTableWidth}px`,
+        maxWidth: '100%',
+        margin: '0 auto',
+        alignItems: 'center',
+        boxSizing: 'border-box',
+      }}
+    >
       {/* Top Filter & Telemetry Bar */}
-      <div style={telemetryBarStyle}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+      <div
+        style={{
+          ...telemetryBarStyle,
+          background: cardColor,
+          borderColor: colorWithAlpha(secondaryColor, 0.45, 'var(--color-border)'),
+          width: '100%',
+          boxSizing: 'border-box',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          {/* Competitor / Match # Quick Search */}
+          <div style={{ position: 'relative', width: '175px' }}>
+            <Search
+              size={13}
+              style={{
+                position: 'absolute',
+                left: '0.6rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--color-text-muted)',
+              }}
+            />
+            <input
+              type="text"
+              placeholder="Search competitor or #..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.32rem 0.55rem 0.32rem 1.8rem',
+                fontSize: '0.78rem',
+                borderRadius: 'var(--radius-sm)',
+                border: `1px solid ${colorWithAlpha(secondaryColor, 0.5, 'var(--color-border)')}`,
+                background: 'var(--color-bg-base)',
+                color: 'var(--color-text-primary)',
+              }}
+            />
+          </div>
+
           {/* Multi-Select Round Filter Dropdown */}
           <div style={{ position: 'relative' }}>
             <button
               onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
               className="btn btn-secondary"
-              style={{ padding: '0.45rem 0.85rem', fontSize: '0.85rem' }}
+              style={{
+                padding: '0.32rem 0.75rem',
+                fontSize: '0.78rem',
+                borderRadius: 'var(--radius-sm)',
+                border: `1px solid ${colorWithAlpha(secondaryColor, 0.5, 'var(--color-border)')}`,
+                background: 'var(--color-bg-base)',
+                color: 'var(--color-text-primary)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+              }}
             >
-              <Filter size={16} />
+              <Filter size={13} color={primaryColor} />
               <span>
-                Round Filter:{' '}
-                <strong>
+                Round:{' '}
+                <strong style={{ color: primaryColor }}>
                   {selectedRoundFilter === 'ALL'
-                    ? 'All Rounds'
+                    ? 'All'
                     : selectedRoundFilter === 'IN_PROGRESS'
-                    ? 'In Progress Only'
+                    ? 'Live Only'
                     : selectedRoundFilter === 'COMPLETE'
-                    ? 'Completed Only'
+                    ? 'Complete Only'
                     : `${selectedRoundFilter.length} Selected`}
                 </strong>
               </span>
-              <ChevronDown size={14} />
+              <ChevronDown size={13} />
             </button>
 
             {isFilterDropdownOpen && (
-              <div style={dropdownMenuStyle} onClick={e => e.stopPropagation()}>
+              <div
+                style={{
+                  ...dropdownMenuStyle,
+                  background: getAlternateShade(cardColor, 8),
+                  borderColor: colorWithAlpha(secondaryColor, 0.6, 'var(--color-border)'),
+                }}
+                onClick={e => e.stopPropagation()}
+              >
                 <div style={dropdownSectionHeaderStyle}>Filter Presets</div>
                 <button
                   style={dropdownItemStyle}
@@ -173,7 +376,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                     setIsFilterDropdownOpen(false);
                   }}
                 >
-                  <span style={{ width: 16 }}>{selectedRoundFilter === 'ALL' && <Check size={14} />}</span>
+                  <span style={{ width: 16 }}>{selectedRoundFilter === 'ALL' && <Check size={13} color={primaryColor} />}</span>
                   <span>All Rounds</span>
                 </button>
                 <button
@@ -183,7 +386,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                     setIsFilterDropdownOpen(false);
                   }}
                 >
-                  <span style={{ width: 16 }}>{selectedRoundFilter === 'IN_PROGRESS' && <Check size={14} />}</span>
+                  <span style={{ width: 16 }}>{selectedRoundFilter === 'IN_PROGRESS' && <Check size={13} color={primaryColor} />}</span>
                   <span>In Progress Only</span>
                 </button>
                 <button
@@ -193,11 +396,11 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                     setIsFilterDropdownOpen(false);
                   }}
                 >
-                  <span style={{ width: 16 }}>{selectedRoundFilter === 'COMPLETE' && <Check size={14} />}</span>
+                  <span style={{ width: 16 }}>{selectedRoundFilter === 'COMPLETE' && <Check size={13} color={primaryColor} />}</span>
                   <span>Completed Only</span>
                 </button>
 
-                <div style={{ ...dropdownSectionHeaderStyle, marginTop: '0.5rem' }}>Individual Rounds</div>
+                <div style={{ ...dropdownSectionHeaderStyle, marginTop: '0.4rem' }}>Individual Rounds</div>
                 {roundNames.map(rName => {
                   const isChecked = Array.isArray(selectedRoundFilter) && selectedRoundFilter.includes(rName);
                   return (
@@ -210,7 +413,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                         type="checkbox"
                         checked={isChecked}
                         readOnly
-                        style={{ accentColor: 'var(--color-gold)', cursor: 'pointer' }}
+                        style={{ accentColor: primaryColor, cursor: 'pointer' }}
                       />
                       <span>{rName}</span>
                     </button>
@@ -220,381 +423,799 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
             )}
           </div>
 
-          {/* Telemetry Stats */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', fontSize: '0.85rem' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--color-text-secondary)' }}>
-              <CheckCircle2 size={16} color="var(--color-green)" />
-              Matches: <strong style={{ color: 'var(--color-text-primary)' }}>{telemetry.completed} / {telemetry.total}</strong>
+          {/* Telemetry Stats Pills */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', fontSize: '0.78rem' }}>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                padding: '0.2rem 0.55rem',
+                borderRadius: 'var(--radius-full)',
+                background: 'rgba(34, 197, 94, 0.1)',
+                border: '1px solid rgba(34, 197, 94, 0.25)',
+                color: '#4ade80',
+              }}
+            >
+              <CheckCircle2 size={13} />
+              <span style={{ color: 'var(--color-text-secondary)' }}>Matches:</span>
+              <strong className="tabular-nums" style={{ color: '#ffffff' }}>
+                {telemetry.completed} / {telemetry.total}
+              </strong>
             </span>
+
             {telemetry.inProgress > 0 && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: primaryColor }}>
-                <Clock size={16} />
-                Live: <strong>{telemetry.inProgress} active</strong>
-              </span>
-            )}
-            {telemetry.topScore > 0 && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--color-cyan)' }}>
-                <Sparkles size={16} />
-                Tier High: <strong className="tabular-nums">{telemetry.topScore.toLocaleString()}</strong> by {telemetry.topScorer}
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  padding: '0.2rem 0.55rem',
+                  borderRadius: 'var(--radius-full)',
+                  background: colorWithAlpha(primaryColor, 0.14, 'rgba(245, 158, 11, 0.1)'),
+                  border: `1px solid ${colorWithAlpha(primaryColor, 0.35, 'rgba(245, 158, 11, 0.3)')}`,
+                  color: primaryColor,
+                }}
+              >
+                <Clock size={13} />
+                <span>Live:</span>
+                <strong className="tabular-nums">{telemetry.inProgress} active</strong>
               </span>
             )}
           </div>
         </div>
-
-        <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-          Click any match row to edit scores in the inspector drawer
-        </div>
       </div>
 
-      {/* Main Sheet Matrix Table */}
-      <div style={{ overflowX: 'auto', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', background: 'var(--color-bg-surface)' }}>
-        <table style={tableStyle}>
-          <thead>
-            <tr style={tableHeaderRowStyle}>
-              <th style={{ ...thStyle, width: '70px', textAlign: 'center' }}>Match #</th>
-              <th style={{ ...thStyle, width: '120px' }}>Round</th>
-              <th style={{ ...thStyle, width: '75px', textAlign: 'center' }}>Best Of</th>
-              <th style={{ ...thStyle, minWidth: '200px' }}>Seed & Player</th>
-              <th style={{ ...thStyle, width: '90px', textAlign: 'center' }}>Series</th>
-              <th style={{ ...thStyle, width: '105px', textAlign: 'right' }}>Game 1</th>
-              <th style={{ ...thStyle, width: '105px', textAlign: 'right' }}>Game 2</th>
-              <th style={{ ...thStyle, width: '105px', textAlign: 'right' }}>Game 3</th>
-              <th style={{ ...thStyle, width: '105px', textAlign: 'right' }}>Game 4</th>
-              <th style={{ ...thStyle, width: '105px', textAlign: 'right' }}>Game 5</th>
-              <th style={{ ...thStyle, width: '120px', textAlign: 'center' }}>Status</th>
-            </tr>
-          </thead>
+      {/* Main Sheet Matrix Cards */}
+      {filteredRounds.length === 0 ? (
+        <div
+          style={{
+            borderRadius: 'var(--radius-md)',
+            border: `1px solid ${colorWithAlpha(secondaryColor, 0.45, 'var(--color-border)')}`,
+            background: cardColor,
+            boxShadow: 'var(--shadow-md)',
+            padding: '2.5rem',
+            textAlign: 'center',
+            color: textColor || 'var(--color-text-muted)',
+            width: '100%',
+            maxWidth: `${maxTableWidth}px`,
+            boxSizing: 'border-box',
+          }}
+        >
+          {searchTerm
+            ? `No matches found matching "${searchTerm}".`
+            : 'No matches found matching the current round filter.'}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', width: '100%', alignItems: 'center' }}>
+          {filteredRounds.map((round) => {
+            // Loser / Lower bracket round identification
+            const isLoserRound =
+              round.stage === 'LOSERS' ||
+              Boolean(round.name?.toLowerCase().includes('loser'));
+            const roundAccentColor = isLoserRound ? lowerBracketColor : primaryColor;
+            const completedCount = round.filteredMatches.filter(
+              m => getMatchStatus(m, tournament.matchScores[m.id]).type === 'complete'
+            ).length;
 
-          <tbody>
-            {filteredRounds.length === 0 ? (
-              <tr>
-                <td colSpan={11} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
-                  No matches found matching the current filter.
-                </td>
-              </tr>
-            ) : (
-              filteredRounds.map((round) => (
-                <React.Fragment key={round.roundNumber}>
-                  {/* Sticky Round Divider Banner */}
-                  <tr style={roundDividerRowStyle}>
-                    <td
-                      colSpan={11}
+            const { inheritedBestOf, effectiveGameCount } = getEffectiveRoundGameCount(
+              round,
+              tier,
+              tournament.matchScores
+            );
+            const gameNumbers = Array.from({ length: effectiveGameCount }, (_, i) => i + 1);
+
+            // Table width: 52 (Match#) + 180 (Competitor) + 100 (Games Won) + (games * 86) + 86 (Complete)
+            // Maintains equidistant spacing and generous gap between game scores
+            const tableWidth = 52 + 180 + 100 + (effectiveGameCount * 86) + 86;
+
+            return (
+              <div
+                key={round.roundNumber}
+                style={{
+                  borderRadius: 'var(--radius-md)',
+                  border: `1px solid ${colorWithAlpha(secondaryColor, 0.45, 'var(--color-border)')}`,
+                  background: cardColor,
+                  boxShadow: 'var(--shadow-md)',
+                  overflow: 'hidden',
+                  width: '100%',
+                  maxWidth: '100%',
+                  boxSizing: 'border-box',
+                }}
+              >
+                {/* Clean Round Divider Banner with Left-Only Accent Border */}
+                <div
+                  style={{
+                    padding: '0.45rem 0.85rem',
+                    background: 'var(--color-bg-base)',
+                    borderBottom: '1px solid var(--color-border)',
+                    borderLeft: `4px solid ${roundAccentColor}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '0.5rem',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                    <span
                       style={{
-                        ...roundDividerCellStyle,
-                        color: primaryColor,
-                        borderTop: `2px solid ${colorWithAlpha(primaryColor, 0.45, 'var(--color-border)')}`,
-                        background: colorWithAlpha(primaryColor, 0.05, 'transparent'),
+                        fontWeight: 800,
+                        fontSize: '0.82rem',
+                        color: 'var(--color-text-primary)',
+                        letterSpacing: '0.04em',
+                        textTransform: 'uppercase',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span>
-                          <strong>{round.name}</strong> • {round.filteredMatches.length} Matches
-                        </span>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--color-text-secondary)' }}>
-                          {round.filteredMatches.filter(m => getMatchStatus(m, tournament.matchScores[m.id]).type === 'complete').length} / {round.filteredMatches.length} Complete
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
+                      {round.name}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: '0.7rem',
+                        padding: '0.12rem 0.45rem',
+                        borderRadius: 'var(--radius-sm)',
+                        background: 'rgba(255, 255, 255, 0.06)',
+                        border: '1px solid var(--color-border)',
+                        color: 'var(--color-text-secondary)',
+                        fontWeight: 600,
+                        fontFamily: 'var(--font-mono)',
+                      }}
+                    >
+                      Best of {inheritedBestOf}
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
+                      • {round.filteredMatches.length} {round.filteredMatches.length === 1 ? 'Match' : 'Matches'}
+                    </span>
+                  </div>
+                  <span
+                    className="tabular-nums"
+                    style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      padding: '0.12rem 0.5rem',
+                      borderRadius: 'var(--radius-full)',
+                      background: 'rgba(255, 255, 255, 0.06)',
+                      color: 'var(--color-text-secondary)',
+                      border: '1px solid var(--color-border)',
+                    }}
+                  >
+                    {completedCount} / {round.filteredMatches.length} Complete
+                  </span>
+                </div>
 
-                  {/* 2-Row Match Blocks */}
-                  {round.filteredMatches.map((match, matchIdx) => {
-                    const record = tournament.matchScores[match.id];
-                    const status = getMatchStatus(match, record);
-                    const isHovered = hoveredMatchId === match.id;
-                    const isEvenBlock = matchIdx % 2 === 0;
+                {/* Compact Round Table with Horizontal Scroll Protection */}
+                <div style={{ overflowX: 'auto', width: '100%' }}>
+                  <table
+                    style={{
+                      ...tableStyle,
+                      width: `${tableWidth}px`,
+                      minWidth: `${tableWidth}px`,
+                    }}
+                  >
+                    <thead>
+                      <tr
+                        style={{
+                          background: getAlternateShade(cardColor, 7),
+                          borderBottom: `2px solid ${colorWithAlpha(secondaryColor, 0.6, 'var(--color-border)')}`,
+                        }}
+                      >
+                        <th style={{ ...thStyle, width: '52px', minWidth: '52px', maxWidth: '52px', textAlign: 'center', color: textColor }}>Match #</th>
+                        <th style={{ ...thStyle, width: '180px', minWidth: '180px', maxWidth: '180px', textAlign: 'left', paddingLeft: '72px', color: textColor }}>Competitor</th>
+                        <th style={{ ...thStyle, width: '100px', minWidth: '100px', maxWidth: '100px', textAlign: 'center', paddingRight: '14px', color: textColor }}>Games Won</th>
+                        {gameNumbers.map((gNum) => (
+                          <th
+                            key={gNum}
+                            style={{
+                              ...thStyle,
+                              width: '86px',
+                              minWidth: '86px',
+                              maxWidth: '86px',
+                              textAlign: 'center',
+                              padding: '0.42rem 0.25rem',
+                              color: textColor,
+                            }}
+                          >
+                            Game {gNum}
+                          </th>
+                        ))}
+                        <th style={{ ...thStyle, width: '86px', minWidth: '86px', maxWidth: '86px', textAlign: 'center', padding: '0.42rem 0.3rem', color: textColor }}>Complete</th>
+                      </tr>
+                    </thead>
 
-                    const p1 = match.player1.player;
-                    const p2 = match.player2.player;
-                    const p1Name = p1?.name || (match.player1.sourceMatchId ? `Winner of Match #${tier.bracket.matchesById[match.player1.sourceMatchId]?.matchNumber || '?'}` : 'TBD');
-                    const p2Name = p2?.name || (match.player2.sourceMatchId ? `Winner of Match #${tier.bracket.matchesById[match.player2.sourceMatchId]?.matchNumber || '?'}` : 'TBD');
+                    <tbody>
+                      {round.filteredMatches.map((match, matchIdx) => {
+                        const record = tournament.matchScores[match.id];
+                        const status = getMatchStatus(match, record);
+                        const isHovered = hoveredMatchId === match.id;
+                        const isComplete = status.type === 'complete';
 
-                    const p1Wins = record?.player1Wins || 0;
-                    const p2Wins = record?.player2Wins || 0;
-                    const matchBestOf = record?.bestOf || match.bestOf || tier.bestOf || 5;
-                    const hasTieGame = Boolean(record?.games?.some(g => g.winnerPlayerId === 'TIE' || (g.player1Points !== null && g.player1Points === g.player2Points && g.player1Points > 0)));
-                    const hasTiebreaker = Boolean(record?.hasTiebreaker || hasTieGame || (record?.games && record.games.length > matchBestOf));
-                    const p1ScoreDisplay = hasTiebreaker ? `${p1Wins} (t)` : `${p1Wins}`;
-                    const p2ScoreDisplay = hasTiebreaker ? `${p2Wins} (t)` : `${p2Wins}`;
+                        // Lower bracket match check
+                        const isMatchInLosers =
+                          isLoserRound ||
+                          match.stage === 'LOSERS' ||
+                          (match.roundIdentifier?.startsWith('L') && match.roundIdentifier !== 'LF') ||
+                          match.roundIdentifier === 'LF' ||
+                          match.subTrack === 'PRE_MERGE_LOWER' ||
+                          match.subTrack === 'RE_CLIMB' ||
+                          match.roundIdentifier === 'PRE_L1' ||
+                          match.roundIdentifier === 'PRE_L2' ||
+                          match.roundIdentifier === '2C' ||
+                          match.roundIdentifier === 'PO';
+                        const matchAccentColor = isMatchInLosers ? lowerBracketColor : primaryColor;
 
-                    const p1IsWinner = Boolean(p1?.id && (match.winnerId === p1.id || (record?.isComplete && record?.winnerPlayerId === p1.id)));
-                    const p2IsWinner = Boolean(p2?.id && (match.winnerId === p2.id || (record?.isComplete && record?.winnerPlayerId === p2.id)));
-                    const isPlayable = isMatchPlayable(match);
+                        const p1 = match.player1.player;
+                        const p2 = match.player2.player;
+                        const p1Name = p1?.name || (match.player1.sourceMatchId ? `Winner of #${tier.bracket.matchesById[match.player1.sourceMatchId]?.matchNumber || '?'}` : 'TBD');
+                        const p2Name = p2?.name || (match.player2.sourceMatchId ? `Winner of #${tier.bracket.matchesById[match.player2.sourceMatchId]?.matchNumber || '?'}` : 'TBD');
 
-                    // Block background color for alternating match groups
-                    const blockBg = isHovered
-                      ? colorWithAlpha(primaryColor, 0.08, 'rgba(245, 158, 11, 0.08)')
-                      : isEvenBlock
-                      ? 'var(--color-bg-surface)'
-                      : 'var(--color-bg-surface-elevated)';
+                        const p1Wins = record?.player1Wins || 0;
+                        const p2Wins = record?.player2Wins || 0;
+                        const matchBestOf = record?.bestOf || match.bestOf || inheritedBestOf;
+                        const hasTieGame = Boolean(record?.games?.some(g => g.winnerPlayerId === 'TIE' || (g.player1Points !== null && g.player1Points === g.player2Points && g.player1Points > 0)));
+                        const hasTiebreaker = Boolean(record?.hasTiebreaker || hasTieGame || (record?.games && record.games.length > matchBestOf));
+                        const p1ScoreDisplay = hasTiebreaker ? `${p1Wins} (t)` : `${p1Wins}`;
+                        const p2ScoreDisplay = hasTiebreaker ? `${p2Wins} (t)` : `${p2Wins}`;
 
-                    const borderTopStyle = '2px solid var(--color-border)';
+                        const p1IsWinner = Boolean(p1?.id && (match.winnerId === p1.id || (record?.isComplete && record?.winnerPlayerId === p1.id)));
+                        const p2IsWinner = Boolean(p2?.id && (match.winnerId === p2.id || (record?.isComplete && record?.winnerPlayerId === p2.id)));
+                        const isPlayable = isMatchPlayable(match);
 
-                    return (
-                      <React.Fragment key={match.id}>
-                        {/* Row 1: Player 1 */}
-                        <tr
-                          onClick={() => {
-                            if (isPlayable && tournament.isLocked) {
-                              setSelectedMatch({
-                                match,
-                                roundName: match.stage === 'GRAND_FINALS_RESET' ? 'Grand Finals' : round.name,
-                              });
-                            }
-                          }}
-                          onMouseEnter={() => setHoveredMatchId(match.id)}
-                          onMouseLeave={() => setHoveredMatchId(null)}
-                          style={{
-                            background: blockBg,
-                            cursor: isPlayable && tournament.isLocked ? 'pointer' : 'default',
-                            opacity: isPlayable ? 1 : 0.75,
-                            transition: 'background 0.1s ease',
-                          }}
-                        >
-                          {/* Match # (RowSpan 2) */}
-                          <td rowSpan={2} style={{ ...tdMergedStyle, borderTop: borderTopStyle, textAlign: 'center', fontWeight: 700 }}>
-                            <span
-                              style={{
-                                fontSize: '0.8rem',
-                                padding: '0.2rem 0.5rem',
-                                borderRadius: 'var(--radius-sm)',
-                                fontWeight: 700,
-                                background: colorWithAlpha(primaryColor, 0.15, 'var(--color-gold-bg)'),
-                                color: primaryColor,
-                                border: `1px solid ${colorWithAlpha(primaryColor, 0.4, 'var(--color-gold)')}`,
-                              }}
-                            >
-                              #{match.matchNumber}
-                            </span>
-                          </td>
+                        // Pure alternating zebra backgrounds without winner row tint
+                        const baseCard = cardColor;
+                        const altCard = getAlternateShade(baseCard, 5);
+                        const matchBaseBg = matchIdx % 2 === 0 ? baseCard : altCard;
+                        const matchHoverBg = colorWithAlpha(matchAccentColor, 0.12, 'rgba(255, 255, 255, 0.07)');
+                        const blockBg = isHovered ? matchHoverBg : matchBaseBg;
 
-                          {/* Round Name (RowSpan 2) */}
-                          <td rowSpan={2} style={{ ...tdMergedStyle, borderTop: borderTopStyle, color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>
-                            {match.stage === 'GRAND_FINALS_RESET' ? 'Grand Finals Reset' : round.name}
-                          </td>
+                        // Block borders
+                        const topRowBorder = `1px solid ${colorWithAlpha(secondaryColor, 0.35, 'rgba(255, 255, 255, 0.08)')}`;
+                        const midRowBorder = '1px solid rgba(255, 255, 255, 0.04)';
+                        const botRowBorder = `1px solid ${colorWithAlpha(secondaryColor, 0.25, 'rgba(255, 255, 255, 0.06)')}`;
 
-                          {/* Best Of (RowSpan 2) */}
-                          <td rowSpan={2} style={{ ...tdMergedStyle, borderTop: borderTopStyle, textAlign: 'center', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-                            Bo{matchBestOf}
-                          </td>
-
-                          {/* Player 1 Seed & Name */}
-                          <td style={{ ...tdStyle, borderTop: borderTopStyle }}>
-                            <div
-                              onClick={(e) => {
-                                if (p1?.id) {
-                                  e.stopPropagation();
-                                  handlePlayerClick(p1.id, p1.name);
+                        return (
+                          <React.Fragment key={match.id}>
+                            {/* Row 1: Player 1 */}
+                            <tr
+                              onClick={() => {
+                                if (isPlayable && tournament.isLocked) {
+                                  setSelectedMatch({
+                                    match,
+                                    roundName: match.stage === 'GRAND_FINALS_RESET' ? 'Grand Finals' : round.name,
+                                  });
                                 }
                               }}
-                              onMouseEnter={() => p1?.id && setHoveredPlayerKey(`p1-${match.id}`)}
-                              onMouseLeave={() => setHoveredPlayerKey(null)}
+                              onMouseEnter={() => setHoveredMatchId(match.id)}
+                              onMouseLeave={() => setHoveredMatchId(null)}
                               style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.5rem',
-                                padding: '0.2rem 0.45rem',
-                                borderRadius: 'var(--radius-sm)',
-                                background: hoveredPlayerKey === `p1-${match.id}` ? 'rgba(251, 191, 36, 0.18)' : 'transparent',
-                                boxShadow: hoveredPlayerKey === `p1-${match.id}` ? '0 0 0 1px var(--color-gold)' : 'none',
-                                cursor: p1?.id ? 'pointer' : 'inherit',
-                                transition: 'all 0.15s ease',
+                                background: blockBg,
+                                cursor: isPlayable && tournament.isLocked ? 'pointer' : 'default',
+                                opacity: isPlayable ? 1 : 0.72,
+                                transition: 'background 0.12s ease',
                               }}
-                              title={p1?.id ? "View competitor tournament profile" : undefined}
                             >
-                              {p1?.seed && (
-                                <span style={seedBadgeStyle}>#{p1.seed}</span>
-                              )}
-                              <span style={{ fontWeight: p1IsWinner ? 700 : 500, color: hoveredPlayerKey === `p1-${match.id}` ? 'var(--color-gold-bright)' : p1IsWinner ? primaryColor : 'var(--color-text-primary)' }}>
-                                {p1Name}
-                              </span>
-                            </div>
-                          </td>
-
-                          {/* Player 1 Series Score */}
-                          <td style={{ ...tdStyle, borderTop: borderTopStyle, textAlign: 'center', fontWeight: 700, fontSize: '1rem', color: p1IsWinner ? primaryColor : 'var(--color-text-primary)' }}>
-                            <span className="tabular-nums">{p1ScoreDisplay}</span>
-                          </td>
-
-                          {/* Games 1 to 5 for Player 1 */}
-                          {[1, 2, 3, 4, 5].map(gNum => {
-                            const isBeyondBestOf = gNum > matchBestOf;
-                            const game = record?.games.find(g => g.gameNumber === gNum);
-                            const p1Pts = game?.player1Points;
-                            const p2Pts = game?.player2Points;
-                            const p1WonGame = game?.winnerPlayerId === p1?.id || (p1Pts !== null && p2Pts !== null && p1Pts !== undefined && p2Pts !== undefined && p1Pts > p2Pts);
-
-                            return (
+                              {/* Match # (RowSpan 2) */}
                               <td
-                                key={gNum}
+                                rowSpan={2}
                                 style={{
-                                  ...tdStyle,
-                                  borderTop: borderTopStyle,
-                                  textAlign: 'right',
-                                  color: isBeyondBestOf ? 'var(--color-text-muted)' : 'var(--color-text-primary)',
-                                  opacity: isBeyondBestOf ? 0.3 : 1,
-                                }}
-                              >
-                                {isBeyondBestOf ? (
-                                  '—'
-                                ) : p1Pts !== null && p1Pts !== undefined ? (
-                                  <span
-                                    className="tabular-nums"
-                                    style={{
-                                      padding: '0.15rem 0.4rem',
-                                      borderRadius: 'var(--radius-sm)',
-                                      background: p1WonGame ? colorWithAlpha(primaryColor, 0.18, 'var(--color-gold-bg)') : 'transparent',
-                                      color: p1WonGame ? primaryColor : 'inherit',
-                                      fontWeight: p1WonGame ? 700 : 400,
-                                      border: p1WonGame ? `1px solid ${colorWithAlpha(primaryColor, 0.4, 'rgba(245, 158, 11, 0.3)')}` : '1px solid transparent',
-                                      display: 'inline-block',
-                                    }}
-                                  >
-                                    {p1Pts.toLocaleString()}
-                                  </span>
-                                ) : (
-                                  <span style={{ color: 'var(--color-border)' }}>·</span>
-                                )}
-                              </td>
-                            );
-                          })}
-
-                          {/* Status (RowSpan 2) */}
-                          <td rowSpan={2} style={{ ...tdMergedStyle, borderTop: borderTopStyle, textAlign: 'center' }}>
-                            {status.type === 'complete' && (
-                              <span className="badge badge-green" style={{ fontSize: '0.75rem' }}>Complete</span>
-                            )}
-                            {status.type === 'in_progress' && (
-                              <span
-                                style={{
-                                  fontSize: '0.75rem',
+                                  ...tdMergedStyle,
+                                  borderTop: topRowBorder,
+                                  borderBottom: botRowBorder,
+                                  textAlign: 'center',
                                   fontWeight: 700,
-                                  padding: '0.15rem 0.5rem',
-                                  borderRadius: 'var(--radius-sm)',
-                                  background: colorWithAlpha(primaryColor, 0.15, 'var(--color-gold-bg)'),
-                                  color: primaryColor,
-                                  border: `1px solid ${colorWithAlpha(primaryColor, 0.4, 'var(--color-gold)')}`,
-                                }}
-                                className="animate-pulse-border"
-                              >
-                                Live
-                              </span>
-                            )}
-                            {status.type === 'not_started' && (
-                              <span className="badge badge-muted" style={{ fontSize: '0.75rem' }}>Waiting</span>
-                            )}
-                          </td>
-                        </tr>
-
-                        {/* Row 2: Player 2 */}
-                        <tr
-                          onClick={() => {
-                            if (isPlayable && tournament.isLocked) {
-                              setSelectedMatch({
-                                match,
-                                roundName: match.stage === 'GRAND_FINALS_RESET' ? 'Grand Finals' : round.name,
-                              });
-                            }
-                          }}
-                          onMouseEnter={() => setHoveredMatchId(match.id)}
-                          onMouseLeave={() => setHoveredMatchId(null)}
-                          style={{
-                            background: blockBg,
-                            cursor: isPlayable && tournament.isLocked ? 'pointer' : 'default',
-                            opacity: isPlayable ? 1 : 0.75,
-                            transition: 'background 0.1s ease',
-                          }}
-                        >
-                          {/* Player 2 Seed & Name */}
-                          <td style={{ ...tdStyle, borderBottom: '1px solid var(--color-border-subtle)' }}>
-                            <div
-                              onClick={(e) => {
-                                if (p2?.id) {
-                                  e.stopPropagation();
-                                  handlePlayerClick(p2.id, p2.name);
-                                }
-                              }}
-                              onMouseEnter={() => p2?.id && setHoveredPlayerKey(`p2-${match.id}`)}
-                              onMouseLeave={() => setHoveredPlayerKey(null)}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.5rem',
-                                padding: '0.2rem 0.45rem',
-                                borderRadius: 'var(--radius-sm)',
-                                background: hoveredPlayerKey === `p2-${match.id}` ? 'rgba(251, 191, 36, 0.18)' : 'transparent',
-                                boxShadow: hoveredPlayerKey === `p2-${match.id}` ? '0 0 0 1px var(--color-gold)' : 'none',
-                                cursor: p2?.id ? 'pointer' : 'inherit',
-                                transition: 'all 0.15s ease',
-                              }}
-                              title={p2?.id ? "View competitor tournament profile" : undefined}
-                            >
-                              {p2?.seed && (
-                                <span style={seedBadgeStyle}>#{p2.seed}</span>
-                              )}
-                              <span style={{ fontWeight: p2IsWinner ? 700 : 500, color: hoveredPlayerKey === `p2-${match.id}` ? 'var(--color-gold-bright)' : p2IsWinner ? primaryColor : 'var(--color-text-primary)' }}>
-                                {p2Name}
-                              </span>
-                            </div>
-                          </td>
-
-                          {/* Player 2 Series Score */}
-                          <td style={{ ...tdStyle, borderBottom: '1px solid var(--color-border-subtle)', textAlign: 'center', fontWeight: 700, fontSize: '1rem', color: p2IsWinner ? primaryColor : 'var(--color-text-primary)' }}>
-                            <span className="tabular-nums">{p2ScoreDisplay}</span>
-                          </td>
-
-                          {/* Games 1 to 5 for Player 2 */}
-                          {[1, 2, 3, 4, 5].map(gNum => {
-                            const isBeyondBestOf = gNum > matchBestOf;
-                            const game = record?.games.find(g => g.gameNumber === gNum);
-                            const p1Pts = game?.player1Points;
-                            const p2Pts = game?.player2Points;
-                            const p2WonGame = game?.winnerPlayerId === p2?.id || (p1Pts !== null && p2Pts !== null && p1Pts !== undefined && p2Pts !== undefined && p2Pts > p1Pts);
-
-                            return (
-                              <td
-                                key={gNum}
-                                style={{
-                                  ...tdStyle,
-                                  borderBottom: '1px solid var(--color-border-subtle)',
-                                  textAlign: 'right',
-                                  color: isBeyondBestOf ? 'var(--color-text-muted)' : 'var(--color-text-primary)',
-                                  opacity: isBeyondBestOf ? 0.3 : 1,
+                                  width: '52px',
+                                  minWidth: '52px',
+                                  maxWidth: '52px',
                                 }}
                               >
-                                {isBeyondBestOf ? (
-                                  '—'
-                                ) : p2Pts !== null && p2Pts !== undefined ? (
+                                <span
+                                  style={{
+                                    fontSize: '0.72rem',
+                                    padding: '0.12rem 0.4rem',
+                                    borderRadius: 'var(--radius-sm)',
+                                    fontWeight: 700,
+                                    fontFamily: 'var(--font-mono)',
+                                    background: colorWithAlpha(matchAccentColor, 0.15, 'rgba(255, 255, 255, 0.06)'),
+                                    color: matchAccentColor,
+                                    border: `1px solid ${colorWithAlpha(matchAccentColor, 0.4, 'rgba(255, 255, 255, 0.12)')}`,
+                                    display: 'inline-block',
+                                    lineHeight: 1.2,
+                                  }}
+                                >
+                                  #{match.matchNumber}
+                                </span>
+                              </td>
+
+                              {/* Player 1 Seed & Competitor Info */}
+                              <td style={{ ...tdStyle, borderTop: topRowBorder, borderBottom: midRowBorder, width: '180px', minWidth: '180px', maxWidth: '180px', textAlign: 'left' }}>
+                                <div
+                                  onClick={(e) => {
+                                    if (p1?.id) {
+                                      e.stopPropagation();
+                                      handlePlayerClick(p1.id, p1.name, p1.country);
+                                    }
+                                  }}
+                                  onMouseEnter={() => p1?.id && setHoveredPlayerKey(`p1-${match.id}`)}
+                                  onMouseLeave={() => setHoveredPlayerKey(null)}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.4rem',
+                                    padding: '0.1rem 0.35rem',
+                                    borderRadius: 'var(--radius-sm)',
+                                    background: hoveredPlayerKey === `p1-${match.id}` ? colorWithAlpha(primaryColor, 0.15, 'rgba(255, 255, 255, 0.08)') : 'transparent',
+                                    boxShadow: hoveredPlayerKey === `p1-${match.id}` ? `0 0 0 1px ${primaryColor}` : 'none',
+                                    cursor: p1?.id ? 'pointer' : 'inherit',
+                                    transition: 'all 0.12s ease',
+                                    maxWidth: '100%',
+                                  }}
+                                  title={p1?.id ? "View competitor tournament profile" : undefined}
+                                >
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', width: '50px', flexShrink: 0 }}>
+                                    {p1?.country && <CountryFlag country={p1.country} />}
+                                    {p1?.seed && (
+                                      <span
+                                        style={{
+                                          fontSize: '0.65rem',
+                                          padding: '0.06rem 0.28rem',
+                                          borderRadius: 'var(--radius-sm)',
+                                          background: colorWithAlpha(matchAccentColor, 0.12, 'rgba(255, 255, 255, 0.08)'),
+                                          color: matchAccentColor,
+                                          border: `1px solid ${colorWithAlpha(matchAccentColor, 0.25, 'rgba(255, 255, 255, 0.1)')}`,
+                                          fontFamily: 'var(--font-mono)',
+                                          fontWeight: 700,
+                                          lineHeight: 1.1,
+                                        }}
+                                      >
+                                        #{p1.seed}
+                                      </span>
+                                    )}
+                                  </span>
                                   <span
-                                    className="tabular-nums"
                                     style={{
-                                      padding: '0.15rem 0.4rem',
-                                      borderRadius: 'var(--radius-sm)',
-                                      background: p2WonGame ? colorWithAlpha(primaryColor, 0.18, 'var(--color-gold-bg)') : 'transparent',
-                                      color: p2WonGame ? primaryColor : 'inherit',
-                                      fontWeight: p2WonGame ? 700 : 400,
-                                      border: p2WonGame ? `1px solid ${colorWithAlpha(primaryColor, 0.4, 'rgba(245, 158, 11, 0.3)')}` : '1px solid transparent',
-                                      display: 'inline-block',
+                                      fontWeight: isComplete ? (p1IsWinner ? 800 : 400) : (p1IsWinner ? 700 : 500),
+                                      fontSize: '0.82rem',
+                                      color: hoveredPlayerKey === `p1-${match.id}`
+                                        ? primaryColor
+                                        : p1IsWinner
+                                        ? primaryColor
+                                        : 'var(--color-text-primary)',
+                                      opacity: hoveredPlayerKey === `p1-${match.id}` ? 1 : isComplete && p2IsWinner ? 0.45 : 1,
+                                      whiteSpace: 'nowrap',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
                                     }}
                                   >
-                                    {p2Pts.toLocaleString()}
+                                    {p1Name}
                                   </span>
-                                ) : (
-                                  <span style={{ color: 'var(--color-border)' }}>·</span>
+                                  {p1IsWinner && isComplete && (
+                                    <span
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        width: '14px',
+                                        height: '14px',
+                                        borderRadius: '50%',
+                                        background: colorWithAlpha(primaryColor, 0.25),
+                                        border: `1px solid ${primaryColor}`,
+                                        color: primaryColor,
+                                        flexShrink: 0,
+                                      }}
+                                      title="Winner"
+                                    >
+                                      <Check size={9} strokeWidth={3} />
+                                    </span>
+                                  )}
+                                  {match.player1.isManualOverride && (
+                                    <span
+                                      style={{
+                                        fontSize: '0.6rem',
+                                        fontWeight: 700,
+                                        letterSpacing: '0.04em',
+                                        padding: '0.05rem 0.28rem',
+                                        borderRadius: 'var(--radius-sm)',
+                                        background: 'rgba(245, 158, 11, 0.18)',
+                                        color: '#fbbf24',
+                                        border: '1px solid rgba(245, 158, 11, 0.4)',
+                                        textTransform: 'uppercase',
+                                        lineHeight: 1.1,
+                                      }}
+                                      title="Position manually placed by tournament organizer"
+                                    >
+                                      OVERRIDE
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Player 1 Games Won Score */}
+                              <td
+                                style={{
+                                  ...tdStyle,
+                                  borderTop: topRowBorder,
+                                  borderBottom: midRowBorder,
+                                  textAlign: 'center',
+                                  paddingRight: '14px',
+                                  fontWeight: p1IsWinner ? 800 : 600,
+                                  fontSize: '0.85rem',
+                                  width: '100px',
+                                  minWidth: '100px',
+                                  maxWidth: '100px',
+                                }}
+                              >
+                                <span
+                                  className="tabular-nums"
+                                  style={{
+                                    display: 'inline-block',
+                                    padding: '0.08rem 0.4rem',
+                                    borderRadius: 'var(--radius-sm)',
+                                    background: p1IsWinner
+                                      ? colorWithAlpha(primaryColor, 0.22, 'rgba(255, 255, 255, 0.08)')
+                                      : 'transparent',
+                                    color: p1IsWinner
+                                      ? primaryColor
+                                      : 'var(--color-text-primary)',
+                                    opacity: isComplete && p2IsWinner ? 0.45 : 1,
+                                    border: p1IsWinner ? `1px solid ${colorWithAlpha(primaryColor, 0.55, 'transparent')}` : '1px solid transparent',
+                                    lineHeight: 1.2,
+                                  }}
+                                >
+                                  {p1ScoreDisplay}
+                                </span>
+                              </td>
+
+                              {/* Games 1 to effectiveGameCount for Player 1 */}
+                              {gameNumbers.map((gNum) => {
+                                const isBeyondBestOf = gNum > matchBestOf;
+                                const game = record?.games.find((g) => g.gameNumber === gNum);
+                                const p1Pts = game?.player1Points;
+                                const p2Pts = game?.player2Points;
+                                const p1WonGame =
+                                  game?.winnerPlayerId === p1?.id ||
+                                  (p1Pts !== null && p2Pts !== null && p1Pts !== undefined && p2Pts !== undefined && p1Pts > p2Pts);
+
+                                return (
+                                  <td
+                                    key={gNum}
+                                    style={{
+                                      ...tdStyle,
+                                      borderTop: topRowBorder,
+                                      borderBottom: midRowBorder,
+                                      textAlign: 'right',
+                                      padding: '0.24rem 0.35rem',
+                                      width: '86px',
+                                      minWidth: '86px',
+                                      maxWidth: '86px',
+                                      color: isBeyondBestOf ? 'var(--color-text-muted)' : 'var(--color-text-primary)',
+                                      opacity: isBeyondBestOf ? 0.25 : isComplete && p2IsWinner && !p1WonGame ? 0.45 : 1,
+                                    }}
+                                  >
+                                    {isBeyondBestOf ? (
+                                      '—'
+                                    ) : p1Pts !== null && p1Pts !== undefined ? (
+                                      <span
+                                        className="tabular-nums"
+                                        style={{
+                                          padding: '0.1rem 0.28rem',
+                                          margin: '0 3px',
+                                          borderRadius: 'var(--radius-sm)',
+                                          background: p1WonGame ? colorWithAlpha(matchAccentColor, 0.16, 'rgba(255, 255, 255, 0.08)') : 'transparent',
+                                          color: p1WonGame ? matchAccentColor : 'var(--color-text-primary)',
+                                          fontWeight: p1WonGame ? 700 : 400,
+                                          fontSize: '0.78rem',
+                                          fontFamily: 'var(--font-mono)',
+                                          border: p1WonGame ? `1px solid ${colorWithAlpha(matchAccentColor, 0.38, 'transparent')}` : '1px solid transparent',
+                                          display: 'inline-block',
+                                          lineHeight: 1.2,
+                                        }}
+                                      >
+                                        {p1Pts.toLocaleString()}
+                                      </span>
+                                    ) : (
+                                      <span style={{ color: 'rgba(255, 255, 255, 0.15)', fontSize: '0.8rem', marginRight: '6px' }}>·</span>
+                                    )}
+                                  </td>
+                                );
+                              })}
+
+                              {/* Complete Status (RowSpan 2) */}
+                              <td
+                                rowSpan={2}
+                                style={{
+                                  ...tdMergedStyle,
+                                  borderTop: topRowBorder,
+                                  borderBottom: botRowBorder,
+                                  textAlign: 'center',
+                                  padding: '0.24rem 0.4rem',
+                                  width: '86px',
+                                  minWidth: '86px',
+                                  maxWidth: '86px',
+                                }}
+                              >
+                                {status.type === 'complete' && (
+                                  <span
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      width: '20px',
+                                      height: '20px',
+                                      borderRadius: '50%',
+                                      background: 'rgba(34, 197, 94, 0.16)',
+                                      border: '1px solid rgba(34, 197, 94, 0.4)',
+                                      color: '#4ade80',
+                                      margin: '0 auto',
+                                    }}
+                                    title="Complete"
+                                  >
+                                    <Check size={12} strokeWidth={3} />
+                                  </span>
+                                )}
+                                {status.type === 'in_progress' && (
+                                  <span
+                                    style={{
+                                      fontSize: '0.7rem',
+                                      fontWeight: 700,
+                                      padding: '0.12rem 0.45rem',
+                                      borderRadius: 'var(--radius-full)',
+                                      background: colorWithAlpha(primaryColor, 0.18, 'rgba(245, 158, 11, 0.18)'),
+                                      color: primaryColor,
+                                      border: `1px solid ${colorWithAlpha(primaryColor, 0.45, 'rgba(245, 158, 11, 0.45)')}`,
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '0.25rem',
+                                      lineHeight: 1.2,
+                                    }}
+                                    title="In Progress"
+                                  >
+                                    <span
+                                      style={{
+                                        width: '5px',
+                                        height: '5px',
+                                        borderRadius: '50%',
+                                        background: primaryColor,
+                                        boxShadow: `0 0 5px ${primaryColor}`,
+                                      }}
+                                    />
+                                    Live
+                                  </span>
+                                )}
+                                {status.type === 'not_started' && (
+                                  <span
+                                    style={{
+                                      color: 'var(--color-text-muted)',
+                                      fontSize: '0.75rem',
+                                      opacity: 0.35,
+                                    }}
+                                    title="Waiting"
+                                  >
+                                    —
+                                  </span>
                                 )}
                               </td>
-                            );
-                          })}
-                        </tr>
-                      </React.Fragment>
-                    );
-                  })}
-                </React.Fragment>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+                            </tr>
+
+                            {/* Row 2: Player 2 */}
+                            <tr
+                              onClick={() => {
+                                if (isPlayable && tournament.isLocked) {
+                                  setSelectedMatch({
+                                    match,
+                                    roundName: match.stage === 'GRAND_FINALS_RESET' ? 'Grand Finals' : round.name,
+                                  });
+                                }
+                              }}
+                              onMouseEnter={() => setHoveredMatchId(match.id)}
+                              onMouseLeave={() => setHoveredMatchId(null)}
+                              style={{
+                                background: blockBg,
+                                cursor: isPlayable && tournament.isLocked ? 'pointer' : 'default',
+                                opacity: isPlayable ? 1 : 0.72,
+                                transition: 'background 0.12s ease',
+                              }}
+                            >
+                              {/* Player 2 Seed & Competitor Info */}
+                              <td style={{ ...tdStyle, borderBottom: botRowBorder, width: '180px', minWidth: '180px', maxWidth: '180px', textAlign: 'left' }}>
+                                <div
+                                  onClick={(e) => {
+                                    if (p2?.id) {
+                                      e.stopPropagation();
+                                      handlePlayerClick(p2.id, p2.name, p2.country);
+                                    }
+                                  }}
+                                  onMouseEnter={() => p2?.id && setHoveredPlayerKey(`p2-${match.id}`)}
+                                  onMouseLeave={() => setHoveredPlayerKey(null)}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.4rem',
+                                    padding: '0.1rem 0.35rem',
+                                    borderRadius: 'var(--radius-sm)',
+                                    background: hoveredPlayerKey === `p2-${match.id}` ? colorWithAlpha(primaryColor, 0.15, 'rgba(255, 255, 255, 0.08)') : 'transparent',
+                                    boxShadow: hoveredPlayerKey === `p2-${match.id}` ? `0 0 0 1px ${primaryColor}` : 'none',
+                                    cursor: p2?.id ? 'pointer' : 'inherit',
+                                    transition: 'all 0.12s ease',
+                                    maxWidth: '100%',
+                                  }}
+                                  title={p2?.id ? "View competitor tournament profile" : undefined}
+                                >
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', width: '50px', flexShrink: 0 }}>
+                                    {p2?.country && <CountryFlag country={p2.country} />}
+                                    {p2?.seed && (
+                                      <span
+                                        style={{
+                                          fontSize: '0.65rem',
+                                          padding: '0.06rem 0.28rem',
+                                          borderRadius: 'var(--radius-sm)',
+                                          background: colorWithAlpha(matchAccentColor, 0.12, 'rgba(255, 255, 255, 0.08)'),
+                                          color: matchAccentColor,
+                                          border: `1px solid ${colorWithAlpha(matchAccentColor, 0.25, 'rgba(255, 255, 255, 0.1)')}`,
+                                          fontFamily: 'var(--font-mono)',
+                                          fontWeight: 700,
+                                          lineHeight: 1.1,
+                                        }}
+                                      >
+                                        #{p2.seed}
+                                      </span>
+                                    )}
+                                  </span>
+                                  <span
+                                    style={{
+                                      fontWeight: isComplete ? (p2IsWinner ? 800 : 400) : (p2IsWinner ? 700 : 500),
+                                      fontSize: '0.82rem',
+                                      color: hoveredPlayerKey === `p2-${match.id}`
+                                        ? primaryColor
+                                        : p2IsWinner
+                                        ? primaryColor
+                                        : 'var(--color-text-primary)',
+                                      opacity: hoveredPlayerKey === `p2-${match.id}` ? 1 : isComplete && p1IsWinner ? 0.45 : 1,
+                                      whiteSpace: 'nowrap',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                    }}
+                                  >
+                                    {p2Name}
+                                  </span>
+                                  {p2IsWinner && isComplete && (
+                                    <span
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        width: '14px',
+                                        height: '14px',
+                                        borderRadius: '50%',
+                                        background: colorWithAlpha(primaryColor, 0.25),
+                                        border: `1px solid ${primaryColor}`,
+                                        color: primaryColor,
+                                        flexShrink: 0,
+                                      }}
+                                      title="Winner"
+                                    >
+                                      <Check size={9} strokeWidth={3} />
+                                    </span>
+                                  )}
+                                  {match.player2.isManualOverride && (
+                                    <span
+                                      style={{
+                                        fontSize: '0.6rem',
+                                        fontWeight: 700,
+                                        letterSpacing: '0.04em',
+                                        padding: '0.05rem 0.28rem',
+                                        borderRadius: 'var(--radius-sm)',
+                                        background: 'rgba(245, 158, 11, 0.18)',
+                                        color: '#fbbf24',
+                                        border: '1px solid rgba(245, 158, 11, 0.4)',
+                                        textTransform: 'uppercase',
+                                        lineHeight: 1.1,
+                                      }}
+                                      title="Position manually placed by tournament organizer"
+                                    >
+                                      OVERRIDE
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Player 2 Games Won Score */}
+                              <td
+                                style={{
+                                  ...tdStyle,
+                                  borderBottom: botRowBorder,
+                                  textAlign: 'center',
+                                  paddingRight: '14px',
+                                  fontWeight: p2IsWinner ? 800 : 600,
+                                  fontSize: '0.85rem',
+                                  width: '100px',
+                                  minWidth: '100px',
+                                  maxWidth: '100px',
+                                }}
+                              >
+                                <span
+                                  className="tabular-nums"
+                                  style={{
+                                    display: 'inline-block',
+                                    padding: '0.08rem 0.4rem',
+                                    borderRadius: 'var(--radius-sm)',
+                                    background: p2IsWinner
+                                      ? colorWithAlpha(primaryColor, 0.22, 'rgba(255, 255, 255, 0.08)')
+                                      : 'transparent',
+                                    color: p2IsWinner
+                                      ? primaryColor
+                                      : 'var(--color-text-primary)',
+                                    opacity: isComplete && p1IsWinner ? 0.45 : 1,
+                                    border: p2IsWinner ? `1px solid ${colorWithAlpha(primaryColor, 0.55, 'transparent')}` : '1px solid transparent',
+                                    lineHeight: 1.2,
+                                  }}
+                                >
+                                  {p2ScoreDisplay}
+                                </span>
+                              </td>
+
+                              {/* Games 1 to effectiveGameCount for Player 2 */}
+                              {gameNumbers.map((gNum) => {
+                                const isBeyondBestOf = gNum > matchBestOf;
+                                const game = record?.games.find((g) => g.gameNumber === gNum);
+                                const p1Pts = game?.player1Points;
+                                const p2Pts = game?.player2Points;
+                                const p2WonGame =
+                                  game?.winnerPlayerId === p2?.id ||
+                                  (p1Pts !== null && p2Pts !== null && p1Pts !== undefined && p2Pts !== undefined && p2Pts > p1Pts);
+
+                                return (
+                                  <td
+                                    key={gNum}
+                                    style={{
+                                      ...tdStyle,
+                                      borderBottom: botRowBorder,
+                                      textAlign: 'right',
+                                      padding: '0.24rem 0.35rem',
+                                      width: '86px',
+                                      minWidth: '86px',
+                                      maxWidth: '86px',
+                                      color: isBeyondBestOf ? 'var(--color-text-muted)' : 'var(--color-text-primary)',
+                                      opacity: isBeyondBestOf ? 0.25 : isComplete && p1IsWinner && !p2WonGame ? 0.45 : 1,
+                                    }}
+                                  >
+                                    {isBeyondBestOf ? (
+                                      '—'
+                                    ) : p2Pts !== null && p2Pts !== undefined ? (
+                                      <span
+                                        className="tabular-nums"
+                                        style={{
+                                          padding: '0.1rem 0.28rem',
+                                          margin: '0 3px',
+                                          borderRadius: 'var(--radius-sm)',
+                                          background: p2WonGame ? colorWithAlpha(matchAccentColor, 0.16, 'rgba(255, 255, 255, 0.08)') : 'transparent',
+                                          color: p2WonGame ? matchAccentColor : 'var(--color-text-primary)',
+                                          fontWeight: p2WonGame ? 700 : 400,
+                                          fontSize: '0.78rem',
+                                          fontFamily: 'var(--font-mono)',
+                                          border: p2WonGame ? `1px solid ${colorWithAlpha(matchAccentColor, 0.38, 'transparent')}` : '1px solid transparent',
+                                          display: 'inline-block',
+                                          lineHeight: 1.2,
+                                        }}
+                                      >
+                                        {p2Pts.toLocaleString()}
+                                      </span>
+                                    ) : (
+                                      <span style={{ color: 'rgba(255, 255, 255, 0.15)', fontSize: '0.8rem', marginRight: '6px' }}>·</span>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Slide-out Scorekeeper Drawer */}
       {selectedMatch && (
@@ -628,34 +1249,34 @@ const telemetryBarStyle: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
-  padding: '0.75rem 1rem',
+  padding: '0.55rem 0.85rem',
   background: 'var(--color-bg-surface-elevated)',
   borderRadius: 'var(--radius-md)',
   border: '1px solid var(--color-border)',
   flexWrap: 'wrap',
-  gap: '0.75rem',
+  gap: '0.65rem',
 };
 
 const dropdownMenuStyle: React.CSSProperties = {
   position: 'absolute',
-  top: 'calc(100% + 6px)',
+  top: 'calc(100% + 5px)',
   left: 0,
   background: 'var(--color-bg-surface-elevated)',
   border: '1px solid var(--color-border)',
   borderRadius: 'var(--radius-md)',
   boxShadow: 'var(--shadow-lg)',
   zIndex: 100,
-  minWidth: '240px',
-  padding: '0.5rem',
-  maxHeight: '340px',
+  minWidth: '220px',
+  padding: '0.4rem',
+  maxHeight: '320px',
   overflowY: 'auto',
 };
 
 const dropdownSectionHeaderStyle: React.CSSProperties = {
-  fontSize: '0.7rem',
+  fontSize: '0.68rem',
   textTransform: 'uppercase',
   color: 'var(--color-text-muted)',
-  padding: '0.25rem 0.5rem',
+  padding: '0.2rem 0.45rem',
   fontWeight: 700,
   letterSpacing: '0.05em',
 };
@@ -663,70 +1284,41 @@ const dropdownSectionHeaderStyle: React.CSSProperties = {
 const dropdownItemStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: '0.5rem',
+  gap: '0.45rem',
   width: '100%',
-  padding: '0.45rem 0.6rem',
+  padding: '0.35rem 0.5rem',
   background: 'transparent',
   border: 'none',
   borderRadius: 'var(--radius-sm)',
   color: 'var(--color-text-primary)',
-  fontSize: '0.85rem',
+  fontSize: '0.8rem',
   cursor: 'pointer',
   textAlign: 'left',
 };
 
 const tableStyle: React.CSSProperties = {
-  width: '100%',
-  borderCollapse: 'separate',
-  borderSpacing: 0,
-  fontSize: '0.875rem',
-};
-
-const tableHeaderRowStyle: React.CSSProperties = {
-  background: 'var(--color-bg-surface-highlight)',
-  borderBottom: '2px solid var(--color-border)',
+  borderCollapse: 'collapse',
+  fontSize: '0.82rem',
+  tableLayout: 'fixed',
 };
 
 const thStyle: React.CSSProperties = {
-  padding: '0.75rem 0.85rem',
+  padding: '0.42rem 0.65rem',
   color: 'var(--color-text-secondary)',
-  fontWeight: 600,
-  fontSize: '0.8rem',
+  fontWeight: 700,
+  fontSize: '0.72rem',
   textTransform: 'uppercase',
-  letterSpacing: '0.04em',
-  borderBottom: '2px solid var(--color-border)',
+  letterSpacing: '0.05em',
+  whiteSpace: 'nowrap',
 };
 
 const tdStyle: React.CSSProperties = {
-  padding: '0.6rem 0.85rem',
+  padding: '0.24rem 0.6rem',
   verticalAlign: 'middle',
 };
 
 const tdMergedStyle: React.CSSProperties = {
-  padding: '0.6rem 0.85rem',
+  padding: '0.24rem 0.6rem',
   verticalAlign: 'middle',
-  borderRight: '1px solid var(--color-border-subtle)',
-};
-
-const roundDividerRowStyle: React.CSSProperties = {
-  background: 'var(--color-bg-base)',
-};
-
-const roundDividerCellStyle: React.CSSProperties = {
-  padding: '0.6rem 1rem',
-  fontSize: '0.8rem',
-  color: 'var(--color-gold-bright)',
-  textTransform: 'uppercase',
-  letterSpacing: '0.06em',
-  borderTop: '2px solid var(--color-border)',
-  borderBottom: '1px solid var(--color-border)',
-};
-
-const seedBadgeStyle: React.CSSProperties = {
-  fontSize: '0.7rem',
-  padding: '0.1rem 0.35rem',
-  borderRadius: 'var(--radius-sm)',
-  background: 'rgba(255, 255, 255, 0.08)',
-  color: 'var(--color-text-muted)',
-  fontFamily: 'var(--font-mono)',
+  borderRight: '1px solid rgba(255, 255, 255, 0.05)',
 };
