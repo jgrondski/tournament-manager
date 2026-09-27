@@ -1,10 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Tournament, TournamentTier, PlayerProfile } from '../../tournament/types';
 import { BracketMatch, isMatchPlayable, canonicalizeBracketRounds } from '../types';
 import { MatchScoreDrawer } from './MatchScoreDrawer';
-import { colorWithAlpha } from '../colorUtils';
-import { Clock, CheckCircle2, ChevronRight, Lock } from 'lucide-react';
+import {
+  colorWithAlpha,
+  getDefaultTierColors,
+  getAlternateShade,
+  getContrastingTextColor,
+} from '../colorUtils';
+import { Clock, CheckCircle2, ChevronRight, Lock, Search } from 'lucide-react';
 import { PlayerDetailDrawer } from '../../qualifiers/components/PlayerDetailDrawer';
+import { CountryFlag } from '../../players/flagUtils';
+import { getInheritedRoundBestOf } from './OrganizerSheetMatrix';
 
 interface MatchCardFeedProps {
   tournament: Tournament;
@@ -19,8 +26,16 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
   const [isPlayerDrawerOpen, setIsPlayerDrawerOpen] = useState(false);
   const [hoveredPlayerKey, setHoveredPlayerKey] = useState<string | null>(null);
   const [hoveredMatchId, setHoveredMatchId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const rounds = React.useMemo(() => {
+  // Tier color theming matching Master Sheet, Quals, and Standings
+  const defaults = getDefaultTierColors(tier);
+  const primaryColor = tier.primaryColor || defaults.primaryColor || '#f59e0b';
+  const secondaryColor = tier.secondaryColor || defaults.secondaryColor || '#705b33';
+  const cardColor = tier.cardColor || defaults.cardColor || '#161922';
+  const lowerBracketColor = tier.lowerBracketColor || defaults.lowerBracketColor || '#c2410c';
+
+  const rounds = useMemo(() => {
     if (tier.bracket?.rounds) {
       canonicalizeBracketRounds(tier.bracket.rounds);
     }
@@ -28,7 +43,7 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
   }, [tier.bracket?.rounds]);
   const isDoubleElim = tier.eliminationType === 'DOUBLE';
 
-  const visibleRounds = React.useMemo(() => {
+  const visibleRounds = useMemo(() => {
     if (!isDoubleElim || selectedStage === 'ALL') {
       return rounds;
     }
@@ -61,12 +76,43 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
   }, [rounds, isDoubleElim, selectedStage]);
 
   const currentRound = visibleRounds[selectedRoundIdx] || visibleRounds[0] || rounds[0];
-  const primaryColor = tier.primaryColor || '#f59e0b';
+  const inheritedBestOf = currentRound ? getInheritedRoundBestOf(currentRound, tier) : (tier.bestOf || 5);
 
-  const handlePlayerClick = (pId: string, pName: string) => {
+  const isLoserRound =
+    currentRound?.stage === 'LOSERS' ||
+    Boolean(currentRound?.name?.toLowerCase().includes('loser'));
+  const roundAccentColor = isLoserRound ? lowerBracketColor : primaryColor;
+
+  // Round completion progress
+  const completedCount = useMemo(() => {
+    if (!currentRound?.matches) return 0;
+    return currentRound.matches.filter(m => {
+      const rec = tournament.matchScores[m.id];
+      const p1 = m.player1.player;
+      const p2 = m.player2.player;
+      return (p1?.id && m.winnerId === p1.id) || (p2?.id && m.winnerId === p2.id) || rec?.isComplete;
+    }).length;
+  }, [currentRound?.matches, tournament.matchScores]);
+
+  // Search filter for quick match/player location on mobile
+  const filteredMatches = useMemo(() => {
+    const matches = currentRound?.matches || [];
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return matches;
+    return matches.filter((m) => {
+      const p1Name = m.player1.player?.name?.toLowerCase() || '';
+      const p2Name = m.player2.player?.name?.toLowerCase() || '';
+      const matchNum = `#${m.matchNumber}`.toLowerCase();
+      const numOnly = m.matchNumber.toString();
+      return p1Name.includes(query) || p2Name.includes(query) || matchNum.includes(query) || numOnly === query;
+    });
+  }, [currentRound?.matches, searchTerm]);
+
+  const handlePlayerClick = (pId: string, pName: string, country?: string) => {
     const profile = (tournament.playersPool || []).find(p => p.id === pId) || {
       id: pId,
       name: pName,
+      country,
       personalBest: 0,
       playstyle: 'DAS',
     };
@@ -75,13 +121,34 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
   };
 
   return (
-    <div style={{ maxWidth: '680px', margin: '0 auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <div
+      style={{
+        width: '100%',
+        maxWidth: '480px',
+        margin: '0 auto',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.75rem',
+        boxSizing: 'border-box',
+      }}
+    >
       {/* Stage Filter Tabs (Winners / Losers / Grand Finals) for Double Elimination */}
       {isDoubleElim && (
-        <div style={{ display: 'flex', gap: '0.4rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem', overflowX: 'auto' }}>
+        <div
+          style={{
+            display: 'flex',
+            gap: '0.35rem',
+            paddingBottom: '0.2rem',
+            overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none',
+          }}
+        >
           {(['ALL', 'WINNERS', 'LOSERS', 'GRAND_FINALS'] as const).map((stage) => {
-            const label = stage === 'ALL' ? 'All Rounds' : stage === 'WINNERS' ? 'Winners' : stage === 'LOSERS' ? 'Losers' : 'Finals';
+            const label = stage === 'ALL' ? 'All' : stage === 'WINNERS' ? 'Winners' : stage === 'LOSERS' ? 'Losers' : 'Finals';
             const isSelected = selectedStage === stage;
+            const stageAccent = stage === 'LOSERS' ? lowerBracketColor : primaryColor;
+            const contrast = getContrastingTextColor(stageAccent);
             return (
               <button
                 key={stage}
@@ -89,13 +156,18 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
                   setSelectedStage(stage);
                   setSelectedRoundIdx(0);
                 }}
-                className={`btn btn-sm ${isSelected ? 'btn-primary' : 'btn-secondary'}`}
                 style={{
-                  fontSize: '0.75rem',
+                  fontSize: '0.72rem',
                   fontWeight: isSelected ? 800 : 600,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.04em',
+                  padding: '0.3rem 0.65rem',
+                  borderRadius: 'var(--radius-full)',
+                  border: isSelected ? `1px solid ${stageAccent}` : `1px solid ${colorWithAlpha(secondaryColor, 0.4, 'var(--color-border)')}`,
+                  background: isSelected ? stageAccent : getAlternateShade(cardColor, 6),
+                  color: isSelected ? contrast : 'var(--color-text-secondary)',
+                  cursor: 'pointer',
                   whiteSpace: 'nowrap',
+                  transition: 'all 0.12s ease',
+                  flexShrink: 0,
                 }}
               >
                 {label}
@@ -106,245 +178,573 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
       )}
 
       {/* Round Selector Bar */}
-      <div style={{ overflowX: 'auto', display: 'flex', gap: '0.5rem', paddingBottom: '0.5rem' }}>
-        {visibleRounds.map((round, idx) => (
-          <button
-            key={round.roundNumber}
-            onClick={() => setSelectedRoundIdx(idx)}
-            className={`btn ${selectedRoundIdx === idx ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ padding: '0.4rem 0.85rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
-          >
-            {round.name}
-          </button>
-        ))}
-      </div>
-
-      {/* Matches Feed */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-        {currentRound?.matches.map((match) => {
-          const record = tournament.matchScores[match.id];
-          const p1 = match.player1.player;
-          const p2 = match.player2.player;
-
-          const getSlotPlaceholder = (slot: typeof match.player1, fallbackNumber: number) => {
-            if (!slot.sourceMatchId) return 'TBD';
-            const src = tier.bracket.matchesById[slot.sourceMatchId];
-            if (!src) return 'TBD';
-            const isLoserDrop = match.stage === 'LOSERS' && src.stage === 'WINNERS';
-            return `${isLoserDrop ? 'Loser' : 'Winner'} of Match #${src.matchNumber || fallbackNumber}`;
-          };
-
-          const p1Name = p1?.name || getSlotPlaceholder(match.player1, 1);
-          const p2Name = p2?.name || getSlotPlaceholder(match.player2, 2);
-
-          const p1Wins = record?.player1Wins || 0;
-          const p2Wins = record?.player2Wins || 0;
-          const matchBestOf = record?.bestOf || match.bestOf || tier.bestOf || 5;
-          const hasTieGame = Boolean(record?.games?.some(g => g.winnerPlayerId === 'TIE' || (g.player1Points !== null && g.player1Points === g.player2Points && g.player1Points > 0)));
-          const hasTiebreaker = Boolean(record?.hasTiebreaker || hasTieGame || (record?.games && record.games.length > matchBestOf));
-          const p1ScoreDisplay = hasTiebreaker ? `${p1Wins} (t)` : `${p1Wins}`;
-          const p2ScoreDisplay = hasTiebreaker ? `${p2Wins} (t)` : `${p2Wins}`;
-
-          const isPlayable = isMatchPlayable(match);
-          const isComplete = Boolean((p1?.id && match.winnerId === p1.id) || (p2?.id && match.winnerId === p2.id) || record?.isComplete);
-          const inProgress = !isComplete && (p1Wins > 0 || p2Wins > 0);
-          const p1Won = Boolean(p1?.id && (match.winnerId === p1.id || record?.winnerPlayerId === p1.id));
-          const p2Won = Boolean(p2?.id && (match.winnerId === p2.id || record?.winnerPlayerId === p2.id));
-          const isMatchCardHovered = hoveredMatchId === match.id;
-
+      <div
+        style={{
+          overflowX: 'auto',
+          display: 'flex',
+          gap: '0.4rem',
+          paddingBottom: '0.2rem',
+          WebkitOverflowScrolling: 'touch',
+          scrollbarWidth: 'none',
+        }}
+      >
+        {visibleRounds.map((round, idx) => {
+          const isSelected = selectedRoundIdx === idx;
+          const isRoundLoser = round.stage === 'LOSERS' || Boolean(round.name?.toLowerCase().includes('loser'));
+          const rColor = isRoundLoser ? lowerBracketColor : primaryColor;
+          const contrast = getContrastingTextColor(rColor);
           return (
-            <div
-              key={match.id}
-              onClick={() => {
-                if (isPlayable && tournament.isLocked) setActiveMatch(match);
-              }}
-              onMouseEnter={() => setHoveredMatchId(match.id)}
-              onMouseLeave={() => setHoveredMatchId(null)}
+            <button
+              key={round.roundNumber}
+              onClick={() => setSelectedRoundIdx(idx)}
               style={{
-                background: isMatchCardHovered
-                  ? colorWithAlpha(primaryColor, 0.06, 'var(--color-bg-surface-elevated)')
-                  : 'var(--color-bg-surface)',
-                borderRadius: 'var(--radius-md)',
-                border: inProgress
-                  ? `2px solid ${primaryColor}`
-                  : isMatchCardHovered
-                  ? `1px solid ${colorWithAlpha(primaryColor, 0.6, 'var(--color-gold)')}`
-                  : isComplete
-                  ? '1px solid var(--color-border)'
-                  : '1px solid var(--color-border-subtle)',
-                boxShadow: inProgress
-                  ? `0 0 12px ${colorWithAlpha(primaryColor, 0.3, 'rgba(245, 158, 11, 0.25)')}`
-                  : isMatchCardHovered
-                  ? 'var(--shadow-md)'
-                  : 'var(--shadow-sm)',
-                padding: '1rem',
-                cursor: isPlayable && tournament.isLocked ? 'pointer' : 'default',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.85rem',
-                opacity: isPlayable ? 1 : 0.65,
-                transition: 'all 0.15s ease',
+                padding: '0.35rem 0.75rem',
+                fontSize: '0.76rem',
+                fontWeight: isSelected ? 800 : 600,
+                borderRadius: 'var(--radius-full)',
+                border: isSelected ? `1px solid ${rColor}` : `1px solid ${colorWithAlpha(secondaryColor, 0.4, 'var(--color-border)')}`,
+                background: isSelected ? rColor : getAlternateShade(cardColor, 6),
+                color: isSelected ? contrast : 'var(--color-text-secondary)',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.12s ease',
+                flexShrink: 0,
+                boxShadow: isSelected ? `0 0 8px ${colorWithAlpha(rColor, 0.35)}` : 'none',
               }}
             >
-              {/* Card Top */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span
-                    style={{
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      padding: '0.2rem 0.55rem',
-                      borderRadius: 'var(--radius-sm)',
-                      background: colorWithAlpha(primaryColor, 0.15, 'var(--color-gold-bg)'),
-                      color: primaryColor,
-                      border: `1px solid ${colorWithAlpha(primaryColor, 0.4, 'var(--color-gold)')}`,
-                    }}
-                  >
-                    Match #{match.matchNumber}
-                  </span>
-                  {currentRound?.name && (
-                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
-                      {currentRound.name}
-                    </span>
-                  )}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  {!tournament.isLocked ? (
-                    <span className="badge badge-muted" title="Scores locked during Qualifiers Mode">
-                      <Lock size={12} /> Qualifiers Mode
-                    </span>
-                  ) : isComplete ? (
-                    <span className="badge badge-green">
-                      <CheckCircle2 size={12} /> Complete
-                    </span>
-                  ) : inProgress ? (
-                    <span
-                      style={{
-                        fontSize: '0.7rem',
-                        fontWeight: 700,
-                        padding: '0.15rem 0.5rem',
-                        borderRadius: 'var(--radius-sm)',
-                        background: colorWithAlpha(primaryColor, 0.15, 'var(--color-gold-bg)'),
-                        color: primaryColor,
-                        border: `1px solid ${colorWithAlpha(primaryColor, 0.4, 'var(--color-gold)')}`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.35rem',
-                      }}
-                      className="animate-pulse-border"
-                    >
-                      <Clock size={12} /> Live (Bo{matchBestOf})
-                    </span>
-                  ) : (
-                    <span className="badge badge-muted">Ready</span>
-                  )}
-                  {tournament.isLocked && <ChevronRight size={18} color="var(--color-text-muted)" />}
-                </div>
-              </div>
-
-              {/* Matchup row */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {/* Player 1 Row */}
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '0.5rem 0.75rem',
-                    borderRadius: 'var(--radius-sm)',
-                    background: p1Won ? colorWithAlpha(primaryColor, 0.18, 'var(--color-gold-bg)') : 'var(--color-bg-surface-elevated)',
-                  }}
-                >
-                  <div
-                    onClick={(e) => {
-                      if (p1?.id) {
-                        e.stopPropagation();
-                        handlePlayerClick(p1.id, p1.name);
-                      }
-                    }}
-                    onMouseEnter={() => p1?.id && setHoveredPlayerKey(`p1-${match.id}`)}
-                    onMouseLeave={() => setHoveredPlayerKey(null)}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      padding: '0.2rem 0.45rem',
-                      borderRadius: 'var(--radius-sm)',
-                      background: hoveredPlayerKey === `p1-${match.id}` ? 'rgba(251, 191, 36, 0.18)' : 'transparent',
-                      boxShadow: hoveredPlayerKey === `p1-${match.id}` ? '0 0 0 1px var(--color-gold)' : 'none',
-                      cursor: p1?.id ? 'pointer' : 'inherit',
-                      transition: 'all 0.15s ease',
-                    }}
-                    title={p1?.id ? "View competitor tournament profile" : undefined}
-                  >
-                    {p1?.seed && <span style={badgeSeedStyle}>#{p1.seed}</span>}
-                    <span
-                      style={{
-                        fontWeight: p1Won ? 700 : 500,
-                        color: hoveredPlayerKey === `p1-${match.id}` ? 'var(--color-gold-bright)' : p1Won ? primaryColor : 'var(--color-text-primary)',
-                      }}
-                    >
-                      {p1Name}
-                    </span>
-                  </div>
-                  <span className="tabular-nums" style={{ fontSize: '1.25rem', fontWeight: 800, color: p1Won ? primaryColor : 'inherit' }}>
-                    {p1ScoreDisplay}
-                  </span>
-                </div>
-
-                {/* Player 2 Row */}
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '0.5rem 0.75rem',
-                    borderRadius: 'var(--radius-sm)',
-                    background: p2Won ? colorWithAlpha(primaryColor, 0.18, 'var(--color-gold-bg)') : 'var(--color-bg-surface-elevated)',
-                  }}
-                >
-                  <div
-                    onClick={(e) => {
-                      if (p2?.id) {
-                        e.stopPropagation();
-                        handlePlayerClick(p2.id, p2.name);
-                      }
-                    }}
-                    onMouseEnter={() => p2?.id && setHoveredPlayerKey(`p2-${match.id}`)}
-                    onMouseLeave={() => setHoveredPlayerKey(null)}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      padding: '0.2rem 0.45rem',
-                      borderRadius: 'var(--radius-sm)',
-                      background: hoveredPlayerKey === `p2-${match.id}` ? 'rgba(251, 191, 36, 0.18)' : 'transparent',
-                      boxShadow: hoveredPlayerKey === `p2-${match.id}` ? '0 0 0 1px var(--color-gold)' : 'none',
-                      cursor: p2?.id ? 'pointer' : 'inherit',
-                      transition: 'all 0.15s ease',
-                    }}
-                    title={p2?.id ? "View competitor tournament profile" : undefined}
-                  >
-                    {p2?.seed && <span style={badgeSeedStyle}>#{p2.seed}</span>}
-                    <span
-                      style={{
-                        fontWeight: p2Won ? 700 : 500,
-                        color: hoveredPlayerKey === `p2-${match.id}` ? 'var(--color-gold-bright)' : p2Won ? primaryColor : 'var(--color-text-primary)',
-                      }}
-                    >
-                      {p2Name}
-                    </span>
-                  </div>
-                  <span className="tabular-nums" style={{ fontSize: '1.25rem', fontWeight: 800, color: p2Won ? primaryColor : 'inherit' }}>
-                    {p2ScoreDisplay}
-                  </span>
-                </div>
-              </div>
-            </div>
+              {round.name}
+            </button>
           );
         })}
       </div>
 
+      {/* Search & Round Context Bar */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        {/* Compact Quick Search */}
+        <div style={{ position: 'relative', width: '100%' }}>
+          <Search
+            size={13}
+            style={{
+              position: 'absolute',
+              left: '0.65rem',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: 'var(--color-text-muted)',
+            }}
+          />
+          <input
+            type="text"
+            placeholder="Search match # or player..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '0.35rem 0.6rem 0.35rem 1.85rem',
+              fontSize: '0.78rem',
+              borderRadius: 'var(--radius-sm)',
+              border: `1px solid ${colorWithAlpha(secondaryColor, 0.45, 'var(--color-border)')}`,
+              background: getAlternateShade(cardColor, 4),
+              color: 'var(--color-text-primary)',
+              boxSizing: 'border-box',
+            }}
+          />
+        </div>
+
+        {/* Round Summary Banner with Left Accent Border */}
+        {currentRound && (
+          <div
+            style={{
+              padding: '0.45rem 0.75rem',
+              background: getAlternateShade(cardColor, 3),
+              borderRadius: 'var(--radius-md)',
+              border: `1px solid ${colorWithAlpha(secondaryColor, 0.45, 'var(--color-border)')}`,
+              borderLeft: `4px solid ${roundAccentColor}`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '0.5rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span
+                style={{
+                  fontWeight: 800,
+                  fontSize: '0.82rem',
+                  color: 'var(--color-text-primary)',
+                  letterSpacing: '0.03em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {currentRound.name}
+              </span>
+              <span
+                style={{
+                  fontSize: '0.68rem',
+                  padding: '0.08rem 0.38rem',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid var(--color-border)',
+                  color: 'var(--color-text-secondary)',
+                  fontWeight: 600,
+                  fontFamily: 'var(--font-mono)',
+                }}
+              >
+                Best of {inheritedBestOf}
+              </span>
+            </div>
+            <span
+              className="tabular-nums"
+              style={{
+                fontSize: '0.7rem',
+                fontWeight: 600,
+                padding: '0.1rem 0.45rem',
+                borderRadius: 'var(--radius-full)',
+                background: 'rgba(255, 255, 255, 0.06)',
+                color: 'var(--color-text-secondary)',
+                border: '1px solid var(--color-border)',
+              }}
+            >
+              {completedCount} / {currentRound.matches.length} Done
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Matches Feed */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+        {filteredMatches.length === 0 ? (
+          <div
+            style={{
+              padding: '2rem 1rem',
+              textAlign: 'center',
+              color: 'var(--color-text-muted)',
+              background: cardColor,
+              borderRadius: 'var(--radius-md)',
+              border: `1px solid ${colorWithAlpha(secondaryColor, 0.35, 'var(--color-border)')}`,
+              fontSize: '0.82rem',
+            }}
+          >
+            {searchTerm ? `No matches found matching "${searchTerm}".` : 'No matches available in this round.'}
+          </div>
+        ) : (
+          filteredMatches.map((match) => {
+            const record = tournament.matchScores[match.id];
+            const p1 = match.player1.player;
+            const p2 = match.player2.player;
+
+            const getSlotPlaceholder = (slot: typeof match.player1, fallbackNumber: number) => {
+              if (!slot.sourceMatchId) return 'TBD';
+              const src = tier.bracket.matchesById[slot.sourceMatchId];
+              if (!src) return 'TBD';
+              const isLoserDrop = match.stage === 'LOSERS' && src.stage === 'WINNERS';
+              return `${isLoserDrop ? 'Loser' : 'Winner'} #${src.matchNumber || fallbackNumber}`;
+            };
+
+            const p1Name = p1?.name || getSlotPlaceholder(match.player1, 1);
+            const p2Name = p2?.name || getSlotPlaceholder(match.player2, 2);
+
+            const p1Wins = record?.player1Wins || 0;
+            const p2Wins = record?.player2Wins || 0;
+            const matchBestOf = record?.bestOf || match.bestOf || tier.bestOf || 5;
+            const hasTieGame = Boolean(record?.games?.some(g => g.winnerPlayerId === 'TIE' || (g.player1Points !== null && g.player1Points === g.player2Points && g.player1Points > 0)));
+            const hasTiebreaker = Boolean(record?.hasTiebreaker || hasTieGame || (record?.games && record.games.length > matchBestOf));
+            const p1ScoreDisplay = hasTiebreaker ? `${p1Wins} (t)` : `${p1Wins}`;
+            const p2ScoreDisplay = hasTiebreaker ? `${p2Wins} (t)` : `${p2Wins}`;
+
+            const isPlayable = isMatchPlayable(match);
+            const isComplete = Boolean((p1?.id && match.winnerId === p1.id) || (p2?.id && match.winnerId === p2.id) || record?.isComplete);
+            const inProgress = !isComplete && (p1Wins > 0 || p2Wins > 0);
+            const p1Won = Boolean(p1?.id && (match.winnerId === p1.id || record?.winnerPlayerId === p1.id));
+            const p2Won = Boolean(p2?.id && (match.winnerId === p2.id || record?.winnerPlayerId === p2.id));
+            const isMatchCardHovered = hoveredMatchId === match.id;
+
+            const isLoserMatch =
+              match.stage === 'LOSERS' ||
+              isLoserRound;
+            const matchAccentColor = isLoserMatch ? lowerBracketColor : primaryColor;
+
+            return (
+              <div
+                key={match.id}
+                onClick={() => {
+                  if (isPlayable && tournament.isLocked) setActiveMatch(match);
+                }}
+                onMouseEnter={() => setHoveredMatchId(match.id)}
+                onMouseLeave={() => setHoveredMatchId(null)}
+                style={{
+                  background: isMatchCardHovered
+                    ? getAlternateShade(cardColor, 8)
+                    : cardColor,
+                  borderRadius: 'var(--radius-md)',
+                  border: inProgress
+                    ? `2px solid ${primaryColor}`
+                    : isMatchCardHovered
+                    ? `1px solid ${colorWithAlpha(primaryColor, 0.6, 'var(--color-gold)')}`
+                    : isComplete
+                    ? `1px solid ${colorWithAlpha(secondaryColor, 0.4, 'var(--color-border)')}`
+                    : `1px solid ${colorWithAlpha(secondaryColor, 0.25, 'var(--color-border-subtle)')}`,
+                  boxShadow: inProgress
+                    ? `0 0 12px ${colorWithAlpha(primaryColor, 0.3, 'rgba(245, 158, 11, 0.25)')}`
+                    : isMatchCardHovered
+                    ? 'var(--shadow-md)'
+                    : 'var(--shadow-sm)',
+                  padding: '0.75rem',
+                  cursor: isPlayable && tournament.isLocked ? 'pointer' : 'default',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.55rem',
+                  opacity: isPlayable ? 1 : 0.65,
+                  transition: 'all 0.12s ease',
+                  boxSizing: 'border-box',
+                }}
+              >
+                {/* Card Top: Match # badge on left, status on right (Round name removed per user request) */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <span
+                      style={{
+                        fontSize: '0.74rem',
+                        fontWeight: 800,
+                        fontFamily: 'var(--font-mono)',
+                        padding: '0.15rem 0.5rem',
+                        borderRadius: 'var(--radius-sm)',
+                        background: colorWithAlpha(matchAccentColor, 0.15, 'rgba(255, 255, 255, 0.08)'),
+                        color: matchAccentColor,
+                        border: `1px solid ${colorWithAlpha(matchAccentColor, 0.35, 'transparent')}`,
+                      }}
+                    >
+                      Match #{match.matchNumber}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    {!tournament.isLocked ? (
+                      <span
+                        style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 600,
+                          padding: '0.12rem 0.45rem',
+                          borderRadius: 'var(--radius-sm)',
+                          background: 'rgba(255, 255, 255, 0.06)',
+                          color: 'var(--color-text-muted)',
+                          border: '1px solid var(--color-border)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                        }}
+                        title="Scores locked during Qualifiers Mode"
+                      >
+                        <Lock size={11} /> Qualifiers
+                      </span>
+                    ) : isComplete ? (
+                      <span
+                        style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          padding: '0.12rem 0.45rem',
+                          borderRadius: 'var(--radius-sm)',
+                          background: 'rgba(34, 197, 94, 0.15)',
+                          color: '#4ade80',
+                          border: '1px solid rgba(34, 197, 94, 0.35)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                        }}
+                      >
+                        <CheckCircle2 size={11} /> Complete
+                      </span>
+                    ) : inProgress ? (
+                      <span
+                        style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          padding: '0.12rem 0.45rem',
+                          borderRadius: 'var(--radius-sm)',
+                          background: colorWithAlpha(primaryColor, 0.15, 'rgba(245, 158, 11, 0.1)'),
+                          color: primaryColor,
+                          border: `1px solid ${colorWithAlpha(primaryColor, 0.4, 'rgba(245, 158, 11, 0.3)')}`,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                        }}
+                        className="animate-pulse-border"
+                      >
+                        <Clock size={11} /> Live (Bo{matchBestOf})
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 600,
+                          padding: '0.12rem 0.45rem',
+                          borderRadius: 'var(--radius-sm)',
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          color: 'var(--color-text-muted)',
+                          border: '1px solid var(--color-border)',
+                        }}
+                      >
+                        Ready
+                      </span>
+                    )}
+                    {tournament.isLocked && isPlayable && (
+                      <ChevronRight size={15} color="var(--color-text-muted)" style={{ opacity: 0.6 }} />
+                    )}
+                  </div>
+                </div>
+
+                {/* Matchup Rows */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  {/* Player 1 Row */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '0.5rem 0.65rem',
+                      borderRadius: 'var(--radius-sm)',
+                      background: p1Won
+                        ? colorWithAlpha(primaryColor, 0.18, 'rgba(255, 255, 255, 0.08)')
+                        : getAlternateShade(cardColor, 6),
+                      border: p1Won
+                        ? `1px solid ${colorWithAlpha(primaryColor, 0.45, 'transparent')}`
+                        : `1px solid ${colorWithAlpha(secondaryColor, 0.18, 'rgba(255, 255, 255, 0.04)')}`,
+                      transition: 'all 0.12s ease',
+                    }}
+                  >
+                    <div
+                      onClick={(e) => {
+                        if (p1?.id) {
+                          e.stopPropagation();
+                          handlePlayerClick(p1.id, p1.name, p1.country);
+                        }
+                      }}
+                      onMouseEnter={() => p1?.id && setHoveredPlayerKey(`p1-${match.id}`)}
+                      onMouseLeave={() => setHoveredPlayerKey(null)}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        padding: '0.1rem 0.35rem',
+                        borderRadius: 'var(--radius-sm)',
+                        background: hoveredPlayerKey === `p1-${match.id}` ? colorWithAlpha(primaryColor, 0.15) : 'transparent',
+                        boxShadow: hoveredPlayerKey === `p1-${match.id}` ? `0 0 0 1px ${primaryColor}` : 'none',
+                        cursor: p1?.id ? 'pointer' : 'inherit',
+                        transition: 'all 0.12s ease',
+                        maxWidth: 'calc(100% - 50px)',
+                        minWidth: 0,
+                      }}
+                      title={p1?.id ? "View competitor tournament profile" : undefined}
+                    >
+                      {p1?.country && <CountryFlag country={p1.country} />}
+                      {p1?.seed && (
+                        <span
+                          style={{
+                            fontSize: '0.65rem',
+                            padding: '0.06rem 0.28rem',
+                            borderRadius: 'var(--radius-sm)',
+                            background: colorWithAlpha(matchAccentColor, 0.12, 'rgba(255, 255, 255, 0.08)'),
+                            color: matchAccentColor,
+                            border: `1px solid ${colorWithAlpha(matchAccentColor, 0.25, 'rgba(255, 255, 255, 0.1)')}`,
+                            fontFamily: 'var(--font-mono)',
+                            fontWeight: 700,
+                            lineHeight: 1.1,
+                            flexShrink: 0,
+                          }}
+                        >
+                          #{p1.seed}
+                        </span>
+                      )}
+                      {match.player1.isManualOverride && (
+                        <span
+                          style={{
+                            fontSize: '0.58rem',
+                            fontWeight: 700,
+                            letterSpacing: '0.04em',
+                            padding: '0.05rem 0.25rem',
+                            borderRadius: 'var(--radius-sm)',
+                            background: 'rgba(245, 158, 11, 0.18)',
+                            color: '#fbbf24',
+                            border: '1px solid rgba(245, 158, 11, 0.4)',
+                            textTransform: 'uppercase',
+                            lineHeight: 1.1,
+                            flexShrink: 0,
+                          }}
+                          title="Position manually placed by tournament organizer"
+                        >
+                          OVERRIDE
+                        </span>
+                      )}
+                      <span
+                        style={{
+                          fontWeight: isComplete ? (p1Won ? 800 : 400) : (p1Wins > p2Wins ? 700 : 500),
+                          fontSize: '0.85rem',
+                          color: hoveredPlayerKey === `p1-${match.id}`
+                            ? primaryColor
+                            : p1Won
+                            ? primaryColor
+                            : 'var(--color-text-primary)',
+                          opacity: hoveredPlayerKey === `p1-${match.id}` ? 1 : isComplete && p2Won ? 0.45 : 1,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {p1Name}
+                      </span>
+                    </div>
+
+                    <span
+                      className="tabular-nums"
+                      style={{
+                        fontSize: '1.15rem',
+                        fontWeight: p1Won ? 800 : 600,
+                        padding: '0.1rem 0.5rem',
+                        borderRadius: 'var(--radius-sm)',
+                        background: p1Won
+                          ? colorWithAlpha(primaryColor, 0.22, 'rgba(255, 255, 255, 0.08)')
+                          : 'transparent',
+                        color: p1Won ? primaryColor : 'var(--color-text-primary)',
+                        opacity: isComplete && p2Won ? 0.45 : 1,
+                        border: p1Won
+                          ? `1px solid ${colorWithAlpha(primaryColor, 0.55, 'transparent')}`
+                          : '1px solid transparent',
+                        lineHeight: 1.2,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {p1ScoreDisplay}
+                    </span>
+                  </div>
+
+                  {/* Player 2 Row */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '0.5rem 0.65rem',
+                      borderRadius: 'var(--radius-sm)',
+                      background: p2Won
+                        ? colorWithAlpha(primaryColor, 0.18, 'rgba(255, 255, 255, 0.08)')
+                        : getAlternateShade(cardColor, 6),
+                      border: p2Won
+                        ? `1px solid ${colorWithAlpha(primaryColor, 0.45, 'transparent')}`
+                        : `1px solid ${colorWithAlpha(secondaryColor, 0.18, 'rgba(255, 255, 255, 0.04)')}`,
+                      transition: 'all 0.12s ease',
+                    }}
+                  >
+                    <div
+                      onClick={(e) => {
+                        if (p2?.id) {
+                          e.stopPropagation();
+                          handlePlayerClick(p2.id, p2.name, p2.country);
+                        }
+                      }}
+                      onMouseEnter={() => p2?.id && setHoveredPlayerKey(`p2-${match.id}`)}
+                      onMouseLeave={() => setHoveredPlayerKey(null)}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        padding: '0.1rem 0.35rem',
+                        borderRadius: 'var(--radius-sm)',
+                        background: hoveredPlayerKey === `p2-${match.id}` ? colorWithAlpha(primaryColor, 0.15) : 'transparent',
+                        boxShadow: hoveredPlayerKey === `p2-${match.id}` ? `0 0 0 1px ${primaryColor}` : 'none',
+                        cursor: p2?.id ? 'pointer' : 'inherit',
+                        transition: 'all 0.12s ease',
+                        maxWidth: 'calc(100% - 50px)',
+                        minWidth: 0,
+                      }}
+                      title={p2?.id ? "View competitor tournament profile" : undefined}
+                    >
+                      {p2?.country && <CountryFlag country={p2.country} />}
+                      {p2?.seed && (
+                        <span
+                          style={{
+                            fontSize: '0.65rem',
+                            padding: '0.06rem 0.28rem',
+                            borderRadius: 'var(--radius-sm)',
+                            background: colorWithAlpha(matchAccentColor, 0.12, 'rgba(255, 255, 255, 0.08)'),
+                            color: matchAccentColor,
+                            border: `1px solid ${colorWithAlpha(matchAccentColor, 0.25, 'rgba(255, 255, 255, 0.1)')}`,
+                            fontFamily: 'var(--font-mono)',
+                            fontWeight: 700,
+                            lineHeight: 1.1,
+                            flexShrink: 0,
+                          }}
+                        >
+                          #{p2.seed}
+                        </span>
+                      )}
+                      {match.player2.isManualOverride && (
+                        <span
+                          style={{
+                            fontSize: '0.58rem',
+                            fontWeight: 700,
+                            letterSpacing: '0.04em',
+                            padding: '0.05rem 0.25rem',
+                            borderRadius: 'var(--radius-sm)',
+                            background: 'rgba(245, 158, 11, 0.18)',
+                            color: '#fbbf24',
+                            border: '1px solid rgba(245, 158, 11, 0.4)',
+                            textTransform: 'uppercase',
+                            lineHeight: 1.1,
+                            flexShrink: 0,
+                          }}
+                          title="Position manually placed by tournament organizer"
+                        >
+                          OVERRIDE
+                        </span>
+                      )}
+                      <span
+                        style={{
+                          fontWeight: isComplete ? (p2Won ? 800 : 400) : (p2Wins > p1Wins ? 700 : 500),
+                          fontSize: '0.85rem',
+                          color: hoveredPlayerKey === `p2-${match.id}`
+                            ? primaryColor
+                            : p2Won
+                            ? primaryColor
+                            : 'var(--color-text-primary)',
+                          opacity: hoveredPlayerKey === `p2-${match.id}` ? 1 : isComplete && p1Won ? 0.45 : 1,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {p2Name}
+                      </span>
+                    </div>
+
+                    <span
+                      className="tabular-nums"
+                      style={{
+                        fontSize: '1.15rem',
+                        fontWeight: p2Won ? 800 : 600,
+                        padding: '0.1rem 0.5rem',
+                        borderRadius: 'var(--radius-sm)',
+                        background: p2Won
+                          ? colorWithAlpha(primaryColor, 0.22, 'rgba(255, 255, 255, 0.08)')
+                          : 'transparent',
+                        color: p2Won ? primaryColor : 'var(--color-text-primary)',
+                        opacity: isComplete && p1Won ? 0.45 : 1,
+                        border: p2Won
+                          ? `1px solid ${colorWithAlpha(primaryColor, 0.55, 'transparent')}`
+                          : '1px solid transparent',
+                        lineHeight: 1.2,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {p2ScoreDisplay}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Slide-out Scorekeeper Drawer */}
       {activeMatch && (
         <MatchScoreDrawer
           isOpen={true}
@@ -357,6 +757,7 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
         />
       )}
 
+      {/* Slide-out Player Detail Profile Drawer */}
       {selectedPlayerForDrawer && (
         <PlayerDetailDrawer
           isOpen={isPlayerDrawerOpen}
@@ -370,14 +771,4 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
       )}
     </div>
   );
-};
-
-const badgeSeedStyle: React.CSSProperties = {
-  fontSize: '0.75rem',
-  padding: '0.15rem 0.4rem',
-  borderRadius: 'var(--radius-sm)',
-  background: 'rgba(255, 255, 255, 0.08)',
-  color: 'var(--color-text-muted)',
-  fontWeight: 600,
-  fontFamily: 'var(--font-mono)',
 };

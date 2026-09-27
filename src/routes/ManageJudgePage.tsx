@@ -160,7 +160,7 @@ export const ManageJudgePage: React.FC = () => {
         </Link>
       </div>
 
-      <main style={{ flex: 1, padding: '1rem 0' }}>
+      <main style={{ flex: 1, padding: '0.75rem 0.5rem', width: '100%', maxWidth: '520px', margin: '0 auto', boxSizing: 'border-box' }}>
         <MatchCardFeed
           tournament={tournament}
           tier={tier}

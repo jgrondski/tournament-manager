@@ -905,13 +905,6 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
               ? `1.5px solid ${primaryColor}`
               : `1.5px solid ${secondaryColor}`;
 
-            const cardBorderLeft = branchAccentColor
-              ? `4px solid ${branchAccentColor}`
-              : baseCardBorder;
-            const cardBorderRight = branchAccentColor
-              ? `4px solid ${branchAccentColor}`
-              : baseCardBorder;
-
             const p1NameColor = getHighlightedPlayerNameColor({
               isHighlightActive,
               isTargetSlot: isP1Target,
@@ -1021,10 +1014,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                     height: '100%',
                     background: effectiveCardBg,
                     borderRadius: '5px',
-                    borderTop: baseCardBorder,
-                    borderBottom: baseCardBorder,
-                    borderLeft: cardBorderLeft,
-                    borderRight: cardBorderRight,
+                    border: baseCardBorder,
                     boxShadow: isFocusedMatch
                       ? `0 0 0 3px ${primaryColor}, 0 0 35px ${primaryColor}dd, 0 0 70px ${primaryColor}66`
                       : hoveredAncestry

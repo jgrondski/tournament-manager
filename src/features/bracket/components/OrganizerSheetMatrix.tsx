@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Tournament, TournamentTier, MatchScoreRecord, PlayerProfile } from '../../tournament/types';
 import { BracketMatch, isMatchPlayable, canonicalizeBracketRounds } from '../types';
 import { MatchScoreDrawer } from './MatchScoreDrawer';
@@ -166,6 +166,92 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
   const [hoveredPlayerKey, setHoveredPlayerKey] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Adjustable Competitor Column Width (Google Sheets style resizable)
+  const [competitorColWidth, setCompetitorColWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('tm_master_sheet_competitor_col_width');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= 160 && parsed <= 600) {
+          return parsed;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return 250;
+  });
+
+  const [isResizingCol, setIsResizingCol] = useState(false);
+  const dragStartXRef = useRef<number>(0);
+  const dragStartWidthRef = useRef<number>(250);
+
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizingCol(true);
+    dragStartXRef.current = e.clientX;
+    dragStartWidthRef.current = competitorColWidth;
+  };
+
+  const handleResizeTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      setIsResizingCol(true);
+      dragStartXRef.current = e.touches[0].clientX;
+      dragStartWidthRef.current = competitorColWidth;
+    }
+  };
+
+  const handleResetColWidth = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCompetitorColWidth(250);
+    try {
+      localStorage.setItem('tm_master_sheet_competitor_col_width', '250');
+    } catch {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    if (!isResizingCol) return;
+
+    const onMouseMove = (e: MouseEvent) => {
+      const delta = e.clientX - dragStartXRef.current;
+      const nextWidth = Math.max(160, Math.min(600, dragStartWidthRef.current + delta));
+      setCompetitorColWidth(nextWidth);
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        const delta = e.touches[0].clientX - dragStartXRef.current;
+        const nextWidth = Math.max(160, Math.min(600, dragStartWidthRef.current + delta));
+        setCompetitorColWidth(nextWidth);
+      }
+    };
+
+    const onMouseUp = () => {
+      setIsResizingCol(false);
+      try {
+        localStorage.setItem('tm_master_sheet_competitor_col_width', String(competitorColWidth));
+      } catch {
+        // ignore
+      }
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    window.addEventListener('touchmove', onTouchMove);
+    window.addEventListener('touchend', onMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onMouseUp);
+    };
+  }, [isResizingCol, competitorColWidth]);
+
   // Bracket color themes from tier
   const defaults = getDefaultTierColors(tier);
   const primaryColor = tier.primaryColor || defaults.primaryColor || '#f59e0b';
@@ -264,14 +350,14 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
   };
 
   const maxTableWidth = useMemo(() => {
-    if (filteredRounds.length === 0) return 676;
+    if (filteredRounds.length === 0) return 52 + competitorColWidth + 100 + (3 * 86) + 86;
     return Math.max(
       ...filteredRounds.map(r => {
         const { effectiveGameCount } = getEffectiveRoundGameCount(r, tier, tournament.matchScores);
-        return 52 + 180 + 100 + (effectiveGameCount * 86) + 86;
+        return 52 + competitorColWidth + 100 + (effectiveGameCount * 86) + 86;
       })
     );
-  }, [filteredRounds, tournament.matchScores, tier]);
+  }, [filteredRounds, tournament.matchScores, tier, competitorColWidth]);
 
   return (
     <div
@@ -505,9 +591,9 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
             );
             const gameNumbers = Array.from({ length: effectiveGameCount }, (_, i) => i + 1);
 
-            // Table width: 52 (Match#) + 180 (Competitor) + 100 (Games Won) + (games * 86) + 86 (Complete)
+            // Table width: 52 (Match#) + competitorColWidth (Competitor) + 100 (Games Won) + (games * 86) + 86 (Complete)
             // Maintains equidistant spacing and generous gap between game scores
-            const tableWidth = 52 + 180 + 100 + (effectiveGameCount * 86) + 86;
+            const tableWidth = 52 + competitorColWidth + 100 + (effectiveGameCount * 86) + 86;
 
             return (
               <div
@@ -600,7 +686,56 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                         }}
                       >
                         <th style={{ ...thStyle, width: '52px', minWidth: '52px', maxWidth: '52px', textAlign: 'center', color: textColor }}>Match #</th>
-                        <th style={{ ...thStyle, width: '180px', minWidth: '180px', maxWidth: '180px', textAlign: 'left', paddingLeft: '72px', color: textColor }}>Competitor</th>
+                        <th
+                          style={{
+                            ...thStyle,
+                            width: `${competitorColWidth}px`,
+                            minWidth: `${competitorColWidth}px`,
+                            maxWidth: `${competitorColWidth}px`,
+                            textAlign: 'left',
+                            paddingLeft: '72px',
+                            color: textColor,
+                            position: 'relative',
+                            userSelect: isResizingCol ? 'none' : 'auto',
+                          }}
+                        >
+                          <span>Competitor</span>
+
+                          {/* Google Sheet Style Resizer Handle */}
+                          <div
+                            onMouseDown={handleResizeMouseDown}
+                            onTouchStart={handleResizeTouchStart}
+                            onDoubleClick={handleResetColWidth}
+                            title="Drag to adjust column width (double-click to reset)"
+                            style={{
+                              position: 'absolute',
+                              right: 0,
+                              top: 0,
+                              bottom: 0,
+                              width: '10px',
+                              cursor: 'col-resize',
+                              zIndex: 10,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              touchAction: 'none',
+                              userSelect: 'none',
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: isResizingCol ? '3px' : '2px',
+                                height: '65%',
+                                borderRadius: '1px',
+                                background: isResizingCol
+                                  ? primaryColor
+                                  : colorWithAlpha(secondaryColor, 0.7, 'var(--color-border)'),
+                                boxShadow: isResizingCol ? `0 0 6px ${primaryColor}` : 'none',
+                                transition: 'all 0.1s ease',
+                              }}
+                            />
+                          </div>
+                        </th>
                         <th style={{ ...thStyle, width: '100px', minWidth: '100px', maxWidth: '100px', textAlign: 'center', paddingRight: '14px', color: textColor }}>Games Won</th>
                         {gameNumbers.map((gNum) => (
                           <th
@@ -726,7 +861,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                               </td>
 
                               {/* Player 1 Seed & Competitor Info */}
-                              <td style={{ ...tdStyle, borderTop: topRowBorder, borderBottom: midRowBorder, width: '180px', minWidth: '180px', maxWidth: '180px', textAlign: 'left' }}>
+                              <td style={{ ...tdStyle, borderTop: topRowBorder, borderBottom: midRowBorder, width: `${competitorColWidth}px`, minWidth: `${competitorColWidth}px`, maxWidth: `${competitorColWidth}px`, textAlign: 'left' }}>
                                 <div
                                   onClick={(e) => {
                                     if (p1?.id) {
@@ -747,6 +882,8 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                                     cursor: p1?.id ? 'pointer' : 'inherit',
                                     transition: 'all 0.12s ease',
                                     maxWidth: '100%',
+                                    width: '100%',
+                                    boxSizing: 'border-box',
                                   }}
                                   title={p1?.id ? "View competitor tournament profile" : undefined}
                                 >
@@ -783,29 +920,12 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                                       whiteSpace: 'nowrap',
                                       overflow: 'hidden',
                                       textOverflow: 'ellipsis',
+                                      flex: 1,
+                                      minWidth: 0,
                                     }}
                                   >
                                     {p1Name}
                                   </span>
-                                  {p1IsWinner && isComplete && (
-                                    <span
-                                      style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        width: '14px',
-                                        height: '14px',
-                                        borderRadius: '50%',
-                                        background: colorWithAlpha(primaryColor, 0.25),
-                                        border: `1px solid ${primaryColor}`,
-                                        color: primaryColor,
-                                        flexShrink: 0,
-                                      }}
-                                      title="Winner"
-                                    >
-                                      <Check size={9} strokeWidth={3} />
-                                    </span>
-                                  )}
                                   {match.player1.isManualOverride && (
                                     <span
                                       style={{
@@ -1015,7 +1135,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                               }}
                             >
                               {/* Player 2 Seed & Competitor Info */}
-                              <td style={{ ...tdStyle, borderBottom: botRowBorder, width: '180px', minWidth: '180px', maxWidth: '180px', textAlign: 'left' }}>
+                              <td style={{ ...tdStyle, borderBottom: botRowBorder, width: `${competitorColWidth}px`, minWidth: `${competitorColWidth}px`, maxWidth: `${competitorColWidth}px`, textAlign: 'left' }}>
                                 <div
                                   onClick={(e) => {
                                     if (p2?.id) {
@@ -1036,6 +1156,8 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                                     cursor: p2?.id ? 'pointer' : 'inherit',
                                     transition: 'all 0.12s ease',
                                     maxWidth: '100%',
+                                    width: '100%',
+                                    boxSizing: 'border-box',
                                   }}
                                   title={p2?.id ? "View competitor tournament profile" : undefined}
                                 >
@@ -1072,29 +1194,12 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                                       whiteSpace: 'nowrap',
                                       overflow: 'hidden',
                                       textOverflow: 'ellipsis',
+                                      flex: 1,
+                                      minWidth: 0,
                                     }}
                                   >
                                     {p2Name}
                                   </span>
-                                  {p2IsWinner && isComplete && (
-                                    <span
-                                      style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        width: '14px',
-                                        height: '14px',
-                                        borderRadius: '50%',
-                                        background: colorWithAlpha(primaryColor, 0.25),
-                                        border: `1px solid ${primaryColor}`,
-                                        color: primaryColor,
-                                        flexShrink: 0,
-                                      }}
-                                      title="Winner"
-                                    >
-                                      <Check size={9} strokeWidth={3} />
-                                    </span>
-                                  )}
                                   {match.player2.isManualOverride && (
                                     <span
                                       style={{
