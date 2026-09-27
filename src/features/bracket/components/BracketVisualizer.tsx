@@ -893,6 +893,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
           }}
           player={selectedPlayerForDrawer}
           tournament={tournament}
+          tier={tier}
         />
       )}
     </div>

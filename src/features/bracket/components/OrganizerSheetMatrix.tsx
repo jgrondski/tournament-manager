@@ -610,6 +610,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
           onClose={() => setSelectedPlayer(null)}
           player={selectedPlayer}
           tournament={tournament}
+          tier={tier}
         />
       )}
     </div>

@@ -523,6 +523,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
           player={selectedPlayer}
           tournament={tournament}
           rankRow={selectedRankRow}
+          tier={selectedRankRow?.assignedTier}
         />
       )}
     </div>

@@ -767,6 +767,7 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
           }}
           player={selectedPlayerForDrawer}
           tournament={tournament}
+          tier={tier}
         />
       )}
     </div>
