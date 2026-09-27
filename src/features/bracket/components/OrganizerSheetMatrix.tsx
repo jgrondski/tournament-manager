@@ -350,11 +350,11 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
   };
 
   const maxTableWidth = useMemo(() => {
-    if (filteredRounds.length === 0) return 52 + competitorColWidth + 100 + (3 * 86) + 86;
+    if (filteredRounds.length === 0) return 52 + competitorColWidth + 100 + (3 * 86) + 86 + 2;
     return Math.max(
       ...filteredRounds.map(r => {
         const { effectiveGameCount } = getEffectiveRoundGameCount(r, tier, tournament.matchScores);
-        return 52 + competitorColWidth + 100 + (effectiveGameCount * 86) + 86;
+        return 52 + competitorColWidth + 100 + (effectiveGameCount * 86) + 86 + 2;
       })
     );
   }, [filteredRounds, tournament.matchScores, tier, competitorColWidth]);
@@ -591,10 +591,6 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
             );
             const gameNumbers = Array.from({ length: effectiveGameCount }, (_, i) => i + 1);
 
-            // Table width: 52 (Match#) + competitorColWidth (Competitor) + 100 (Games Won) + (games * 86) + 86 (Complete)
-            // Maintains equidistant spacing and generous gap between game scores
-            const tableWidth = 52 + competitorColWidth + 100 + (effectiveGameCount * 86) + 86;
-
             return (
               <div
                 key={round.roundNumber}
@@ -669,13 +665,12 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                   </span>
                 </div>
 
-                {/* Compact Round Table with Horizontal Scroll Protection */}
-                <div style={{ overflowX: 'auto', width: '100%' }}>
+                {/* Compact Round Table */}
+                <div style={{ width: '100%' }}>
                   <table
                     style={{
                       ...tableStyle,
-                      width: `${tableWidth}px`,
-                      minWidth: `${tableWidth}px`,
+                      width: '100%',
                     }}
                   >
                     <thead>
@@ -799,13 +794,29 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                         const baseCard = cardColor;
                         const altCard = getAlternateShade(baseCard, 5);
                         const matchBaseBg = matchIdx % 2 === 0 ? baseCard : altCard;
-                        const matchHoverBg = colorWithAlpha(matchAccentColor, 0.12, 'rgba(255, 255, 255, 0.07)');
+                        const matchHoverBg = colorWithAlpha(primaryColor, 0.10, 'rgba(255, 255, 255, 0.07)');
                         const blockBg = isHovered ? matchHoverBg : matchBaseBg;
 
-                        // Block borders
+                        // Block borders & theme-appropriate hover highlight
+                        const hoverBorderColor = colorWithAlpha(primaryColor, 0.75, 'var(--color-gold, #f59e0b)');
                         const topRowBorder = `1px solid ${colorWithAlpha(secondaryColor, 0.35, 'rgba(255, 255, 255, 0.08)')}`;
                         const midRowBorder = '1px solid rgba(255, 255, 255, 0.04)';
                         const botRowBorder = `1px solid ${colorWithAlpha(secondaryColor, 0.25, 'rgba(255, 255, 255, 0.06)')}`;
+
+                        const topBorder = topRowBorder;
+                        const botBorder = botRowBorder;
+                        const midBorder = isHovered ? `1px solid ${colorWithAlpha(primaryColor, 0.15, 'rgba(255, 255, 255, 0.04)')}` : midRowBorder;
+                        const leftBorder = '1px solid transparent';
+                        const rightBorder = '1px solid rgba(255, 255, 255, 0.05)';
+
+                        const matchNumShadow = isHovered
+                          ? `inset 1px 0 0 ${hoverBorderColor}, inset 0 1px 0 ${hoverBorderColor}, inset 0 -1px 0 ${hoverBorderColor}`
+                          : 'none';
+                        const completeShadow = isHovered
+                          ? `inset -1px 0 0 ${hoverBorderColor}, inset 0 1px 0 ${hoverBorderColor}, inset 0 -1px 0 ${hoverBorderColor}`
+                          : 'none';
+                        const row1Shadow = isHovered ? `inset 0 1px 0 ${hoverBorderColor}` : 'none';
+                        const row2Shadow = isHovered ? `inset 0 -1px 0 ${hoverBorderColor}` : 'none';
 
                         return (
                           <React.Fragment key={match.id}>
@@ -833,8 +844,10 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                                 rowSpan={2}
                                 style={{
                                   ...tdMergedStyle,
-                                  borderTop: topRowBorder,
-                                  borderBottom: botRowBorder,
+                                  borderTop: topBorder,
+                                  borderBottom: botBorder,
+                                  borderLeft: leftBorder,
+                                  boxShadow: matchNumShadow,
                                   textAlign: 'center',
                                   fontWeight: 700,
                                   width: '52px',
@@ -861,7 +874,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                               </td>
 
                               {/* Player 1 Seed & Competitor Info */}
-                              <td style={{ ...tdStyle, borderTop: topRowBorder, borderBottom: midRowBorder, width: `${competitorColWidth}px`, minWidth: `${competitorColWidth}px`, maxWidth: `${competitorColWidth}px`, textAlign: 'left' }}>
+                              <td style={{ ...tdStyle, borderTop: topBorder, borderBottom: midBorder, boxShadow: row1Shadow, width: `${competitorColWidth}px`, minWidth: `${competitorColWidth}px`, maxWidth: `${competitorColWidth}px`, textAlign: 'left' }}>
                                 <div
                                   onClick={(e) => {
                                     if (p1?.id) {
@@ -952,8 +965,9 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                               <td
                                 style={{
                                   ...tdStyle,
-                                  borderTop: topRowBorder,
-                                  borderBottom: midRowBorder,
+                                  borderTop: topBorder,
+                                  borderBottom: midBorder,
+                                  boxShadow: row1Shadow,
                                   textAlign: 'center',
                                   paddingRight: '14px',
                                   fontWeight: p1IsWinner ? 800 : 600,
@@ -993,25 +1007,26 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                                 const p1WonGame =
                                   game?.winnerPlayerId === p1?.id ||
                                   (p1Pts !== null && p2Pts !== null && p1Pts !== undefined && p2Pts !== undefined && p1Pts > p2Pts);
+                                const isLoserScore = isComplete && p2IsWinner && !p1WonGame;
 
                                 return (
                                   <td
                                     key={gNum}
                                     style={{
                                       ...tdStyle,
-                                      borderTop: topRowBorder,
-                                      borderBottom: midRowBorder,
+                                      borderTop: topBorder,
+                                      borderBottom: midBorder,
+                                      boxShadow: row1Shadow,
                                       textAlign: 'right',
                                       padding: '0.24rem 0.35rem',
                                       width: '86px',
                                       minWidth: '86px',
                                       maxWidth: '86px',
                                       color: isBeyondBestOf ? 'var(--color-text-muted)' : 'var(--color-text-primary)',
-                                      opacity: isBeyondBestOf ? 0.25 : isComplete && p2IsWinner && !p1WonGame ? 0.45 : 1,
                                     }}
                                   >
                                     {isBeyondBestOf ? (
-                                      '—'
+                                      <span style={{ opacity: 0.25 }}>—</span>
                                     ) : p1Pts !== null && p1Pts !== undefined ? (
                                       <span
                                         className="tabular-nums"
@@ -1021,6 +1036,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                                           borderRadius: 'var(--radius-sm)',
                                           background: p1WonGame ? colorWithAlpha(matchAccentColor, 0.16, 'rgba(255, 255, 255, 0.08)') : 'transparent',
                                           color: p1WonGame ? matchAccentColor : 'var(--color-text-primary)',
+                                          opacity: isLoserScore ? 0.45 : 1,
                                           fontWeight: p1WonGame ? 700 : 400,
                                           fontSize: '0.78rem',
                                           fontFamily: 'var(--font-mono)',
@@ -1043,8 +1059,10 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                                 rowSpan={2}
                                 style={{
                                   ...tdMergedStyle,
-                                  borderTop: topRowBorder,
-                                  borderBottom: botRowBorder,
+                                  borderTop: topBorder,
+                                  borderBottom: botBorder,
+                                  borderRight: rightBorder,
+                                  boxShadow: completeShadow,
                                   textAlign: 'center',
                                   padding: '0.24rem 0.4rem',
                                   width: '86px',
@@ -1135,7 +1153,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                               }}
                             >
                               {/* Player 2 Seed & Competitor Info */}
-                              <td style={{ ...tdStyle, borderBottom: botRowBorder, width: `${competitorColWidth}px`, minWidth: `${competitorColWidth}px`, maxWidth: `${competitorColWidth}px`, textAlign: 'left' }}>
+                              <td style={{ ...tdStyle, borderBottom: botBorder, boxShadow: row2Shadow, width: `${competitorColWidth}px`, minWidth: `${competitorColWidth}px`, maxWidth: `${competitorColWidth}px`, textAlign: 'left' }}>
                                 <div
                                   onClick={(e) => {
                                     if (p2?.id) {
@@ -1226,7 +1244,8 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                               <td
                                 style={{
                                   ...tdStyle,
-                                  borderBottom: botRowBorder,
+                                  borderBottom: botBorder,
+                                  boxShadow: row2Shadow,
                                   textAlign: 'center',
                                   paddingRight: '14px',
                                   fontWeight: p2IsWinner ? 800 : 600,
@@ -1266,24 +1285,25 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                                 const p2WonGame =
                                   game?.winnerPlayerId === p2?.id ||
                                   (p1Pts !== null && p2Pts !== null && p1Pts !== undefined && p2Pts !== undefined && p2Pts > p1Pts);
+                                const isLoserScore = isComplete && p1IsWinner && !p2WonGame;
 
                                 return (
                                   <td
                                     key={gNum}
                                     style={{
                                       ...tdStyle,
-                                      borderBottom: botRowBorder,
+                                      borderBottom: botBorder,
+                                      boxShadow: row2Shadow,
                                       textAlign: 'right',
                                       padding: '0.24rem 0.35rem',
                                       width: '86px',
                                       minWidth: '86px',
                                       maxWidth: '86px',
                                       color: isBeyondBestOf ? 'var(--color-text-muted)' : 'var(--color-text-primary)',
-                                      opacity: isBeyondBestOf ? 0.25 : isComplete && p1IsWinner && !p2WonGame ? 0.45 : 1,
                                     }}
                                   >
                                     {isBeyondBestOf ? (
-                                      '—'
+                                      <span style={{ opacity: 0.25 }}>—</span>
                                     ) : p2Pts !== null && p2Pts !== undefined ? (
                                       <span
                                         className="tabular-nums"
@@ -1293,6 +1313,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
                                           borderRadius: 'var(--radius-sm)',
                                           background: p2WonGame ? colorWithAlpha(matchAccentColor, 0.16, 'rgba(255, 255, 255, 0.08)') : 'transparent',
                                           color: p2WonGame ? matchAccentColor : 'var(--color-text-primary)',
+                                          opacity: isLoserScore ? 0.45 : 1,
                                           fontWeight: p2WonGame ? 700 : 400,
                                           fontSize: '0.78rem',
                                           fontFamily: 'var(--font-mono)',
@@ -1420,10 +1441,12 @@ const thStyle: React.CSSProperties = {
 const tdStyle: React.CSSProperties = {
   padding: '0.24rem 0.6rem',
   verticalAlign: 'middle',
+  transition: 'background 0.12s ease, box-shadow 0.12s ease',
 };
 
 const tdMergedStyle: React.CSSProperties = {
   padding: '0.24rem 0.6rem',
   verticalAlign: 'middle',
   borderRight: '1px solid rgba(255, 255, 255, 0.05)',
+  transition: 'background 0.12s ease, box-shadow 0.12s ease',
 };

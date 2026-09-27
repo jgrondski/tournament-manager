@@ -156,8 +156,13 @@ describe('OrganizerSheetMatrix - Bracket Color Theming & Compact Layout', () => 
     expect(altCard).not.toBe(baseCard);
     expect(altCard.startsWith('#')).toBe(true);
 
-    const hoverTint = colorWithAlpha('#ffc905', 0.12);
+    const hoverTint = colorWithAlpha('#ffc905', 0.10);
     expect(hoverTint).toContain('rgba');
+
+    // Master sheet hover state uses a light theme-appropriate border using primaryColor
+    const primaryColor = '#ffc905';
+    const hoverBorderColor = colorWithAlpha(primaryColor, 0.75, 'var(--color-gold, #f59e0b)');
+    expect(hoverBorderColor).toBe('rgba(255, 201, 5, 0.75)');
   });
 });
 
