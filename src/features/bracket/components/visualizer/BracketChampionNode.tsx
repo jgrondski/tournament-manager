@@ -66,7 +66,6 @@ export const BracketChampionNode: React.FC<BracketChampionNodeProps> = ({
           display: 'flex',
           alignItems: 'stretch',
           overflow: 'hidden',
-          transition: 'all 0.2s ease',
         }}
       >
         {/* Seed Box */}

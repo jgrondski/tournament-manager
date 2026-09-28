@@ -2,11 +2,15 @@ import React from 'react';
 import { Trophy } from 'lucide-react';
 import { colorWithAlpha } from '../../colorUtils';
 
+import { HybridStageTab } from './BracketStageNavBar';
+
 interface BracketBroadcastHeaderProps {
   tournamentName: string;
   tierName: string;
   eliminationType?: 'SINGLE' | 'DOUBLE' | string;
   isAcceleratedHybrid?: boolean;
+  activeHybridTab?: HybridStageTab;
+  finalsCutoff?: number;
   isObsMode?: boolean;
   chromaHex?: string | null;
   primaryColor: string;
@@ -17,10 +21,35 @@ export const BracketBroadcastHeader: React.FC<BracketBroadcastHeaderProps> = ({
   tierName,
   eliminationType,
   isAcceleratedHybrid = false,
+  activeHybridTab,
+  finalsCutoff = 16,
   isObsMode = false,
   chromaHex = null,
   primaryColor,
 }) => {
+  const getStageLabel = () => {
+    if (!isAcceleratedHybrid) {
+      return eliminationType === 'DOUBLE' ? 'Double Elimination' : 'Single Elimination';
+    }
+    switch (activeHybridTab) {
+      case 'championship':
+        return `Accelerated Hybrid • Top ${finalsCutoff} Finals`;
+      case 'accel':
+        return `Accelerated Hybrid • Pod 1: Accelerated Round (Seeds 1–${finalsCutoff})`;
+      case 'upper':
+        return `Accelerated Hybrid • Pod 2: Upper Qualifying Bracket`;
+      case 'lower':
+        return `Accelerated Hybrid • Pod 3: Lower / Play-In Bracket`;
+      case 'premerge':
+        return `Accelerated Hybrid • Pre-Merge Gauntlet`;
+      case 'combined':
+        return `Accelerated Hybrid • Full Tournament (All Stages)`;
+      case 'qualifiers':
+      default:
+        return `Accelerated Hybrid • Early Rounds (3 Pods)`;
+    }
+  };
+
   return (
     <div
       id="bracket-broadcast-header"
@@ -80,11 +109,7 @@ export const BracketBroadcastHeader: React.FC<BracketBroadcastHeaderProps> = ({
             color: 'var(--color-text-muted)',
           }}
         >
-          {isAcceleratedHybrid
-            ? 'Accelerated Hybrid'
-            : eliminationType === 'DOUBLE'
-            ? 'Double Elimination'
-            : 'Single Elimination'}
+          {getStageLabel()}
         </span>
       </div>
     </div>

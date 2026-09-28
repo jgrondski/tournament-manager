@@ -122,52 +122,67 @@ describe('TournamentSidebar helpers', () => {
   describe('getTournamentTargetUrl', () => {
     const target = mockTournaments[0]; // ctwc-2026, top tier is 'gold'
 
-    it('preserves standings view across tournaments', () => {
-      expect(getTournamentTargetUrl(target, 'standings')).toBe('/ctwc-2026/standings');
+    describe('director / manage mode (default)', () => {
+      it('preserves standings view in manage mode', () => {
+        expect(getTournamentTargetUrl(target, 'standings')).toBe('/ctwc-2026/manage/standings');
+      });
+
+      it('preserves master sheet view with top tier', () => {
+        expect(getTournamentTargetUrl(target, 'sheet')).toBe('/ctwc-2026/manage/sheet?tier=gold');
+      });
+
+      it('preserves bracket visualizer view with top tier in manage mode', () => {
+        expect(getTournamentTargetUrl(target, 'bracket')).toBe('/ctwc-2026/manage/bracket/gold');
+      });
+
+      it('preserves floor judge view with top tier', () => {
+        expect(getTournamentTargetUrl(target, 'judge')).toBe('/ctwc-2026/manage/judge?tier=gold');
+      });
+
+      it('preserves obs hub view', () => {
+        expect(getTournamentTargetUrl(target, 'obs')).toBe('/ctwc-2026/obs');
+      });
+
+      it('preserves tournament roster view', () => {
+        expect(getTournamentTargetUrl(target, 'players')).toBe('/ctwc-2026/manage/players');
+      });
+
+      it('preserves tournament settings view', () => {
+        expect(getTournamentTargetUrl(target, 'settings')).toBe('/ctwc-2026/manage/settings');
+      });
+
+      it('defaults to qualifiers manage view', () => {
+        expect(getTournamentTargetUrl(target, 'leaderboard')).toBe('/ctwc-2026/manage/qualifiers');
+        expect(getTournamentTargetUrl(target, undefined)).toBe('/ctwc-2026/manage/qualifiers');
+      });
+
+      it('uses stored tier slug if user previously visited a specific tier of target tournament', () => {
+        setStoredTierSlug('ctwc-2026', 'silver');
+        expect(getTournamentTargetUrl(target, 'bracket')).toBe('/ctwc-2026/manage/bracket/silver');
+        expect(getTournamentTargetUrl(target, 'sheet')).toBe('/ctwc-2026/manage/sheet?tier=silver');
+        expect(getTournamentTargetUrl(target, 'judge')).toBe('/ctwc-2026/manage/judge?tier=silver');
+        setStoredTierSlug('ctwc-2026', undefined);
+      });
+
+      it('handles target tournament without any tiers gracefully in manage mode', () => {
+        const noTiers = mockTournaments[2]; // lone-star-2026
+        expect(getTournamentTargetUrl(noTiers, 'bracket')).toBe('/lone-star-2026/manage/bracket');
+        expect(getTournamentTargetUrl(noTiers, 'sheet')).toBe('/lone-star-2026/manage/sheet');
+        expect(getTournamentTargetUrl(noTiers, 'judge')).toBe('/lone-star-2026/manage/judge');
+      });
     });
 
-    it('preserves master sheet view with top tier', () => {
-      expect(getTournamentTargetUrl(target, 'sheet')).toBe('/ctwc-2026/manage/sheet?tier=gold');
-    });
+    describe('public spectator mode (isManage = false)', () => {
+      it('returns public spectator URLs', () => {
+        expect(getTournamentTargetUrl(target, 'standings', false)).toBe('/ctwc-2026/standings');
+        expect(getTournamentTargetUrl(target, 'bracket', false)).toBe('/ctwc-2026/gold');
+        expect(getTournamentTargetUrl(target, 'leaderboard', false)).toBe('/ctwc-2026/leaderboard');
+      });
 
-    it('preserves bracket visualizer view with top tier', () => {
-      expect(getTournamentTargetUrl(target, 'bracket')).toBe('/ctwc-2026/gold');
-    });
-
-    it('preserves floor judge view with top tier', () => {
-      expect(getTournamentTargetUrl(target, 'judge')).toBe('/ctwc-2026/manage/judge?tier=gold');
-    });
-
-    it('preserves obs hub view', () => {
-      expect(getTournamentTargetUrl(target, 'obs')).toBe('/ctwc-2026/obs');
-    });
-
-    it('preserves tournament roster view', () => {
-      expect(getTournamentTargetUrl(target, 'players')).toBe('/ctwc-2026/manage/players');
-    });
-
-    it('preserves tournament settings view', () => {
-      expect(getTournamentTargetUrl(target, 'settings')).toBe('/ctwc-2026/manage/settings');
-    });
-
-    it('defaults to qualifiers/leaderboard view', () => {
-      expect(getTournamentTargetUrl(target, 'leaderboard')).toBe('/ctwc-2026/leaderboard');
-      expect(getTournamentTargetUrl(target, undefined)).toBe('/ctwc-2026/leaderboard');
-    });
-
-    it('uses stored tier slug if user previously visited a specific tier of target tournament', () => {
-      setStoredTierSlug('ctwc-2026', 'silver');
-      expect(getTournamentTargetUrl(target, 'bracket')).toBe('/ctwc-2026/silver');
-      expect(getTournamentTargetUrl(target, 'sheet')).toBe('/ctwc-2026/manage/sheet?tier=silver');
-      expect(getTournamentTargetUrl(target, 'judge')).toBe('/ctwc-2026/manage/judge?tier=silver');
-      setStoredTierSlug('ctwc-2026', undefined);
-    });
-
-    it('handles target tournament without any tiers gracefully', () => {
-      const noTiers = mockTournaments[2]; // lone-star-2026
-      expect(getTournamentTargetUrl(noTiers, 'bracket')).toBe('/lone-star-2026/brackets');
-      expect(getTournamentTargetUrl(noTiers, 'sheet')).toBe('/lone-star-2026/manage/sheet');
-      expect(getTournamentTargetUrl(noTiers, 'judge')).toBe('/lone-star-2026/manage/judge');
+      it('handles target tournament without tiers in public mode', () => {
+        const noTiers = mockTournaments[2];
+        expect(getTournamentTargetUrl(noTiers, 'bracket', false)).toBe('/lone-star-2026/brackets');
+      });
     });
   });
 });

@@ -119,7 +119,7 @@ export function getHighlightedPlayerNameColor({
   isHighlightActive,
   isTargetSlot,
   isOpponentSlot,
-  isHoveredText,
+  isHoveredText: _isHoveredText,
   isComplete,
   isWinner,
   isLeading,
@@ -130,7 +130,7 @@ export function getHighlightedPlayerNameColor({
   isHighlightActive: boolean;
   isTargetSlot: boolean;
   isOpponentSlot: boolean;
-  isHoveredText: boolean;
+  isHoveredText?: boolean;
   isComplete: boolean;
   isWinner: boolean;
   isLeading: boolean;
@@ -142,9 +142,7 @@ export function getHighlightedPlayerNameColor({
     if (isTargetSlot && !isOpponentSlot) return primaryColor;
     if (isOpponentSlot && !isTargetSlot) return secondaryColor;
   }
-  return isHoveredText
-    ? secondaryColor
-    : (isComplete && isWinner) || isLeading
+  return (isComplete && isWinner) || isLeading
     ? primaryColor
     : textColor;
 }

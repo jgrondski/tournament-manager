@@ -35,8 +35,6 @@ interface BracketCanvasProps {
   scoreMinW: number;
   scoreH: number;
   isAcceleratedHybrid?: boolean;
-  hoveredPlayerKey: string | null;
-  setHoveredPlayerKey: (key: string | null) => void;
   hoveredMatchId: string | null;
   setHoveredMatchId: (id: string | null) => void;
   hoveredOriginMatchId: string | null;
@@ -79,8 +77,6 @@ export const BracketCanvas: React.FC<BracketCanvasProps> = ({
   scoreMinW,
   scoreH,
   isAcceleratedHybrid = false,
-  hoveredPlayerKey,
-  setHoveredPlayerKey,
   hoveredMatchId,
   setHoveredMatchId,
   hoveredOriginMatchId,
@@ -273,8 +269,6 @@ export const BracketCanvas: React.FC<BracketCanvasProps> = ({
               scoreMinW={scoreMinW}
               scoreH={scoreH}
               isAcceleratedHybrid={isAcceleratedHybrid}
-              hoveredPlayerKey={hoveredPlayerKey}
-              setHoveredPlayerKey={setHoveredPlayerKey}
               hoveredMatchId={hoveredMatchId}
               setHoveredMatchId={setHoveredMatchId}
               hoveredOriginMatchId={hoveredOriginMatchId}

@@ -1,16 +1,22 @@
-import React, { useEffect } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useTournament } from '../features/tournament/store';
 import { TournamentLayout } from '../components/TournamentLayout';
+import { SpectatorLayout } from '../components/SpectatorLayout';
 import { LeaderboardTable } from '../features/qualifiers/components/LeaderboardTable';
+import { ShareBracketModal } from '../features/bracket/components/ShareBracketModal';
 
 export const PublicLeaderboardPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { getTournamentBySlug } = useTournament();
 
+  const isManageRoute = location.pathname.includes('/manage/');
   const isObsMode = searchParams.get('obs') === 'true';
+
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   useEffect(() => {
     if (isObsMode) {
@@ -37,17 +43,39 @@ export const PublicLeaderboardPage: React.FC = () => {
 
   if (isObsMode) {
     return (
-      <div className="obs-mode-canvas" style={{ width: '100%', minHeight: '100vh', background: 'transparent', padding: '1rem' }}>
-        <LeaderboardTable tournament={tournament} isObsMode={true} />
+      <div className="obs-mode-canvas" style={{ width: '100%', minHeight: '100vh', background: 'transparent', padding: '2rem 1.5rem', boxSizing: 'border-box' }}>
+        <div style={{ maxWidth: '1200px', width: '100%', margin: '0 auto' }}>
+          <LeaderboardTable tournament={tournament} isObsMode={true} />
+        </div>
       </div>
     );
   }
 
+  if (isManageRoute) {
+    return (
+      <TournamentLayout tournament={tournament} activeView="leaderboard">
+        <main style={{ flex: 1, padding: '2rem 1.5rem', maxWidth: '1200px', width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
+          <LeaderboardTable tournament={tournament} canManage={true} />
+        </main>
+      </TournamentLayout>
+    );
+  }
+
   return (
-    <TournamentLayout tournament={tournament} activeView="leaderboard">
+    <SpectatorLayout
+      tournament={tournament}
+      activeView="leaderboard"
+      onOpenShare={() => setIsShareModalOpen(true)}
+    >
       <main style={{ flex: 1, padding: '2rem 1.5rem', maxWidth: '1200px', width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
-        <LeaderboardTable tournament={tournament} />
+        <LeaderboardTable tournament={tournament} canManage={false} />
       </main>
-    </TournamentLayout>
+
+      <ShareBracketModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        tournament={tournament}
+      />
+    </SpectatorLayout>
   );
 };

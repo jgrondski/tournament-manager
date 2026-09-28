@@ -688,7 +688,7 @@ describe('bracketLayout calculation engine', () => {
       expect(accelLayout.paths).toHaveLength(0);
       expect(accelLayout.championPosition.width).toBe(0);
       expect(accelLayout.championPath).toBeUndefined();
-      expect(accelLayout.totalWidth).toBeGreaterThan(0);
+      expect(accelLayout.totalWidth).toBe(284); // 260px match + 12px left/right margins (50% more margin)
       expect(accelLayout.totalHeight).toBeGreaterThan(0);
     });
 
@@ -739,32 +739,44 @@ describe('bracketLayout calculation engine', () => {
       expect(preMergeLayout.championPath).toBeUndefined();
     });
 
-    it('calculates Pod 2 Upper Bracket layout with 2 columns and intra-panel tree connectors', () => {
+    it('calculates Pod 2 Upper Bracket layout with 4 columns to reduce vertical height and intra-panel tree connectors', () => {
       const upperLayout = calculateAcceleratedHybridPreMergeUpperLayout(hybridBracket);
 
       // Verify Headers
       expect(upperLayout.stageHeaders).toHaveLength(1);
       expect(upperLayout.stageHeaders![0].title).toBe('Upper Bracket');
-      expect(upperLayout.roundHeaders).toHaveLength(2);
-      expect(upperLayout.roundHeaders[0].name).toBe('Upper Bracket R1');
-      expect(upperLayout.roundHeaders[1].name).toBe('Upper Bracket R2');
+      expect(upperLayout.roundHeaders).toHaveLength(4);
+      expect(upperLayout.roundHeaders[0].name).toContain('Upper Bracket R1');
+      expect(upperLayout.roundHeaders[1].name).toContain('Upper Bracket R2');
+      expect(upperLayout.roundHeaders[2].name).toContain('Upper Bracket R1');
+      expect(upperLayout.roundHeaders[3].name).toContain('Upper Bracket R2');
 
-      // Col 0: Upper R1 (16 matches)
+      // Col 0 & Col 2: Upper R1 split into two groups of 8 matches
       const r1 = hybridBracket.rounds.find((r) => r.roundIdentifier === 'PRE_W1')!;
       expect(r1.matches).toHaveLength(16);
-      r1.matches.forEach((m) => {
+      r1.matches.slice(0, 8).forEach((m) => {
         const pos = upperLayout.matchPositions[m.id];
         expect(pos).toBeDefined();
         expect(pos.x).toBe(upperLayout.roundHeaders[0].x);
       });
+      r1.matches.slice(8).forEach((m) => {
+        const pos = upperLayout.matchPositions[m.id];
+        expect(pos).toBeDefined();
+        expect(pos.x).toBe(upperLayout.roundHeaders[2].x);
+      });
 
-      // Col 1: Upper R2 (8 matches)
+      // Col 1 & Col 3: Upper R2 split into two groups of 4 matches
       const r2 = hybridBracket.rounds.find((r) => r.roundIdentifier === 'PRE_W2')!;
       expect(r2.matches).toHaveLength(8);
-      r2.matches.forEach((m) => {
+      r2.matches.slice(0, 4).forEach((m) => {
         const pos = upperLayout.matchPositions[m.id];
         expect(pos).toBeDefined();
         expect(pos.x).toBe(upperLayout.roundHeaders[1].x);
+      });
+      r2.matches.slice(4).forEach((m) => {
+        const pos = upperLayout.matchPositions[m.id];
+        expect(pos).toBeDefined();
+        expect(pos.x).toBe(upperLayout.roundHeaders[3].x);
       });
 
       // Intra-panel SVG connectors strictly connect R1 to R2
@@ -778,6 +790,18 @@ describe('bracketLayout calculation engine', () => {
       // No champion plaque
       expect(upperLayout.championPosition.width).toBe(0);
       expect(upperLayout.championPath).toBeUndefined();
+
+      // Pod 2 margins and gap checks:
+      // Minimal outline margins: Col 0 x starts at 8px
+      expect(upperLayout.roundHeaders[0].x).toBe(8);
+      // Compact intra-part round gap (32px)
+      expect(upperLayout.roundHeaders[1].x - (upperLayout.roundHeaders[0].x + 260)).toBe(32);
+      // Slightly larger but small gap between Part 1 and Part 2 (48px)
+      expect(upperLayout.roundHeaders[2].x - (upperLayout.roundHeaders[1].x + 260)).toBe(48);
+      // Compact intra-part round gap for Part 2 (32px)
+      expect(upperLayout.roundHeaders[3].x - (upperLayout.roundHeaders[2].x + 260)).toBe(32);
+      // Total width compact (1168px)
+      expect(upperLayout.totalWidth).toBe(1168);
     });
 
     it('calculates Pod 3 Pre-Merge Lower layout with 2 columns and intra-panel connectors', () => {

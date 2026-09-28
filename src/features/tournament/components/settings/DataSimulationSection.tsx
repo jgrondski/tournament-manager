@@ -35,14 +35,49 @@ export const DataSimulationSection: React.FC<DataSimulationSectionProps> = ({
         gap: '0.85rem',
       }}
     >
-      <div style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-        <div>
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
-            Data Management &amp; Simulation
-          </h2>
-          <p style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', margin: '0.2rem 0 0 0' }}>
-            Simulate realistic tournament data for end-to-end testing, or reset match records and qualifier submissions.
-          </p>
+      <div style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.65rem' }}>
+        <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
+          Data Management &amp; Simulation
+        </h2>
+
+        {/* Right-aligned Data Status Summary */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+          <div
+            style={{
+              padding: '0.3rem 0.65rem',
+              background: 'var(--color-bg-surface-elevated)',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--color-border-subtle)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}
+          >
+            <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>
+              Qualifier Attempts
+            </span>
+            <span style={{ fontSize: '0.95rem', fontWeight: 800, color: qualifierCount > 0 ? 'var(--color-gold-bright)' : 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
+              {qualifierCount}
+            </span>
+          </div>
+          <div
+            style={{
+              padding: '0.3rem 0.65rem',
+              background: 'var(--color-bg-surface-elevated)',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--color-border-subtle)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}
+          >
+            <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>
+              Recorded Matches
+            </span>
+            <span style={{ fontSize: '0.95rem', fontWeight: 800, color: recordedMatchCount > 0 ? 'var(--color-gold-bright)' : 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
+              {recordedMatchCount}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -66,26 +101,6 @@ export const DataSimulationSection: React.FC<DataSimulationSectionProps> = ({
           <span>{simFeedback}</span>
         </div>
       )}
-
-      {/* Data Status Summary Bar */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
-        <div style={{ padding: '0.55rem 0.85rem', background: 'var(--color-bg-surface-elevated)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>
-            Qualifier Attempts
-          </span>
-          <span style={{ fontSize: '1.2rem', fontWeight: 800, color: qualifierCount > 0 ? 'var(--color-gold-bright)' : 'var(--color-text-secondary)' }}>
-            {qualifierCount}
-          </span>
-        </div>
-        <div style={{ padding: '0.55rem 0.85rem', background: 'var(--color-bg-surface-elevated)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>
-            Recorded Matches
-          </span>
-          <span style={{ fontSize: '1.2rem', fontWeight: 800, color: recordedMatchCount > 0 ? 'var(--color-gold-bright)' : 'var(--color-text-secondary)' }}>
-            {recordedMatchCount}
-          </span>
-        </div>
-      </div>
 
       {/* Sandbox Simulation & Maintenance Controls Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.85rem' }}>

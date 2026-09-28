@@ -35,20 +35,25 @@ export const App: React.FC = () => {
           {/* Tournament Shortlinks & Cutoffs */}
           <Route path="/:slug" element={<SlugRedirectPage />} />
           <Route path="/:slug/leaderboard" element={<PublicLeaderboardPage />} />
+          <Route path="/:slug/quals" element={<Navigate to="../leaderboard" relative="path" replace />} />
           <Route path="/:slug/standings" element={<FinalStandingsPage />} />
 
           {/* OBS Broadcast Studio Hub */}
           <Route path="/:slug/obs" element={<OBSHubPage />} />
 
           {/* Management Views */}
+          <Route path="/:slug/manage" element={<PublicTierBracketPage />} />
+          <Route path="/:slug/manage/bracket" element={<PublicTierBracketPage />} />
+          <Route path="/:slug/manage/bracket/:tierSlug" element={<PublicTierBracketPage />} />
           <Route path="/:slug/manage/sheet" element={<ManageSheetPage />} />
           <Route path="/:slug/manage/judge" element={<ManageJudgePage />} />
-          <Route path="/:slug/manage/bracket" element={<ManageJudgePage />} />
           <Route path="/:slug/manage/qualifiers" element={<PublicLeaderboardPage />} />
+          <Route path="/:slug/manage/standings" element={<FinalStandingsPage />} />
           <Route path="/:slug/manage/players" element={<ManageTournamentPlayersPage />} />
           <Route path="/:slug/manage/settings" element={<ManageTournamentSettingsPage />} />
 
           {/* Route Aliases for Direct Friendly URLs */}
+          <Route path="/:slug/view" element={<PublicTierBracketPage />} />
           <Route path="/:slug/brackets" element={<PublicTierBracketPage />} />
           <Route path="/:slug/bracket" element={<PublicTierBracketPage />} />
           <Route path="/:slug/sheet" element={<ManageSheetPage />} />

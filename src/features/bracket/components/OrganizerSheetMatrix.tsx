@@ -44,7 +44,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
     } catch {
       // Ignore
     }
-    return 'sm';
+    return 'md';
   });
 
   const handleSizeChange = (newSize: SheetDensitySize) => {
@@ -597,6 +597,7 @@ export const OrganizerSheetMatrix: React.FC<OrganizerSheetMatrixProps> = ({ tour
           isOpen={Boolean(selectedMatch)}
           onClose={() => setSelectedMatch(null)}
           match={selectedMatch.match}
+          matchScoreRecord={tournament.matchScores[selectedMatch.match.id]}
           tournamentId={tournament.id}
           tierId={tier.id}
           roundName={selectedMatch.roundName}

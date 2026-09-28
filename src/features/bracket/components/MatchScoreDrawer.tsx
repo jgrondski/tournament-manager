@@ -34,20 +34,22 @@ export const MatchScoreDrawer: React.FC<MatchScoreDrawerProps> = ({
 }) => {
   const { tournaments, saveMatchScores, updateMatchBestOf, forfeitMatch } = useTournament();
 
+  const liveRecord = matchScoreRecord || (tournamentId && match ? tournaments.find(t => t.id === tournamentId)?.matchScores[match.id] : undefined);
+
   const [bestOf, setBestOf] = useState<number>(match?.bestOf || 5);
   const [games, setGames] = useState<Array<{ p1: string; p2: string; winner: string | null }>>([]);
   const [hasTiebreaker, setHasTiebreaker] = useState(false);
 
   useEffect(() => {
     if (!match) return;
-    const currentBestOf = matchScoreRecord?.bestOf || match.bestOf || 5;
+    const currentBestOf = liveRecord?.bestOf || match.bestOf || 5;
     setBestOf(currentBestOf);
 
-    const recordedCount = matchScoreRecord?.games?.length || 0;
+    const recordedCount = liveRecord?.games?.length || 0;
     const totalCount = Math.max(currentBestOf, recordedCount);
     const initialGames = [];
     for (let i = 1; i <= totalCount; i++) {
-      const recorded = matchScoreRecord?.games.find(g => g.gameNumber === i);
+      const recorded = liveRecord?.games?.find(g => g.gameNumber === i);
       initialGames.push({
         p1: recorded?.player1Points !== null && recorded?.player1Points !== undefined ? String(recorded.player1Points) : '',
         p2: recorded?.player2Points !== null && recorded?.player2Points !== undefined ? String(recorded.player2Points) : '',
@@ -55,17 +57,30 @@ export const MatchScoreDrawer: React.FC<MatchScoreDrawerProps> = ({
       });
     }
     setGames(initialGames);
-    setHasTiebreaker(Boolean(matchScoreRecord?.hasTiebreaker || recordedCount > currentBestOf));
-  }, [match, matchScoreRecord]);
+    setHasTiebreaker(Boolean(liveRecord?.hasTiebreaker || recordedCount > currentBestOf));
+  }, [match, liveRecord]);
+
+  // Keyboard escape listener to close drawer smoothly
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen || !match) return null;
 
-  // Resolve tournament & tier theme colors
+  // Resolve tournament & tier theme colors matching PlayerDetailDrawer conventions
   const currentTournament = tournaments.find(t => t.id === tournamentId);
   const currentTier = currentTournament?.tiers.find(t => t.id === tierId) || currentTournament?.tiers[0];
   const defaults = getDefaultTierColors(currentTier || {});
   const primaryColor = currentTier?.primaryColor || defaults.primaryColor || '#f59e0b';
+  const secondaryColor = currentTier?.secondaryColor || defaults.secondaryColor || '#705b33';
   const cardColor = currentTier?.cardColor || defaults.cardColor || '#161922';
+  const textColor = currentTier?.textColor || defaults.textColor || '#94A3B8';
+  const backgroundColor = currentTier?.backgroundColor || defaults.backgroundColor || '#0c0d12';
 
   const p1 = match.player1.player;
   const p2 = match.player2.player;
@@ -187,43 +202,102 @@ export const MatchScoreDrawer: React.FC<MatchScoreDrawerProps> = ({
   const roundMatches = currentRound?.matches.filter(m => m.id !== match.id && !m.isBye) || [];
 
   const hasRecordedScores = Boolean(
-    matchScoreRecord?.isComplete ||
-    (matchScoreRecord?.games && matchScoreRecord.games.length > 0) ||
+    liveRecord?.isComplete ||
+    (liveRecord?.games && liveRecord.games.length > 0) ||
     games.some(g => (g.p1 && g.p1 !== '0') || (g.p2 && g.p2 !== '0') || g.winner !== null)
   );
 
-  const gameCardBg = getAlternateShade(cardColor, 2);
+  const gameCardBg = getAlternateShade(cardColor, 3);
 
   return (
-    <div style={overlayStyle}>
-      <div style={drawerStyle}>
-        {/* Header: Focused purely on Match Number, Round Info, Tier Pill, and Close Action */}
+    <div style={overlayStyle} onClick={onClose}>
+      <div
+        style={{
+          ...drawerStyle,
+          background: `linear-gradient(180deg, ${getAlternateShade(cardColor, 2)} 0%, ${backgroundColor} 100%)`,
+          borderLeft: `1px solid ${colorWithAlpha(primaryColor, 0.45, 'var(--color-border)')}`,
+          boxShadow: `-12px 0 36px rgba(0, 0, 0, 0.7), -1px 0 16px ${colorWithAlpha(primaryColor, 0.2)}, inset 1px 0 0 ${colorWithAlpha(primaryColor, 0.25)}`,
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Top Glowing Ambient Theme Stripe */}
         <div
           style={{
-            ...headerContainerStyle,
-            background: gameCardBg,
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '3px',
+            background: `linear-gradient(90deg, transparent 0%, ${primaryColor} 25%, ${secondaryColor} 75%, transparent 100%)`,
+            boxShadow: `0 0 12px ${colorWithAlpha(primaryColor, 0.65)}`,
+            zIndex: 10,
+          }}
+        />
+
+        {/* Glow-up Header matching PlayerDetailDrawer */}
+        <div
+          style={{
+            padding: '1.25rem 1.5rem',
             borderBottom: `1px solid ${colorWithAlpha(primaryColor, 0.35, 'var(--color-border)')}`,
-            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            background: gameCardBg,
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.35)',
+            gap: '1rem',
           }}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: 0 }}>
-            {/* Prominently displayed Tournament Name */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-              <Trophy size={13} color="var(--color-gold-bright)" />
-              <span
-                style={{
-                  fontSize: '0.75rem',
-                  fontWeight: 800,
-                  color: 'var(--color-gold-bright)',
-                  letterSpacing: '0.04em',
-                  textTransform: 'uppercase',
-                }}
-              >
-                {currentTournament?.name || 'Tournament'}
-              </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', minWidth: 0, flex: 1 }}>
+            {/* Tournament Title & Active Tier Badge Row */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Trophy size={13} color={primaryColor} />
+                <span
+                  style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    color: primaryColor,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}
+                >
+                  {currentTournament?.name || 'Tournament'}
+                </span>
+              </div>
+
+              {currentTier?.name && (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    padding: '0.12rem 0.6rem',
+                    borderRadius: 'var(--radius-full)',
+                    background: colorWithAlpha(primaryColor, 0.2),
+                    color: primaryColor,
+                    border: `1px solid ${colorWithAlpha(primaryColor, 0.45)}`,
+                    boxShadow: `0 0 8px ${colorWithAlpha(primaryColor, 0.2)}`,
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    letterSpacing: '0.04em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  <span
+                    style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      background: primaryColor,
+                      boxShadow: `0 0 6px ${primaryColor}`,
+                    }}
+                  />
+                  {currentTier.name} Tier
+                </span>
+              )}
             </div>
 
-            {/* Match Number, Bracket Name Chip, and Round Name on the same row */}
+            {/* Match Hero Row */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
               <h2
                 style={{
@@ -237,32 +311,15 @@ export const MatchScoreDrawer: React.FC<MatchScoreDrawerProps> = ({
               >
                 Match #{match.matchNumber}
               </h2>
-              {currentTier?.name && (
-                <span
-                  style={{
-                    fontSize: '0.72rem',
-                    fontWeight: 800,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                    padding: '0.12rem 0.55rem',
-                    borderRadius: 'var(--radius-full)',
-                    background: colorWithAlpha(primaryColor, 0.22),
-                    color: primaryColor,
-                    border: `1px solid ${colorWithAlpha(primaryColor, 0.45)}`,
-                  }}
-                >
-                  {currentTier.name}
-                </span>
-              )}
               <span
                 style={{
-                  fontSize: '0.95rem',
+                  fontSize: '0.92rem',
                   fontWeight: 600,
-                  color: 'var(--color-text-secondary)',
+                  color: textColor,
                   lineHeight: 1.2,
                 }}
               >
-                {roundName}
+                • {roundName}
               </span>
             </div>
           </div>
@@ -270,19 +327,33 @@ export const MatchScoreDrawer: React.FC<MatchScoreDrawerProps> = ({
           <button
             onClick={onClose}
             aria-label="Close drawer"
-            style={closeBtnStyle}
+            style={{
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: `1px solid ${colorWithAlpha(primaryColor, 0.35, 'var(--color-border)')}`,
+              color: 'var(--color-text-muted)',
+              cursor: 'pointer',
+              padding: '0.45rem',
+              borderRadius: 'var(--radius-md)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.15s ease',
+              flexShrink: 0,
+            }}
             onMouseEnter={(e) => {
               e.currentTarget.style.color = '#ffffff';
               e.currentTarget.style.borderColor = primaryColor;
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+              e.currentTarget.style.background = colorWithAlpha(primaryColor, 0.18);
+              e.currentTarget.style.boxShadow = `0 0 10px ${colorWithAlpha(primaryColor, 0.3)}`;
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.color = 'var(--color-text-muted)';
-              e.currentTarget.style.borderColor = 'var(--color-border)';
+              e.currentTarget.style.borderColor = colorWithAlpha(primaryColor, 0.35, 'var(--color-border)');
               e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+              e.currentTarget.style.boxShadow = 'none';
             }}
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
@@ -464,7 +535,15 @@ export const MatchScoreDrawer: React.FC<MatchScoreDrawerProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div style={footerStyle}>
+        <div
+          style={{
+            padding: '1rem 1.5rem',
+            borderTop: `1px solid ${colorWithAlpha(primaryColor, 0.35, 'var(--color-border)')}`,
+            background: gameCardBg,
+            display: 'flex',
+            gap: '0.75rem',
+          }}
+        >
           <button
             type="button"
             onClick={onClose}
@@ -494,7 +573,7 @@ export const MatchScoreDrawer: React.FC<MatchScoreDrawerProps> = ({
               fontWeight: 700,
               fontSize: '0.9rem',
               cursor: 'pointer',
-              boxShadow: `0 2px 12px ${colorWithAlpha(primaryColor, 0.3)}`,
+              boxShadow: `0 2px 14px ${colorWithAlpha(primaryColor, 0.4)}`,
               transition: 'all 0.15s ease',
             }}
           >
@@ -520,7 +599,7 @@ const overlayStyle: React.CSSProperties = {
 
 const drawerStyle: React.CSSProperties = {
   width: '100%',
-  maxWidth: '500px',
+  maxWidth: '520px',
   height: '100%',
   background: '#0d1117',
   borderLeft: '1px solid var(--color-border)',
@@ -528,39 +607,10 @@ const drawerStyle: React.CSSProperties = {
   flexDirection: 'column',
   boxShadow: '-8px 0 32px rgba(0, 0, 0, 0.6)',
   animation: 'slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+  position: 'relative',
+  overflow: 'hidden',
 };
 
-const headerContainerStyle: React.CSSProperties = {
-  padding: '1.25rem 1.5rem',
-  borderBottom: '1px solid var(--color-border)',
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'flex-start',
-  background: 'rgba(255, 255, 255, 0.02)',
-  gap: '1rem',
-};
-
-const closeBtnStyle: React.CSSProperties = {
-  background: 'rgba(255, 255, 255, 0.04)',
-  border: '1px solid var(--color-border)',
-  color: 'var(--color-text-muted)',
-  cursor: 'pointer',
-  padding: '0.45rem',
-  borderRadius: 'var(--radius-md)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  transition: 'all 0.15s ease',
-  flexShrink: 0,
-};
-
-const footerStyle: React.CSSProperties = {
-  padding: '1rem 1.5rem',
-  borderTop: '1px solid var(--color-border)',
-  background: 'rgba(255, 255, 255, 0.02)',
-  display: 'flex',
-  gap: '0.75rem',
-};
 
 const btnSmallStyle: React.CSSProperties = {
   padding: '0.35rem 0.6rem',

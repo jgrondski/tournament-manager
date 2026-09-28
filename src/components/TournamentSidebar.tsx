@@ -24,6 +24,7 @@ import {
   Check,
   Building2,
   Search,
+  ExternalLink,
 } from 'lucide-react';
 
 export type SidebarNavView =
@@ -45,27 +46,47 @@ export function filterTournamentsByQuery(tournaments: Tournament[], query: strin
   return tournaments.filter(t => t.name.toLowerCase().includes(q) || t.slug.toLowerCase().includes(q));
 }
 
-export function getTournamentTargetUrl(targetTourney: Tournament, view?: SidebarNavView): string {
+export function getTournamentTargetUrl(targetTourney: Tournament, view?: SidebarNavView, isManage: boolean = true): string {
   const storedTier = getStoredTierSlug(targetTourney.slug);
   const tierSlug =
     storedTier && targetTourney.tiers?.some(t => t.slug === storedTier)
       ? storedTier
       : targetTourney.tiers?.[0]?.slug;
+
+  if (isManage) {
+    switch (view) {
+      case 'standings':
+        return `/${targetTourney.slug}/manage/standings`;
+      case 'sheet':
+        return tierSlug ? `/${targetTourney.slug}/manage/sheet?tier=${tierSlug}` : `/${targetTourney.slug}/manage/sheet`;
+      case 'bracket':
+        return tierSlug ? `/${targetTourney.slug}/manage/bracket/${tierSlug}` : `/${targetTourney.slug}/manage/bracket`;
+      case 'judge':
+        return tierSlug ? `/${targetTourney.slug}/manage/judge?tier=${tierSlug}` : `/${targetTourney.slug}/manage/judge`;
+      case 'obs':
+        return `/${targetTourney.slug}/obs`;
+      case 'players':
+        return `/${targetTourney.slug}/manage/players`;
+      case 'settings':
+        return `/${targetTourney.slug}/manage/settings`;
+      case 'leaderboard':
+      default:
+        return `/${targetTourney.slug}/manage/qualifiers`;
+    }
+  }
+
+  // Public Spectator Target URLs
   switch (view) {
     case 'standings':
       return `/${targetTourney.slug}/standings`;
     case 'sheet':
-      return tierSlug ? `/${targetTourney.slug}/manage/sheet?tier=${tierSlug}` : `/${targetTourney.slug}/manage/sheet`;
+    case 'judge':
+    case 'players':
+    case 'settings':
     case 'bracket':
       return tierSlug ? `/${targetTourney.slug}/${tierSlug}` : `/${targetTourney.slug}/brackets`;
-    case 'judge':
-      return tierSlug ? `/${targetTourney.slug}/manage/judge?tier=${tierSlug}` : `/${targetTourney.slug}/manage/judge`;
     case 'obs':
       return `/${targetTourney.slug}/obs`;
-    case 'players':
-      return `/${targetTourney.slug}/manage/players`;
-    case 'settings':
-      return `/${targetTourney.slug}/manage/settings`;
     case 'leaderboard':
     default:
       return `/${targetTourney.slug}/leaderboard`;
@@ -171,14 +192,14 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
       key: 'leaderboard' as const,
       label: 'Qualifiers',
       icon: BarChart3,
-      to: slug ? `/${slug}/leaderboard` : '/',
+      to: slug ? `/${slug}/manage/qualifiers` : '/',
       badge: null,
     },
     {
       key: 'standings' as const,
       label: 'Standings',
       icon: Trophy,
-      to: slug ? `/${slug}/standings` : '/',
+      to: slug ? `/${slug}/manage/standings` : '/',
       badge: null,
     },
     {
@@ -192,7 +213,7 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
       key: 'bracket' as const,
       label: 'Brackets',
       icon: GitBranch,
-      to: slug ? (currentTierSlug ? `/${slug}/${currentTierSlug}` : `/${slug}/brackets`) : '/',
+      to: slug ? (currentTierSlug ? `/${slug}/manage/bracket/${currentTierSlug}` : `/${slug}/manage/bracket`) : '/',
       badge: activeTourney?.tiers.length ? `${activeTourney.tiers.length} Tiers` : null,
     },
     {
@@ -211,7 +232,7 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
     },
     {
       key: 'players' as const,
-      label: 'Tournament Roster',
+      label: 'Players',
       icon: Users,
       to: slug ? `/${slug}/manage/players` : '/',
       badge: activeTourney?.playersPool?.length ? String(activeTourney.playersPool.length) : null,
@@ -725,6 +746,40 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
                   )}
                 </button>
               )}
+            </div>
+
+            {/* Public Spectator View Shortcut for Directors */}
+            <div style={{ marginTop: '0.35rem' }}>
+              <Link
+                to={slug ? (currentTierSlug ? `/${slug}/${currentTierSlug}` : `/${slug}/brackets`) : '/'}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: isCollapsed ? 'center' : 'space-between',
+                  gap: '0.35rem',
+                  padding: isCollapsed ? '0.35rem 0.2rem' : '0.25rem 0.5rem',
+                  borderRadius: 'var(--radius-full)',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid var(--color-border-subtle)',
+                  color: 'var(--color-text-secondary)',
+                  fontSize: '0.68rem',
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  transition: 'all 0.15s ease',
+                }}
+                title="Open live public spectator view in new tab"
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <ExternalLink size={11} color="var(--color-gold-bright)" style={{ flexShrink: 0 }} />
+                  {!isCollapsed && <span>Public View</span>}
+                </div>
+                {!isCollapsed && (
+                  <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>↗</span>
+                )}
+              </Link>
             </div>
           </div>
         )}

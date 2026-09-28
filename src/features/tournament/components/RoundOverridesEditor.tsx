@@ -164,7 +164,7 @@ export const RoundOverridesEditor: React.FC<RoundOverridesEditorProps> = ({ tier
         marginTop: '1.25rem',
         paddingTop: '1rem',
         borderTop: '1px solid var(--color-border-subtle)',
-        maxWidth: '680px',
+        width: '100%',
       }}
     >
       <div
@@ -196,11 +196,12 @@ export const RoundOverridesEditor: React.FC<RoundOverridesEditorProps> = ({ tier
               {configuredCount} configured
             </span>
           </div>
-          <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.15rem' }}>
+          <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.15rem', margin: '0.15rem 0 0 0' }}>
             Override series format for specific rounds (e.g., Finals Bo7). Unconfigured rounds inherit default <strong>Bo{tier.bestOf}</strong>.
           </p>
         </div>
 
+        {/* Add button on the right side of header */}
         <button
           type="button"
           onClick={handleAdd}
@@ -210,40 +211,32 @@ export const RoundOverridesEditor: React.FC<RoundOverridesEditorProps> = ({ tier
               ? 'All rounds in this bracket already have overrides configured'
               : 'Add a round-specific Best-of format override'
           }
+          className="btn btn-primary"
           style={{
-            display: 'flex',
+            display: 'inline-flex',
             alignItems: 'center',
             gap: '0.35rem',
-            padding: '0.35rem 0.65rem',
-            fontSize: '0.75rem',
-            fontWeight: 600,
+            padding: '0.35rem 0.75rem',
+            fontSize: '0.76rem',
             borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--color-border)',
-            background: 'var(--color-bg-surface-elevated)',
-            color: isAllConfigured ? 'var(--color-text-muted)' : 'var(--color-gold-bright)',
             cursor: isAllConfigured ? 'not-allowed' : 'pointer',
             opacity: isAllConfigured ? 0.5 : 1,
+            flexShrink: 0,
           }}
         >
-          <Plus size={14} /> Add Round Override
+          <Plus size={14} /> Add Override
         </button>
       </div>
 
-      {draftRows.length === 0 ? (
+      {draftRows.length > 0 && (
         <div
           style={{
-            padding: '0.6rem 0.75rem',
-            borderRadius: 'var(--radius-sm)',
-            background: 'var(--color-bg-base)',
-            border: '1px dashed var(--color-border-subtle)',
-            fontSize: '0.75rem',
-            color: 'var(--color-text-muted)',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+            gap: '0.65rem',
+            transition: 'all 0.3s ease',
           }}
         >
-          All rounds in this bracket currently inherit tier default <strong>Bo{tier.bestOf}</strong>.
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', transition: 'all 0.3s ease' }}>
           {draftRows.map(row => {
             const otherDraftKeys = new Set(
               draftRows.filter(r => r.id !== row.id).map(r => String(r.roundKey))
@@ -258,91 +251,105 @@ export const RoundOverridesEditor: React.FC<RoundOverridesEditorProps> = ({ tier
                 key={row.id}
                 style={{
                   display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
+                  flexDirection: 'column',
+                  gap: '0.5rem',
+                  padding: '0.65rem 0.75rem',
                   background: 'var(--color-bg-base)',
                   borderRadius: 'var(--radius-sm)',
                   border: row.isDirty
                     ? '1px solid var(--color-gold-bright)'
                     : '1px solid var(--color-border-subtle)',
                   boxShadow: row.isDirty ? '0 0 0 1px rgba(234, 179, 8, 0.2)' : 'none',
+                  boxSizing: 'border-box',
                   transition: 'all 0.3s ease',
                 }}
               >
-                {/* Target Round dropdown */}
-                <div style={{ flex: 1, minWidth: '170px' }}>
-                  <label
-                    style={{
-                      fontSize: '0.7rem',
-                      color: 'var(--color-text-muted)',
-                      display: 'block',
-                      marginBottom: '0.2rem',
-                    }}
-                  >
-                    Target Round
-                  </label>
-                  <select
-                    value={String(row.roundKey)}
-                    onChange={e => {
-                      const val = e.target.value;
-                      const num = parseInt(val, 10);
-                      const parsedKey = !isNaN(num) && String(num) === val ? num : val;
-                      handleRoundChange(row.id, parsedKey);
-                    }}
-                    style={inputStyle}
-                  >
-                    {selectableRounds.map(r => {
-                      const optVal = String(r.roundIdentifier || r.roundNumber);
-                      return (
-                        <option key={optVal} value={optVal}>
-                          {r.name}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', alignItems: 'flex-start' }}>
+                  {/* Target Round dropdown */}
+                  <div style={{ minWidth: 0 }}>
+                    <label
+                      style={{
+                        fontSize: '0.7rem',
+                        color: 'var(--color-text-muted)',
+                        display: 'block',
+                        marginBottom: '0.2rem',
+                        fontWeight: 600,
+                      }}
+                    >
+                      Target Round
+                    </label>
+                    <select
+                      value={String(row.roundKey)}
+                      onChange={e => {
+                        const val = e.target.value;
+                        const num = parseInt(val, 10);
+                        const parsedKey = !isNaN(num) && String(num) === val ? num : val;
+                        handleRoundChange(row.id, parsedKey);
+                      }}
+                      style={{ ...inputStyle, width: '100%', fontSize: '0.78rem', padding: '0.35rem 0.5rem' }}
+                    >
+                      {selectableRounds.map(r => {
+                        const optVal = String(r.roundIdentifier || r.roundNumber);
+                        return (
+                          <option key={optVal} value={optVal}>
+                            {r.name}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
 
-                {/* BestOf Combobox */}
-                <div style={{ flex: 1, minWidth: '170px' }}>
-                  <label
-                    style={{
-                      fontSize: '0.7rem',
-                      color: 'var(--color-text-muted)',
-                      display: 'block',
-                      marginBottom: '0.2rem',
-                    }}
-                  >
-                    Format (Up to Bo99)
-                  </label>
-                  <BestOfSelect
-                    value={row.bestOf}
-                    onChange={newBo => handleBestOfChange(row.id, newBo)}
-                  />
+                  {/* BestOf Combobox */}
+                  <div style={{ minWidth: 0 }}>
+                    <label
+                      style={{
+                        fontSize: '0.7rem',
+                        color: 'var(--color-text-muted)',
+                        display: 'block',
+                        marginBottom: '0.2rem',
+                        fontWeight: 600,
+                      }}
+                    >
+                      Format
+                    </label>
+                    <BestOfSelect
+                      value={row.bestOf}
+                      onChange={newBo => handleBestOfChange(row.id, newBo)}
+                      compact={true}
+                    />
+                  </div>
                 </div>
 
                 {/* Actions: Save & Delete */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', paddingTop: '1.1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.4rem', borderTop: '1px solid var(--color-border-subtle)', paddingTop: '0.4rem' }}>
+                  {row.isDirty && (
+                    <span style={{ fontSize: '0.7rem', color: 'var(--color-gold-bright)', marginRight: 'auto', fontWeight: 600 }}>
+                      Unsaved
+                    </span>
+                  )}
                   <button
                     type="button"
                     disabled={!row.isDirty}
                     onClick={() => handleSaveRow(row.id)}
                     title={row.isDirty ? 'Save round override' : 'No unsaved changes'}
                     style={{
-                      padding: '0.45rem',
+                      padding: '0.25rem 0.55rem',
                       background: row.isDirty ? 'var(--color-gold-bg)' : 'transparent',
                       border: `1px solid ${row.isDirty ? 'var(--color-gold-bright)' : 'var(--color-border-subtle)'}`,
                       borderRadius: 'var(--radius-sm)',
                       color: row.isDirty ? 'var(--color-gold-bright)' : 'var(--color-text-muted)',
                       cursor: row.isDirty ? 'pointer' : 'not-allowed',
                       opacity: row.isDirty ? 1 : 0.4,
-                      display: 'flex',
+                      display: 'inline-flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
+                      gap: '0.25rem',
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
                       transition: 'all 0.2s ease',
                     }}
                   >
-                    <Check size={16} />
+                    <Check size={13} />
+                    <span>Save</span>
                   </button>
 
                   <button
@@ -350,15 +357,17 @@ export const RoundOverridesEditor: React.FC<RoundOverridesEditorProps> = ({ tier
                     onClick={() => handleDeleteRow(row.id)}
                     title="Remove round override"
                     style={{
-                      padding: '0.45rem',
+                      padding: '0.25rem 0.55rem',
                       background: 'transparent',
                       border: '1px solid var(--color-border-subtle)',
                       borderRadius: 'var(--radius-sm)',
                       color: 'var(--color-text-muted)',
                       cursor: 'pointer',
-                      display: 'flex',
+                      display: 'inline-flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
+                      gap: '0.25rem',
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
                       transition: 'all 0.2s ease',
                     }}
                     onMouseEnter={e => {
@@ -370,7 +379,8 @@ export const RoundOverridesEditor: React.FC<RoundOverridesEditorProps> = ({ tier
                       e.currentTarget.style.borderColor = 'var(--color-border-subtle)';
                     }}
                   >
-                    <Trash2 size={16} />
+                    <Trash2 size={13} />
+                    <span>Delete</span>
                   </button>
                 </div>
               </div>

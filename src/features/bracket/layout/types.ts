@@ -26,7 +26,7 @@ export const DEFAULT_LAYOUT_CONFIG: LayoutConfig = {
   championHeight: 76,
 };
 
-export type BracketViewMode = 'standard' | 'fit' | 'split';
+export type BracketViewMode = 'standard' | 'fit' | 'split' | 'feed';
 
 export interface MatchPosition {
   matchId: string;

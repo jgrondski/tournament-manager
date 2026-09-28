@@ -136,12 +136,14 @@ describe('Unified Embedded Routing Chips & Disconnected Routing Rules', () => {
       expect(winnerChip?.text).not.toContain('#');
       expect(winnerChip?.opacity).toBe(1);
 
-      // Outbound completed loser: [MatchNumber]
-      const loserChip = getOutboundChip(2, arMatch!, true, true, false, 16, bracket);
+      // Outbound completed loser: [MatchNumber] (matches lower bracket border color, not green)
+      const loserChip = getOutboundChip(2, arMatch!, true, true, false, 16, bracket, '#ffc905', '#3b82f6', '#c2410c');
       expect(loserChip).not.toBeNull();
       expect(loserChip?.text).toMatch(/^\d+$/);
       expect(loserChip?.text).not.toContain('#');
       expect(loserChip?.opacity).toBe(1);
+      expect(loserChip?.border).toContain('#c2410c');
+      expect(loserChip?.border).not.toContain('#059669');
 
       // Outbound uncompleted: both slots show drop stake [MatchNumber] at opacity 0.4
       const uncompletedSlot1 = getOutboundChip(1, arMatch!, false, false, false, 16, bracket);

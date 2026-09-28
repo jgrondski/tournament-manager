@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Tournament, TournamentTier, PlayerProfile } from '../../tournament/types';
 import { BracketMatch, isMatchPlayable, canonicalizeBracketRounds } from '../types';
 import { MatchScoreDrawer } from './MatchScoreDrawer';
+import { MatchTelemetryModal } from './MatchTelemetryModal';
 import {
   colorWithAlpha,
   getDefaultTierColors,
@@ -16,10 +17,15 @@ import { getInheritedRoundBestOf } from './OrganizerSheetMatrix';
 interface MatchCardFeedProps {
   tournament: Tournament;
   tier: TournamentTier;
+  canManage?: boolean;
 }
 
-export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }) => {
-  const [selectedRoundIdx, setSelectedRoundIdx] = useState<number>(0);
+export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({
+  tournament,
+  tier,
+  canManage = true,
+}) => {
+  const [selectedRoundIdx, setSelectedRoundIdx] = useState<number | 'ALL'>('ALL');
   const [selectedStage, setSelectedStage] = useState<'ALL' | 'WINNERS' | 'LOSERS' | 'GRAND_FINALS'>('ALL');
   const [activeMatch, setActiveMatch] = useState<BracketMatch | null>(null);
   const [selectedPlayerForDrawer, setSelectedPlayerForDrawer] = useState<PlayerProfile | null>(null);
@@ -75,28 +81,16 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
     });
   }, [rounds, isDoubleElim, selectedStage]);
 
-  const currentRound = visibleRounds[selectedRoundIdx] || visibleRounds[0] || rounds[0];
-  const inheritedBestOf = currentRound ? getInheritedRoundBestOf(currentRound, tier) : (tier.bestOf || 5);
+  const roundsToDisplay = useMemo(() => {
+    if (selectedRoundIdx === 'ALL') {
+      return visibleRounds;
+    }
+    const target = visibleRounds[selectedRoundIdx];
+    return target ? [target] : visibleRounds;
+  }, [selectedRoundIdx, visibleRounds]);
 
-  const isLoserRound =
-    currentRound?.stage === 'LOSERS' ||
-    Boolean(currentRound?.name?.toLowerCase().includes('loser'));
-  const roundAccentColor = isLoserRound ? lowerBracketColor : primaryColor;
-
-  // Round completion progress
-  const completedCount = useMemo(() => {
-    if (!currentRound?.matches) return 0;
-    return currentRound.matches.filter(m => {
-      const rec = tournament.matchScores[m.id];
-      const p1 = m.player1.player;
-      const p2 = m.player2.player;
-      return (p1?.id && m.winnerId === p1.id) || (p2?.id && m.winnerId === p2.id) || rec?.isComplete;
-    }).length;
-  }, [currentRound?.matches, tournament.matchScores]);
-
-  // Search filter for quick match/player location on mobile
-  const filteredMatches = useMemo(() => {
-    const matches = currentRound?.matches || [];
+  const getFilteredRoundMatches = (round: (typeof visibleRounds)[0]) => {
+    const matches = round?.matches || [];
     const query = searchTerm.trim().toLowerCase();
     if (!query) return matches;
     return matches.filter((m) => {
@@ -106,7 +100,16 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
       const numOnly = m.matchNumber.toString();
       return p1Name.includes(query) || p2Name.includes(query) || matchNum.includes(query) || numOnly === query;
     });
-  }, [currentRound?.matches, searchTerm]);
+  };
+
+  const totalFilteredMatchesCount = useMemo(() => {
+    return roundsToDisplay.reduce((acc, r) => acc + getFilteredRoundMatches(r).length, 0);
+  }, [roundsToDisplay, searchTerm]);
+
+  const activeMatchRound = activeMatch
+    ? rounds.find(r => r.matches.some(m => m.id === activeMatch.id))
+    : null;
+  const activeMatchRoundName = activeMatchRound?.name || 'Round';
 
   const handlePlayerClick = (pId: string, pName: string, country?: string) => {
     const profile = (tournament.playersPool || []).find(p => p.id === pId) || {
@@ -154,7 +157,7 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
                 key={stage}
                 onClick={() => {
                   setSelectedStage(stage);
-                  setSelectedRoundIdx(0);
+                  setSelectedRoundIdx('ALL');
                 }}
                 style={{
                   fontSize: '0.72rem',
@@ -188,6 +191,26 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
           scrollbarWidth: 'none',
         }}
       >
+        <button
+          key="ALL_ROUNDS"
+          onClick={() => setSelectedRoundIdx('ALL')}
+          style={{
+            padding: '0.35rem 0.75rem',
+            fontSize: '0.76rem',
+            fontWeight: selectedRoundIdx === 'ALL' ? 800 : 600,
+            borderRadius: 'var(--radius-full)',
+            border: selectedRoundIdx === 'ALL' ? `1px solid ${primaryColor}` : `1px solid ${colorWithAlpha(secondaryColor, 0.4, 'var(--color-border)')}`,
+            background: selectedRoundIdx === 'ALL' ? primaryColor : getAlternateShade(cardColor, 6),
+            color: selectedRoundIdx === 'ALL' ? getContrastingTextColor(primaryColor) : 'var(--color-text-secondary)',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            transition: 'all 0.12s ease',
+            flexShrink: 0,
+            boxShadow: selectedRoundIdx === 'ALL' ? `0 0 8px ${colorWithAlpha(primaryColor, 0.35)}` : 'none',
+          }}
+        >
+          All Rounds
+        </button>
         {visibleRounds.map((round, idx) => {
           const isSelected = selectedRoundIdx === idx;
           const isRoundLoser = round.stage === 'LOSERS' || Boolean(round.name?.toLowerCase().includes('loser'));
@@ -249,70 +272,11 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
             }}
           />
         </div>
-
-        {/* Round Summary Banner with Left Accent Border */}
-        {currentRound && (
-          <div
-            style={{
-              padding: '0.45rem 0.75rem',
-              background: getAlternateShade(cardColor, 3),
-              borderRadius: 'var(--radius-md)',
-              border: `1px solid ${colorWithAlpha(secondaryColor, 0.45, 'var(--color-border)')}`,
-              borderLeft: `4px solid ${roundAccentColor}`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '0.5rem',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span
-                style={{
-                  fontWeight: 800,
-                  fontSize: '0.82rem',
-                  color: 'var(--color-text-primary)',
-                  letterSpacing: '0.03em',
-                  textTransform: 'uppercase',
-                }}
-              >
-                {currentRound.name}
-              </span>
-              <span
-                style={{
-                  fontSize: '0.68rem',
-                  padding: '0.08rem 0.38rem',
-                  borderRadius: 'var(--radius-sm)',
-                  background: 'rgba(255, 255, 255, 0.06)',
-                  border: '1px solid var(--color-border)',
-                  color: 'var(--color-text-secondary)',
-                  fontWeight: 600,
-                  fontFamily: 'var(--font-mono)',
-                }}
-              >
-                Best of {inheritedBestOf}
-              </span>
-            </div>
-            <span
-              className="tabular-nums"
-              style={{
-                fontSize: '0.7rem',
-                fontWeight: 600,
-                padding: '0.1rem 0.45rem',
-                borderRadius: 'var(--radius-full)',
-                background: 'rgba(255, 255, 255, 0.06)',
-                color: 'var(--color-text-secondary)',
-                border: '1px solid var(--color-border)',
-              }}
-            >
-              {completedCount} / {currentRound.matches.length} Done
-            </span>
-          </div>
-        )}
       </div>
 
       {/* Matches Feed */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-        {filteredMatches.length === 0 ? (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        {totalFilteredMatchesCount === 0 ? (
           <div
             style={{
               padding: '2rem 1rem',
@@ -324,10 +288,89 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
               fontSize: '0.82rem',
             }}
           >
-            {searchTerm ? `No matches found matching "${searchTerm}".` : 'No matches available in this round.'}
+            {searchTerm ? `No matches found matching "${searchTerm}".` : 'No matches available.'}
           </div>
         ) : (
-          filteredMatches.map((match) => {
+          roundsToDisplay.map((round) => {
+            const roundMatches = getFilteredRoundMatches(round);
+            if (roundMatches.length === 0) return null;
+
+            const isRoundLoser = round.stage === 'LOSERS' || Boolean(round.name?.toLowerCase().includes('loser'));
+            const roundAccentColor = isRoundLoser ? lowerBracketColor : primaryColor;
+            const inheritedBestOf = getInheritedRoundBestOf(round, tier);
+            const roundCompletedCount = round.matches.filter((m) => {
+              const rec = tournament.matchScores[m.id];
+              return Boolean(m.winnerId || rec?.isComplete);
+            }).length;
+
+            return (
+              <div
+                key={round.roundNumber}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.65rem',
+                }}
+              >
+                {/* Round Summary Heading Banner with Left Accent Border */}
+                <div
+                  style={{
+                    padding: '0.45rem 0.75rem',
+                    background: getAlternateShade(cardColor, 3),
+                    borderRadius: 'var(--radius-md)',
+                    border: `1px solid ${colorWithAlpha(secondaryColor, 0.45, 'var(--color-border)')}`,
+                    borderLeft: `4px solid ${roundAccentColor}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '0.5rem',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span
+                      style={{
+                        fontWeight: 800,
+                        fontSize: '0.82rem',
+                        color: 'var(--color-text-primary)',
+                        letterSpacing: '0.03em',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      {round.name}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: '0.68rem',
+                        padding: '0.08rem 0.38rem',
+                        borderRadius: 'var(--radius-sm)',
+                        background: 'rgba(255, 255, 255, 0.06)',
+                        border: '1px solid var(--color-border)',
+                        color: 'var(--color-text-secondary)',
+                        fontWeight: 600,
+                        fontFamily: 'var(--font-mono)',
+                      }}
+                    >
+                      Best of {inheritedBestOf}
+                    </span>
+                  </div>
+                  <span
+                    className="tabular-nums"
+                    style={{
+                      fontSize: '0.7rem',
+                      fontWeight: 600,
+                      padding: '0.1rem 0.45rem',
+                      borderRadius: 'var(--radius-full)',
+                      background: 'rgba(255, 255, 255, 0.06)',
+                      color: 'var(--color-text-secondary)',
+                      border: '1px solid var(--color-border)',
+                    }}
+                  >
+                    {roundCompletedCount} / {round.matches.length} Done
+                  </span>
+                </div>
+
+                {/* Matches in Round */}
+                {roundMatches.map((match) => {
             const record = tournament.matchScores[match.id];
             const p1 = match.player1.player;
             const p2 = match.player2.player;
@@ -360,14 +403,18 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
 
             const isLoserMatch =
               match.stage === 'LOSERS' ||
-              isLoserRound;
+              isRoundLoser;
             const matchAccentColor = isLoserMatch ? lowerBracketColor : primaryColor;
 
             return (
               <div
                 key={match.id}
                 onClick={() => {
-                  if (isPlayable && tournament.isLocked) setActiveMatch(match);
+                  if (canManage && isPlayable && tournament.isLocked) {
+                    setActiveMatch(match);
+                  } else if (!canManage && isPlayable) {
+                    setActiveMatch(match);
+                  }
                 }}
                 onMouseEnter={() => setHoveredMatchId(match.id)}
                 onMouseLeave={() => setHoveredMatchId(null)}
@@ -389,7 +436,7 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
                     ? 'var(--shadow-md)'
                     : 'var(--shadow-sm)',
                   padding: '0.75rem',
-                  cursor: isPlayable && tournament.isLocked ? 'pointer' : 'default',
+                  cursor: (canManage ? (isPlayable && tournament.isLocked) : isPlayable) ? 'pointer' : 'default',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '0.55rem',
@@ -535,20 +582,27 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
                       }}
                       title={p1?.id ? "View competitor tournament profile" : undefined}
                     >
-                      {p1?.country && <CountryFlag country={p1.country} />}
+                      {p1?.country && (
+                        <CountryFlag country={p1.country} style={{ opacity: isComplete && p2Won ? 0.45 : 1 }} />
+                      )}
                       {p1?.seed && (
                         <span
                           style={{
                             fontSize: '0.65rem',
                             padding: '0.06rem 0.28rem',
                             borderRadius: 'var(--radius-sm)',
-                            background: colorWithAlpha(matchAccentColor, 0.12, 'rgba(255, 255, 255, 0.08)'),
-                            color: matchAccentColor,
-                            border: `1px solid ${colorWithAlpha(matchAccentColor, 0.25, 'rgba(255, 255, 255, 0.1)')}`,
+                            background: p1Won
+                              ? colorWithAlpha(primaryColor, 0.15, 'rgba(255, 255, 255, 0.08)')
+                              : colorWithAlpha(matchAccentColor, 0.12, 'rgba(255, 255, 255, 0.08)'),
+                            color: p1Won ? primaryColor : matchAccentColor,
+                            border: p1Won
+                              ? `1px solid ${colorWithAlpha(primaryColor, 0.4, 'rgba(255, 255, 255, 0.15)')}`
+                              : `1px solid ${colorWithAlpha(matchAccentColor, 0.25, 'rgba(255, 255, 255, 0.1)')}`,
                             fontFamily: 'var(--font-mono)',
                             fontWeight: 700,
                             lineHeight: 1.1,
                             flexShrink: 0,
+                            opacity: isComplete && p2Won ? 0.45 : 1,
                           }}
                         >
                           #{p1.seed}
@@ -657,20 +711,27 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
                       }}
                       title={p2?.id ? "View competitor tournament profile" : undefined}
                     >
-                      {p2?.country && <CountryFlag country={p2.country} />}
+                      {p2?.country && (
+                        <CountryFlag country={p2.country} style={{ opacity: isComplete && p1Won ? 0.45 : 1 }} />
+                      )}
                       {p2?.seed && (
                         <span
                           style={{
                             fontSize: '0.65rem',
                             padding: '0.06rem 0.28rem',
                             borderRadius: 'var(--radius-sm)',
-                            background: colorWithAlpha(matchAccentColor, 0.12, 'rgba(255, 255, 255, 0.08)'),
-                            color: matchAccentColor,
-                            border: `1px solid ${colorWithAlpha(matchAccentColor, 0.25, 'rgba(255, 255, 255, 0.1)')}`,
+                            background: p2Won
+                              ? colorWithAlpha(primaryColor, 0.15, 'rgba(255, 255, 255, 0.08)')
+                              : colorWithAlpha(matchAccentColor, 0.12, 'rgba(255, 255, 255, 0.08)'),
+                            color: p2Won ? primaryColor : matchAccentColor,
+                            border: p2Won
+                              ? `1px solid ${colorWithAlpha(primaryColor, 0.4, 'rgba(255, 255, 255, 0.15)')}`
+                              : `1px solid ${colorWithAlpha(matchAccentColor, 0.25, 'rgba(255, 255, 255, 0.1)')}`,
                             fontFamily: 'var(--font-mono)',
                             fontWeight: 700,
                             lineHeight: 1.1,
                             flexShrink: 0,
+                            opacity: isComplete && p1Won ? 0.45 : 1,
                           }}
                         >
                           #{p2.seed}
@@ -740,12 +801,15 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
                 </div>
               </div>
             );
-          })
-        )}
-      </div>
+          })}
+        </div>
+      );
+    })
+  )}
+</div>
 
-      {/* Slide-out Scorekeeper Drawer */}
-      {activeMatch && (
+      {/* Slide-out Scorekeeper Drawer (when canManage === true) */}
+      {activeMatch && canManage && (
         <MatchScoreDrawer
           isOpen={true}
           onClose={() => setActiveMatch(null)}
@@ -753,7 +817,24 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({ tournament, tier }
           tierId={tier.id}
           match={activeMatch}
           matchScoreRecord={tournament.matchScores[activeMatch.id]}
-          roundName={currentRound?.name}
+          roundName={activeMatchRoundName}
+        />
+      )}
+
+      {/* Read-Only Match Telemetry Modal (when canManage === false) */}
+      {activeMatch && !canManage && (
+        <MatchTelemetryModal
+          isOpen={true}
+          onClose={() => setActiveMatch(null)}
+          tournament={tournament}
+          tier={tier}
+          match={activeMatch}
+          matchScoreRecord={tournament.matchScores[activeMatch.id]}
+          roundName={activeMatchRoundName}
+          onSelectPlayer={(pId, pName, country) => {
+            setActiveMatch(null);
+            handlePlayerClick(pId, pName, country);
+          }}
         />
       )}
 

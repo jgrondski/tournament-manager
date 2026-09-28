@@ -95,7 +95,6 @@ export const BracketSvgConnectors: React.FC<BracketSvgConnectorsProps> = ({
                   ? `drop-shadow(0 0 6px ${primaryColor}77)`
                   : 'none',
                 opacity: isPathInAncestry ? 1 : hoveredAncestry ? 0.2 : 1,
-                transition: 'all 0.15s ease',
               }}
             />
           );
@@ -117,7 +116,6 @@ export const BracketSvgConnectors: React.FC<BracketSvgConnectorsProps> = ({
                 : `drop-shadow(0 0 8px ${primaryColor}99)`
               : 'none',
             opacity: hoveredAncestry ? (hoveredAncestry.isChampion ? 1 : 0.2) : 1,
-            transition: 'all 0.25s ease',
           }}
         />
       )}

@@ -5,12 +5,14 @@ import { setStoredTierSlug } from '../../tournament/tierStorage';
 import { getContrastingTextColor } from '../colorUtils';
 import { BracketViewMode } from '../bracketLayout';
 import {
-  Settings,
   Plus,
-  Video,
   Monitor,
   Maximize2,
   Split,
+  ListFilter,
+  Share2,
+  Search,
+  X,
 } from 'lucide-react';
 
 interface BracketTierBarProps {
@@ -19,6 +21,10 @@ interface BracketTierBarProps {
   viewMode?: BracketViewMode;
   onChangeViewMode?: (mode: BracketViewMode) => void;
   canManage?: boolean;
+  onOpenShare?: () => void;
+  playerSearchTerm?: string;
+  onPlayerSearchTermChange?: (term: string) => void;
+  highlightedPlayerName?: string | null;
 }
 
 export const BracketTierBar: React.FC<BracketTierBarProps> = ({
@@ -27,6 +33,10 @@ export const BracketTierBar: React.FC<BracketTierBarProps> = ({
   viewMode = 'standard',
   onChangeViewMode,
   canManage = true,
+  onOpenShare,
+  playerSearchTerm,
+  onPlayerSearchTermChange,
+  highlightedPlayerName,
 }) => {
   const navigate = useNavigate();
   const sortedTiers = [...tournament.tiers].sort((a, b) => a.priority - b.priority);
@@ -54,8 +64,8 @@ export const BracketTierBar: React.FC<BracketTierBarProps> = ({
       ref={tierBarRef}
       id="bracket-tier-bar"
       style={{
-        position: 'sticky',
-        top: 0,
+        position: viewMode === 'fit' ? 'relative' : 'sticky',
+        top: viewMode === 'fit' ? 0 : (canManage ? 0 : '56px'),
         zIndex: 42,
         padding: '0.65rem 1.25rem',
         background: 'var(--color-bg-surface)',
@@ -68,19 +78,8 @@ export const BracketTierBar: React.FC<BracketTierBarProps> = ({
         userSelect: 'none',
       }}
     >
-      {/* Left: Tournament Name & Tier Filter Chips */}
+      {/* Left: Tier Filter Chips */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <span style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-gold-bright)', lineHeight: 1 }}>
-            Tournament
-          </span>
-          <span style={{ fontSize: '1.05rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em', lineHeight: 1.25 }}>
-            {tournament.name}
-          </span>
-        </div>
-
-        <div style={{ height: '22px', width: '1px', background: 'var(--color-border)', margin: '0 0.15rem' }} />
-
         <span
           style={{
             fontSize: '0.7rem',
@@ -106,7 +105,10 @@ export const BracketTierBar: React.FC<BracketTierBarProps> = ({
               onClick={() => {
                 if (!isActive) {
                   setStoredTierSlug(tournament.slug, tier.slug);
-                  navigate(`/${tournament.slug}/${tier.slug}`);
+                  const targetUrl = canManage
+                    ? `/${tournament.slug}/manage/bracket/${tier.slug}`
+                    : `/${tournament.slug}/${tier.slug}`;
+                  navigate(targetUrl);
                 }
               }}
               style={{
@@ -169,8 +171,87 @@ export const BracketTierBar: React.FC<BracketTierBarProps> = ({
         )}
       </div>
 
-      {/* Right: View Mode Toggle & Broadcast Shortcut */}
+      {/* Right: Player Search, View Mode Toggle & Share Button */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+        {/* Bracket Player Search - Hidden on Mobile Feed */}
+        {viewMode !== 'feed' && onPlayerSearchTermChange !== undefined && (
+          <div
+            style={{
+              position: 'relative',
+              width: '185px',
+              maxWidth: '100%',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+            <Search
+              size={13}
+              color={highlightedPlayerName ? 'var(--color-gold-bright)' : 'var(--color-text-muted)'}
+              style={{
+                position: 'absolute',
+                left: '8px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                pointerEvents: 'none',
+              }}
+            />
+            <input
+              id="bracket-player-search-input"
+              type="text"
+              placeholder="Highlight player..."
+              value={playerSearchTerm || ''}
+              onChange={e => onPlayerSearchTermChange(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Escape') onPlayerSearchTermChange('');
+              }}
+              style={{
+                width: '100%',
+                padding: playerSearchTerm
+                  ? '0.32rem 1.6rem 0.32rem 1.7rem'
+                  : '0.32rem 0.65rem 0.32rem 1.7rem',
+                borderRadius: 'var(--radius-sm)',
+                border: highlightedPlayerName
+                  ? '1px solid var(--color-gold-bright)'
+                  : '1px solid var(--color-border)',
+                background: 'var(--color-bg-base)',
+                color: 'var(--color-text-primary)',
+                fontSize: '0.78rem',
+                outline: 'none',
+                boxSizing: 'border-box',
+                transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+                boxShadow: highlightedPlayerName
+                  ? '0 0 8px rgba(245, 158, 11, 0.25)'
+                  : 'none',
+              }}
+              title="Search player to highlight their bracket journey"
+            />
+            {playerSearchTerm && (
+              <button
+                type="button"
+                onClick={() => onPlayerSearchTermChange('')}
+                title="Clear player search"
+                aria-label="Clear player search"
+                style={{
+                  position: 'absolute',
+                  right: '6px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'transparent',
+                  border: 'none',
+                  padding: '2px',
+                  cursor: 'pointer',
+                  color: 'var(--color-text-muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+        )}
+
         {onChangeViewMode && (
           <div
             style={{
@@ -229,8 +310,7 @@ export const BracketTierBar: React.FC<BracketTierBarProps> = ({
 
             <button
               type="button"
-              disabled={isAcceleratedHybrid}
-              onClick={() => !isAcceleratedHybrid && onChangeViewMode('split')}
+              onClick={() => onChangeViewMode('split')}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -239,54 +319,60 @@ export const BracketTierBar: React.FC<BracketTierBarProps> = ({
                 borderRadius: 'var(--radius-xs)',
                 fontSize: '0.72rem',
                 fontWeight: viewMode === 'split' ? 700 : 500,
-                background: viewMode === 'split' && !isAcceleratedHybrid ? 'var(--color-bg-surface-elevated)' : 'transparent',
-                color: isAcceleratedHybrid ? 'var(--color-text-subtle, #666)' : viewMode === 'split' ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
-                opacity: isAcceleratedHybrid ? 0.35 : 1,
+                background: viewMode === 'split' ? 'var(--color-bg-surface-elevated)' : 'transparent',
+                color: viewMode === 'split' ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
                 border: 'none',
-                cursor: isAcceleratedHybrid ? 'not-allowed' : 'pointer',
+                cursor: 'pointer',
               }}
-              title={isAcceleratedHybrid ? 'Split view is not available for Accelerated Hybrid' : 'Bilateral Split Wings (Center Finals)'}
+              title={isAcceleratedHybrid ? 'Side-by-Side Pods (Pod 3 to right of Pod 2)' : 'Bilateral Split Wings (Center Finals)'}
             >
               <Split size={12} />
               <span>Split Wings</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => onChangeViewMode('feed')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                padding: '0.3rem 0.6rem',
+                borderRadius: 'var(--radius-xs)',
+                fontSize: '0.72rem',
+                fontWeight: viewMode === 'feed' ? 700 : 500,
+                background: viewMode === 'feed' ? 'var(--color-bg-surface-elevated)' : 'transparent',
+                color: viewMode === 'feed' ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+              title="Mobile Bracket Feed"
+            >
+              <ListFilter size={12} />
+              <span>Mobile</span>
+            </button>
           </div>
         )}
 
-        {/* Quick Link to OBS Broadcast Hub */}
-        <Link
-          to={`/${tournament.slug}/obs`}
-          className="btn btn-secondary"
-          style={{
-            padding: '0.35rem 0.7rem',
-            fontSize: '0.75rem',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.35rem',
-            color: 'var(--color-text-secondary)',
-          }}
-          title="Open Broadcast Overlay Studio"
-        >
-          <Video size={13} color="var(--color-gold-bright)" />
-          <span>OBS Studio</span>
-        </Link>
-
-        {/* Tier Settings */}
-        {canManage && (
-          <Link
-            to={`/${tournament.slug}/manage/settings`}
-            className="btn btn-secondary"
+        {/* Share Bracket Button (Only in Manage Mode - Public View has Share in top SpectatorLayout header) */}
+        {canManage && onOpenShare && (
+          <button
+            type="button"
+            onClick={onOpenShare}
+            className="btn btn-primary"
             style={{
-              padding: '0.35rem 0.6rem',
+              padding: '0.35rem 0.75rem',
               fontSize: '0.75rem',
               display: 'inline-flex',
               alignItems: 'center',
-              color: 'var(--color-text-muted)',
+              gap: '0.35rem',
+              borderRadius: 'var(--radius-sm)',
             }}
-            title="Edit Tier Settings"
+            title="Share bracket link & venue QR code"
           >
-            <Settings size={13} />
-          </Link>
+            <Share2 size={13} />
+            <span>Share</span>
+          </button>
         )}
       </div>
     </div>

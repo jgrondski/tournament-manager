@@ -28,11 +28,11 @@ export const ACCELERATED_HYBRID_POD_PALETTE = {
     glow: 'rgba(2, 132, 199, 0.6)',
   },
   LB: {
-    border: '#059669',
-    text: '#34D399',
-    bgTranslucent: 'rgba(5, 150, 105, 0.2)',
-    badgeBg: 'rgba(5, 150, 105, 0.25)',
-    glow: 'rgba(5, 150, 105, 0.6)',
+    border: '#c2410c',
+    text: '#fb923c',
+    bgTranslucent: 'rgba(194, 65, 12, 0.2)',
+    badgeBg: 'rgba(194, 65, 12, 0.25)',
+    glow: 'rgba(194, 65, 12, 0.6)',
   },
 } as const;
 
@@ -71,7 +71,7 @@ export const getInboundChip = (
   mIdx: number,
   isPhase2OpeningRound: boolean,
   primaryColor = '#ffc905',
-  _lowerBracketColor = '#c2410c'
+  lowerBracketColor = '#c2410c'
 ): MicroChipData | null => {
   // Finals Rule: Suppress all incoming and outgoing routing chips for Grand Finals,
   // Grand Finals Reset, and Finals (connecting lines already represent these paths).
@@ -100,7 +100,17 @@ export const getInboundChip = (
     detailRound: string,
     targetId?: string
   ): MicroChipData => {
-    const palette = ACCELERATED_HYBRID_POD_PALETTE[branch];
+    const isLb = branch === 'LB';
+    const effectiveLbColor = lowerBracketColor || ACCELERATED_HYBRID_POD_PALETTE.LB.border;
+    const palette = isLb
+      ? {
+          border: effectiveLbColor,
+          text: '#fb923c',
+          bgTranslucent: `${effectiveLbColor}26`,
+          badgeBg: `${effectiveLbColor}33`,
+          glow: `${effectiveLbColor}88`,
+        }
+      : ACCELERATED_HYBRID_POD_PALETTE[branch];
     const resolvedId = targetId || srcId;
     return {
       text: `${matchNumber}`,
@@ -359,7 +369,14 @@ export const getOutboundChip = (
           };
         }
         if (isThisSlotLoser) {
-          const lbPalette = ACCELERATED_HYBRID_POD_PALETTE.LB;
+          const effectiveLbColor = lowerBracketColor || ACCELERATED_HYBRID_POD_PALETTE.LB.border;
+          const lbPalette = {
+            border: effectiveLbColor,
+            text: '#fb923c',
+            bgTranslucent: `${effectiveLbColor}26`,
+            badgeBg: `${effectiveLbColor}33`,
+            glow: `${effectiveLbColor}88`,
+          };
           return {
             text: lbNum ? `${lbNum}` : '',
             tooltip: `Drops to Lower Bracket R3${lbNum ? ` (Match #${lbNum})` : ''}`,
@@ -374,7 +391,14 @@ export const getOutboundChip = (
         return null;
       } else {
         // In-progress / uncompleted: drop stake shown at opacity 0.4
-        const lbPalette = ACCELERATED_HYBRID_POD_PALETTE.LB;
+        const effectiveLbColor = lowerBracketColor || ACCELERATED_HYBRID_POD_PALETTE.LB.border;
+        const lbPalette = {
+          border: effectiveLbColor,
+          text: '#fb923c',
+          bgTranslucent: `${effectiveLbColor}26`,
+          badgeBg: `${effectiveLbColor}33`,
+          glow: `${effectiveLbColor}88`,
+        };
         return {
           text: lbNum ? `${lbNum}` : '',
           tooltip: `Drops to Lower Bracket R3 on defeat${lbNum ? ` (Match #${lbNum})` : ''}`,
@@ -396,7 +420,14 @@ export const getOutboundChip = (
       const lbNum = lbMatch?.matchNumber;
       if (isComplete) {
         if (isThisSlotLoser && lbMatch) {
-          const lbPalette = ACCELERATED_HYBRID_POD_PALETTE.LB;
+          const effectiveLbColor = lowerBracketColor || ACCELERATED_HYBRID_POD_PALETTE.LB.border;
+          const lbPalette = {
+            border: effectiveLbColor,
+            text: '#fb923c',
+            bgTranslucent: `${effectiveLbColor}26`,
+            badgeBg: `${effectiveLbColor}33`,
+            glow: `${effectiveLbColor}88`,
+          };
           return {
             text: lbNum ? `${lbNum}` : '',
             tooltip: `Drops to Lower Bracket${lbNum ? ` (Match #${lbNum})` : ''}`,
@@ -411,7 +442,14 @@ export const getOutboundChip = (
         return null;
       } else if (lbMatch) {
         // In-progress / uncompleted drop stake
-        const lbPalette = ACCELERATED_HYBRID_POD_PALETTE.LB;
+        const effectiveLbColor = lowerBracketColor || ACCELERATED_HYBRID_POD_PALETTE.LB.border;
+        const lbPalette = {
+          border: effectiveLbColor,
+          text: '#fb923c',
+          bgTranslucent: `${effectiveLbColor}26`,
+          badgeBg: `${effectiveLbColor}33`,
+          glow: `${effectiveLbColor}88`,
+        };
         return {
           text: lbNum ? `${lbNum}` : '',
           tooltip: `Drops to Lower Bracket on defeat${lbNum ? ` (Match #${lbNum})` : ''}`,
@@ -432,7 +470,14 @@ export const getOutboundChip = (
     if (match.roundIdentifier === 'PRE_W2') {
       if (isComplete && isThisSlotWinner) {
         const destMatch = findPoMatch(match.id);
-        const lbPalette = ACCELERATED_HYBRID_POD_PALETTE.LB;
+        const effectiveLbColor = lowerBracketColor || ACCELERATED_HYBRID_POD_PALETTE.LB.border;
+        const lbPalette = {
+          border: effectiveLbColor,
+          text: '#fb923c',
+          bgTranslucent: `${effectiveLbColor}26`,
+          badgeBg: `${effectiveLbColor}33`,
+          glow: `${effectiveLbColor}88`,
+        };
         return {
           text: destMatch?.matchNumber ? `${destMatch.matchNumber}` : '',
           tooltip: `Advances to Lower Bracket R4${destMatch?.matchNumber ? ` - Match #${destMatch.matchNumber}` : ''}`,
@@ -609,7 +654,6 @@ export const renderMicroChip = (
         cursor: matchId ? 'pointer' : 'help',
         userSelect: 'none',
         whiteSpace: 'nowrap',
-        transition: 'all 0.15s ease',
       }}
       title={chip.tooltip}
     >

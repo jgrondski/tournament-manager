@@ -21,7 +21,7 @@ export const TournamentPageHeader: React.FC<TournamentPageHeaderProps> = ({
   subtitle,
   searchTerm,
   onSearchChange,
-  searchPlaceholder = 'Search player, country, style...',
+  searchPlaceholder = 'Search competitor, country, style...',
   obsUrl,
   action,
   isObsMode = false,
@@ -72,8 +72,25 @@ export const TournamentPageHeader: React.FC<TournamentPageHeaderProps> = ({
       {/* Action Controls & Search Group */}
       {!isObsMode && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          {action}
+
+          {obsUrl && (
+            <a
+              href={obsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary"
+              title="Open OBS broadcast overlay in new tab (stripped chrome, transparent background)"
+              style={{ fontSize: '0.8rem', padding: '0.5rem 0.85rem', gap: '0.4rem', whiteSpace: 'nowrap' }}
+            >
+              <Video size={15} color="var(--color-gold-bright)" />
+              <span>OBS Overlay</span>
+              <ExternalLink size={13} />
+            </a>
+          )}
+
           {onSearchChange !== undefined && (
-            <div style={{ position: 'relative', minWidth: '240px' }}>
+            <div style={{ position: 'relative', width: '280px', maxWidth: '100%' }}>
               <Search
                 size={16}
                 color="var(--color-text-muted)"
@@ -129,23 +146,6 @@ export const TournamentPageHeader: React.FC<TournamentPageHeaderProps> = ({
               )}
             </div>
           )}
-
-          {obsUrl && (
-            <a
-              href={obsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-secondary"
-              title="Open OBS broadcast overlay in new tab (stripped chrome, transparent background)"
-              style={{ fontSize: '0.8rem', padding: '0.5rem 0.85rem', gap: '0.4rem', whiteSpace: 'nowrap' }}
-            >
-              <Video size={15} color="var(--color-gold-bright)" />
-              <span>OBS Overlay</span>
-              <ExternalLink size={13} />
-            </a>
-          )}
-
-          {action}
         </div>
       )}
     </div>

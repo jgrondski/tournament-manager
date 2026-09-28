@@ -45,10 +45,10 @@ export const OrgBrandPaletteSection: React.FC<OrgBrandPaletteSectionProps> = ({
         background: 'var(--color-bg-surface)',
         borderRadius: 'var(--radius-lg)',
         border: '1px solid var(--color-border)',
-        padding: '1.25rem 1.5rem',
+        padding: '1.15rem 1.35rem',
         display: 'flex',
         flexDirection: 'column',
-        gap: '1.25rem',
+        gap: '1rem',
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.65rem', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -100,28 +100,43 @@ export const OrgBrandPaletteSection: React.FC<OrgBrandPaletteSectionProps> = ({
             </span>
           </div>
 
-          <div style={{ background: 'var(--color-bg-surface-elevated)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border-subtle)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', margin: 0 }}>
-              <input
-                type="checkbox"
-                checked={useOrgBranding}
-                onChange={e => onUseOrgBrandingChange(e.target.checked)}
-                style={{ width: '16px', height: '16px', accentColor: 'var(--color-gold-bright)', cursor: 'pointer' }}
-              />
-              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                Inherit Organization Theme &amp; 5-Color Bracket Palette
-              </span>
-            </label>
+          <div style={{ background: 'var(--color-bg-surface-elevated)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border-subtle)', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.6rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={useOrgBranding}
+                  onChange={e => onUseOrgBrandingChange(e.target.checked)}
+                  style={{ width: '16px', height: '16px', accentColor: 'var(--color-gold-bright)', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                  Inherit Organizational Theme
+                </span>
+              </label>
+
+              {useOrgBranding && (selectedOrg?.themeColors || selectedOrg?.branding?.themeColors) && (
+                <button
+                  type="button"
+                  onClick={onApplyOrgColorsToTiers}
+                  className="btn btn-secondary"
+                  style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem', gap: '0.35rem', flexShrink: 0 }}
+                  title="Copy these 5 colors to all tiers in this tournament"
+                >
+                  <Palette size={13} color="var(--color-gold-bright)" />
+                  Apply
+                </button>
+              )}
+            </div>
 
             {useOrgBranding && (selectedOrg?.themeColors || selectedOrg?.branding?.themeColors) && (
               (() => {
                 const colors = selectedOrg.themeColors || selectedOrg.branding?.themeColors;
                 return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', paddingTop: '0.25rem' }}>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', paddingTop: '0.15rem' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)' }}>
                       Circuit 5-Color Theme:
                     </span>
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
                       {[
                         { label: 'Pri', color: colors?.primaryColor },
                         { label: 'Sec', color: colors?.secondaryColor },
@@ -135,17 +150,6 @@ export const OrgBrandPaletteSection: React.FC<OrgBrandPaletteSectionProps> = ({
                         </div>
                       ))}
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={onApplyOrgColorsToTiers}
-                      className="btn btn-secondary"
-                      style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', alignSelf: 'flex-start', marginTop: '0.25rem', gap: '0.4rem' }}
-                      title="Copy these 5 colors to all tiers in this tournament"
-                    >
-                      <Palette size={13} color="var(--color-gold-bright)" />
-                      Apply Circuit Palettes to All Tiers
-                    </button>
                   </div>
                 );
               })()

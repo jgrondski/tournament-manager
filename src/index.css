@@ -278,3 +278,30 @@ select:disabled {
     transform: scale(1);
   }
 }
+
+@media (max-width: 1024px) {
+  .qualifier-top-pods,
+  .qualifier-side-by-side-pods {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* OBS Hub Cards Grid - Strictly max 3 per row with responsive collapse */
+.obs-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.15rem;
+}
+
+@media (max-width: 1040px) {
+  .obs-cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 680px) {
+  .obs-cards-grid {
+    grid-template-columns: 1fr;
+  }
+}
+

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Plus, Trash2, ArrowUp, ArrowDown, Palette, ChevronDown } from 'lucide-react';
 import { TournamentTier, BracketRouting } from '../../types';
-import { getDefaultTierColors } from '../../../bracket/colorUtils';
+import { getDefaultTierColors, colorWithAlpha } from '../../../bracket/colorUtils';
 import { getValidFlatWidths } from '../../../bracket/math';
 import { BestOfSelect } from '../../../bracket/components/BestOfSelect';
 import { BracketThemeEditor } from '../../../bracket/components/BracketThemeEditor';
@@ -36,33 +36,33 @@ export const TierManagementSection: React.FC<TierManagementSectionProps> = ({
         background: 'var(--color-bg-surface)',
         borderRadius: 'var(--radius-lg)',
         border: '1px solid var(--color-border)',
-        padding: '1.5rem',
+        padding: '1.15rem 1.35rem',
         display: 'flex',
         flexDirection: 'column',
-        gap: '1.25rem',
+        gap: '1rem',
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.75rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.65rem' }}>
         <div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+          <h2 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
             Bracket Tiers
           </h2>
-          <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-            Organize 1 to N tiered brackets (Gold, Silver, Bronze) with automatic cutoff ranges.
+          <p style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
+            Organize 1 to N tiered brackets (Gold, Silver, Bronze) with automatic cutoff ranges and customized themes.
           </p>
         </div>
         <button
           type="button"
           onClick={onAddTier}
           className="btn btn-primary"
-          style={{ padding: '0.45rem 0.9rem', fontSize: '0.85rem' }}
+          style={{ padding: '0.4rem 0.85rem', fontSize: '0.82rem' }}
         >
-          <Plus size={16} /> Add Tier
+          <Plus size={15} /> Add Tier
         </button>
       </div>
 
       {/* Tiers List */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
         {tiers.length === 0 ? (
           <div
             style={{
@@ -92,32 +92,57 @@ export const TierManagementSection: React.FC<TierManagementSectionProps> = ({
         ) : (
           tiers.map((tier, idx) => {
             const badge = tierThresholdBadges[idx];
+            const defaults = getDefaultTierColors(tier);
+            const priColor = tier.primaryColor || defaults.primaryColor || '#ffc905';
+            const secColor = tier.secondaryColor || defaults.secondaryColor || '#705b33';
+            const cardBg = tier.cardColor || defaults.cardColor || '#1b1c1d';
+            const txtColor = tier.textColor || defaults.textColor || '#94A3B8';
 
             return (
               <div
                 key={tier.id}
                 style={{
-                  background: 'var(--color-bg-surface-elevated)',
+                  background: `linear-gradient(135deg, var(--color-bg-surface-elevated) 0%, ${colorWithAlpha(priColor, 0.05)} 100%)`,
                   borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--color-border)',
-                  borderLeft: `5px solid ${tier.primaryColor || 'var(--color-gold)'}`,
-                  padding: '1.25rem',
+                  border: `1px solid ${colorWithAlpha(priColor, 0.28)}`,
+                  borderLeft: `5px solid ${priColor}`,
+                  padding: '0.95rem 1.15rem',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '1rem',
+                  gap: '0.85rem',
+                  boxShadow: 'var(--shadow-sm)',
                 }}
               >
-                {/* Header: Priority, Name, Cutoff Badge & Controls */}
+                {/* Header: Priority, Name, Swatch Pill, Cutoff Badge & Controls */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
                     <span
                       style={{
-                        padding: '0.2rem 0.6rem',
+                        width: '12px',
+                        height: '12px',
+                        borderRadius: '50%',
+                        background: priColor,
+                        boxShadow: `0 0 10px ${colorWithAlpha(priColor, 0.65)}`,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontWeight: 800,
+                        fontSize: '0.98rem',
+                        color: priColor,
+                      }}
+                    >
+                      {tier.name}
+                    </span>
+                    <span
+                      style={{
+                        padding: '0.15rem 0.5rem',
                         borderRadius: 'var(--radius-sm)',
                         background: 'var(--color-bg-surface-highlight)',
                         fontWeight: 700,
-                        fontSize: '0.8rem',
-                        color: 'var(--color-text-primary)',
+                        fontSize: '0.74rem',
+                        color: 'var(--color-text-secondary)',
                       }}
                     >
                       Priority #{tier.priority}
@@ -127,18 +152,37 @@ export const TierManagementSection: React.FC<TierManagementSectionProps> = ({
                     {badge && (
                       <span
                         style={{
-                          padding: '0.25rem 0.75rem',
+                          padding: '0.18rem 0.6rem',
                           borderRadius: 'var(--radius-full)',
-                          background: 'rgba(245, 158, 11, 0.15)',
-                          border: '1px solid rgba(245, 158, 11, 0.3)',
-                          color: 'var(--color-gold-bright)',
+                          background: colorWithAlpha(priColor, 0.14),
+                          border: `1px solid ${colorWithAlpha(priColor, 0.35)}`,
+                          color: priColor,
                           fontWeight: 700,
-                          fontSize: '0.8rem',
+                          fontSize: '0.74rem',
                         }}
                       >
-                        Cutoff: Leaderboard Ranks {badge.start} – {badge.end}
+                        Cutoff: Ranks {badge.start} – {badge.end}
                       </span>
                     )}
+
+                    {/* Header Theme Preview Swatches */}
+                    <div
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.3rem',
+                        padding: '0.15rem 0.45rem',
+                        background: 'var(--color-bg-base)',
+                        borderRadius: 'var(--radius-full)',
+                        border: `1px solid ${colorWithAlpha(priColor, 0.25)}`,
+                      }}
+                      title={`Theme: Primary (${priColor}), Secondary (${secColor}), Card (${cardBg}), Text (${txtColor})`}
+                    >
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: priColor, border: '1px solid rgba(0,0,0,0.4)' }} />
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: secColor, border: '1px solid rgba(0,0,0,0.4)' }} />
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: cardBg, border: '1px solid rgba(255,255,255,0.2)' }} />
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: txtColor, border: '1px solid rgba(0,0,0,0.4)' }} />
+                    </div>
                   </div>
 
                   {/* Move up / down / delete */}
@@ -148,35 +192,35 @@ export const TierManagementSection: React.FC<TierManagementSectionProps> = ({
                       onClick={() => onMoveTier(idx, 'up')}
                       disabled={idx === 0}
                       className="btn btn-secondary"
-                      style={{ padding: '0.25rem 0.5rem', opacity: idx === 0 ? 0.3 : 1 }}
+                      style={{ padding: '0.22rem 0.45rem', opacity: idx === 0 ? 0.3 : 1 }}
                       title="Move tier up in priority"
                     >
-                      <ArrowUp size={14} />
+                      <ArrowUp size={13} />
                     </button>
                     <button
                       type="button"
                       onClick={() => onMoveTier(idx, 'down')}
                       disabled={idx === tiers.length - 1}
                       className="btn btn-secondary"
-                      style={{ padding: '0.25rem 0.5rem', opacity: idx === tiers.length - 1 ? 0.3 : 1 }}
+                      style={{ padding: '0.22rem 0.45rem', opacity: idx === tiers.length - 1 ? 0.3 : 1 }}
                       title="Move tier down in priority"
                     >
-                      <ArrowDown size={14} />
+                      <ArrowDown size={13} />
                     </button>
                     <button
                       type="button"
                       onClick={() => onRequestDeleteTier(idx, tier)}
                       className="btn btn-danger"
-                      style={{ padding: '0.25rem 0.5rem' }}
+                      style={{ padding: '0.22rem 0.45rem' }}
                       title="Delete bracket tier"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={13} />
                     </button>
                   </div>
                 </div>
 
                 {/* Form Fields Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', alignItems: 'end' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.65rem', alignItems: 'end' }}>
                   <div style={{ minWidth: 0 }}>
                     <label style={{ ...labelStyle, height: '1.6rem', display: 'flex', alignItems: 'flex-end', marginBottom: '0.35rem' }}>Tier Name</label>
                     <input
@@ -379,10 +423,10 @@ export const TierManagementSection: React.FC<TierManagementSectionProps> = ({
                   return (
                     <div
                       style={{
-                        marginTop: '1.25rem',
+                        marginTop: '0.75rem',
                         borderRadius: 'var(--radius-md)',
                         background: 'var(--color-bg-surface)',
-                        border: '1px solid var(--color-border-subtle)',
+                        border: `1px solid ${isThemeOpen ? colorWithAlpha(priColor, 0.4) : 'var(--color-border-subtle)'}`,
                         overflow: 'hidden',
                         transition: 'all 0.2s ease',
                       }}
@@ -393,10 +437,10 @@ export const TierManagementSection: React.FC<TierManagementSectionProps> = ({
                         onClick={() => onToggleThemeCollapse(tier.id)}
                         style={{
                           width: '100%',
-                          padding: '0.85rem 1.25rem',
+                          padding: '0.65rem 1rem',
                           background: isThemeOpen ? 'var(--color-bg-surface)' : 'var(--color-bg-surface-elevated)',
                           border: 'none',
-                          borderBottom: isThemeOpen ? '1px solid var(--color-border-subtle)' : 'none',
+                          borderBottom: isThemeOpen ? `1px solid ${colorWithAlpha(priColor, 0.25)}` : 'none',
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',

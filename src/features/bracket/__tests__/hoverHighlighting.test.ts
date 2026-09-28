@@ -226,7 +226,7 @@ describe('Bracket Hover Highlighting & Visual Distinction', () => {
         })
       ).toBe(textColor);
 
-      // Hovered player text is secondaryColor
+      // Hovered player text does NOT blip to secondaryColor when highlight is inactive
       expect(
         getHighlightedPlayerNameColor({
           isHighlightActive: false,
@@ -240,7 +240,7 @@ describe('Bracket Hover Highlighting & Visual Distinction', () => {
           secondaryColor,
           textColor,
         })
-      ).toBe(secondaryColor);
+      ).toBe(textColor);
     });
   });
 
@@ -287,7 +287,7 @@ describe('Bracket Hover Highlighting & Visual Distinction', () => {
         subTrack: 'PRE_MERGE_LOWER',
         roundIdentifier: 'PRE_L1',
       };
-      expect(getMatchBranchColor(mockLBMatch)).toBe('#059669'); // LB.border default
+      expect(getMatchBranchColor(mockLBMatch)).toBe('#c2410c'); // LB.border default
     });
 
     it('returns null for championship / grand finals matches so they use neutral/tier theme', () => {
@@ -297,6 +297,75 @@ describe('Bracket Hover Highlighting & Visual Distinction', () => {
         stage: 'GRAND_FINALS',
       };
       expect(getMatchBranchColor(mockGfMatch, '#ff6600')).toBeNull();
+    });
+  });
+
+  describe('Bracket Player Search Resolution & Journey Highlight', () => {
+    const players = [
+      { id: 'p1', name: 'Fractal' },
+      { id: 'p2', name: 'Alex T' },
+      { id: 'p3', name: 'Alex' },
+      { id: 'p4', name: 'Blue Scuti' },
+    ];
+
+    function resolvePlayerSearch(query: string, candidateList: typeof players) {
+      const q = query.trim().toLowerCase();
+      if (!q) return null;
+      const matches = candidateList.filter(p => p.name.toLowerCase().includes(q));
+      if (matches.length === 1) return matches[0];
+      if (matches.length > 1) {
+        const exact = matches.find(p => p.name.toLowerCase() === q);
+        if (exact) return exact;
+      }
+      return null;
+    }
+
+    it('returns null when query is empty or whitespace only', () => {
+      expect(resolvePlayerSearch('', players)).toBeNull();
+      expect(resolvePlayerSearch('   ', players)).toBeNull();
+    });
+
+    it('returns null when query matches multiple players without an exact match', () => {
+      // "al" matches Fractal, Alex T, Alex
+      expect(resolvePlayerSearch('al', players)).toBeNull();
+    });
+
+    it('resolves to the single matching player when unique substring matches', () => {
+      // "frac" uniquely matches Fractal
+      expect(resolvePlayerSearch('frac', players)?.id).toBe('p1');
+      // "scuti" uniquely matches Blue Scuti
+      expect(resolvePlayerSearch('scuti', players)?.id).toBe('p4');
+    });
+
+    it('resolves to exact match when multiple players share a prefix', () => {
+      // "alex" matches both "Alex T" and "Alex", but "Alex" is an exact match
+      expect(resolvePlayerSearch('alex', players)?.id).toBe('p3');
+    });
+
+    it('clears to null (normal view) when search is cleared', () => {
+      let currentQuery = 'fractal';
+      expect(resolvePlayerSearch(currentQuery, players)?.id).toBe('p1');
+
+      currentQuery = '';
+      expect(resolvePlayerSearch(currentQuery, players)).toBeNull();
+    });
+
+    it('produces active journey matchIds and slotKeys when player resolves', () => {
+      const seeded: SeededPlayer[] = [
+        { id: 'p1', name: 'Fractal', seed: 1 },
+        { id: 'p2', name: 'Alex', seed: 2 },
+        { id: 'p3', name: 'Blue Scuti', seed: 3 },
+        { id: 'p4', name: 'Tristop', seed: 4 },
+      ];
+      const doubleElimBracket = generateTraditionalDoubleElim(seeded, { tierId: 'gold' });
+
+      const resolved = resolvePlayerSearch('fractal', [{ id: 'p1', name: 'Fractal' }]);
+      expect(resolved).not.toBeNull();
+
+      const journey = findPlayerJourney(resolved?.id, null, null, doubleElimBracket, {});
+      expect(journey.matchIds.size).toBeGreaterThan(0);
+      expect(journey.slotKeys.size).toBeGreaterThan(0);
+      expect(journey.targetPlayerId).toBe('p1');
     });
   });
 });

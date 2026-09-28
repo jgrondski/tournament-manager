@@ -20,7 +20,6 @@ import { PointsThresholdsDrawer } from './PointsThresholdsDrawer';
 import { TournamentInfoSection } from './settings/TournamentInfoSection';
 import { OrgBrandPaletteSection } from './settings/OrgBrandPaletteSection';
 import { TierManagementSection } from './settings/TierManagementSection';
-import { TournamentRosterSection } from './settings/TournamentRosterSection';
 import { DataSimulationSection } from './settings/DataSimulationSection';
 import { AdminFormModals } from './settings/AdminFormModals';
 
@@ -610,10 +609,6 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
     return { start, end };
   });
 
-  const totalCapacity = useMemo(() => {
-    return tiers.reduce((acc, t) => acc + (t.playerCount || 0), 0);
-  }, [tiers]);
-
   return (
     <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       {/* Top Banner & Save Indicator */}
@@ -771,13 +766,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
         onRequestDeleteTier={(idx, tier) => setTierToDelete({ index: idx, tier })}
       />
 
-      {/* Section 4: Tournament Roster Management */}
-      <TournamentRosterSection
-        tournament={tournament}
-        totalCapacity={totalCapacity}
-      />
-
-      {/* Section 5: Data Management & Simulation */}
+      {/* Section 4: Data Management & Simulation */}
       <DataSimulationSection
         qualifierCount={qualifierCount}
         recordedMatchCount={recordedMatchCount}
@@ -796,9 +785,9 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
           alignItems: 'center',
           gap: '1rem',
           position: 'sticky',
-          bottom: '1.5rem',
+          bottom: '1rem',
           background: 'var(--color-bg-surface-elevated)',
-          padding: '1rem 1.5rem',
+          padding: '0.75rem 1.25rem',
           borderRadius: 'var(--radius-md)',
           border: '1px solid var(--color-border)',
           boxShadow: 'var(--shadow-lg)',

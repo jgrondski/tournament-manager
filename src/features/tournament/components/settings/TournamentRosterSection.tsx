@@ -30,7 +30,7 @@ export const TournamentRosterSection: React.FC<TournamentRosterSectionProps> = (
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <Users size={18} color="var(--color-gold-bright)" />
           <h2 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
-            Tournament Competitor Roster
+            Player Roster
           </h2>
         </div>
         <span
@@ -46,7 +46,7 @@ export const TournamentRosterSection: React.FC<TournamentRosterSectionProps> = (
           {(tournament.playersPool || []).length} / {totalCapacity} Capacity Registered
         </span>
         <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
-          Manage registrations &amp; pool imports in Register Players.
+          Manage registrations &amp; pool imports in Players.
         </span>
       </div>
 
@@ -55,7 +55,7 @@ export const TournamentRosterSection: React.FC<TournamentRosterSectionProps> = (
         className="btn btn-primary"
         style={{ padding: '0.4rem 0.85rem', fontSize: '0.82rem', gap: '0.4rem', textDecoration: 'none' }}
       >
-        <Users size={14} /> Go to Register Players
+        <Users size={14} /> Go to Players
       </Link>
     </section>
   );

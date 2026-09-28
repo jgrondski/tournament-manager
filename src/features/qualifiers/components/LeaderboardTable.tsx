@@ -91,7 +91,6 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
         searchPlaceholder="Search competitor, country, style..."
-        obsUrl={`/${tournament.slug}/leaderboard?obs=true`}
         action={
           canManage ? (
             <button

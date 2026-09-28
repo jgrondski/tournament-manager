@@ -822,8 +822,8 @@ export function calculateAcceleratedHybridAccelLayout(
 ): BracketLayoutMetadata {
   const config: LayoutConfig = {
     ...DEFAULT_LAYOUT_CONFIG,
-    paddingLeft: 64,
-    paddingRight: 64,
+    paddingLeft: 12,
+    paddingRight: 12,
     ...customConfig,
   };
   if (customConfig?.headerHeight === undefined) {
@@ -906,8 +906,9 @@ export function calculateAcceleratedHybridPreMergeUpperLayout(
 ): BracketLayoutMetadata {
   const config: LayoutConfig = {
     ...DEFAULT_LAYOUT_CONFIG,
-    paddingLeft: 64,
-    paddingRight: 64,
+    paddingLeft: 8,
+    paddingRight: 8,
+    roundGap: 32,
     ...customConfig,
   };
   if (customConfig?.headerHeight === undefined) {
@@ -922,9 +923,19 @@ export function calculateAcceleratedHybridPreMergeUpperLayout(
   const paths: ConnectorPath[] = [];
 
   const preUpperRounds = rounds.filter((r) => r.roundIdentifier?.startsWith('PRE_W'));
+  const r1 = preUpperRounds[0];
+  const r2 = preUpperRounds[1];
+  const shouldSplit4Cols = Boolean(r1 && r1.matches.length > 8);
+
   const colStep = config.matchWidth + config.roundGap;
   const col0X = config.paddingLeft;
   const col1X = config.paddingLeft + colStep;
+
+  // 4-column layout: Group 1 (Cols 0 & 1), Group 2 (Cols 2 & 3)
+  // Keep a slightly larger but still small gap between Part 1 and Part 2
+  const interGroupGap = config.roundGap + 16;
+  const col2X = col1X + config.matchWidth + interGroupGap;
+  const col3X = col2X + colStep;
 
   const stageBadgeHeight = 26;
   const stageBadgeGap = 12;
@@ -937,21 +948,51 @@ export function calculateAcceleratedHybridPreMergeUpperLayout(
     title: 'Upper Bracket',
     x: col0X,
     y: badgeY,
-    width: Math.max(config.matchWidth, preUpperRounds.length * colStep - config.roundGap),
+    width: shouldSplit4Cols
+      ? (col3X + config.matchWidth) - col0X
+      : Math.max(config.matchWidth, preUpperRounds.length * colStep - config.roundGap),
   });
 
-  // Col 0: Upper R1
-  if (preUpperRounds[0]) {
-    const r = preUpperRounds[0];
+  if (shouldSplit4Cols) {
+    const r1Half = Math.ceil(r1.matches.length / 2);
+    const r2Half = r2 ? Math.ceil(r2.matches.length / 2) : 0;
+
+    // Headers for all 4 columns
     roundHeaders.push({
-      roundNumber: r.roundNumber,
-      name: r.name,
+      roundNumber: r1.roundNumber,
+      name: `${r1.name} (Part 1)`,
       x: col0X,
       y: headerY,
       width: config.matchWidth,
     });
+    if (r2) {
+      roundHeaders.push({
+        roundNumber: r2.roundNumber,
+        name: `${r2.name} (Part 1)`,
+        x: col1X,
+        y: headerY,
+        width: config.matchWidth,
+      });
+    }
+    roundHeaders.push({
+      roundNumber: r1.roundNumber,
+      name: `${r1.name} (Part 2)`,
+      x: col2X,
+      y: headerY,
+      width: config.matchWidth,
+    });
+    if (r2) {
+      roundHeaders.push({
+        roundNumber: r2.roundNumber,
+        name: `${r2.name} (Part 2)`,
+        x: col3X,
+        y: headerY,
+        width: config.matchWidth,
+      });
+    }
 
-    r.matches.forEach((m, mIdx) => {
+    // Col 0: R1 Group 1 (matches 0..r1Half - 1)
+    r1.matches.slice(0, r1Half).forEach((m, mIdx) => {
       const topY = matchesStartY + mIdx * config.baseRowHeight;
       const centerY = topY + config.matchHeight / 2;
       matchPositions[m.id] = {
@@ -964,37 +1005,119 @@ export function calculateAcceleratedHybridPreMergeUpperLayout(
         centerX: col0X + config.matchWidth / 2,
       };
     });
-  }
 
-  // Col 1: Upper R2
-  if (preUpperRounds[1]) {
-    const r = preUpperRounds[1];
-    roundHeaders.push({
-      roundNumber: r.roundNumber,
-      name: r.name,
-      x: col1X,
-      y: headerY,
-      width: config.matchWidth,
-    });
+    // Col 1: R2 Group 1 (matches 0..r2Half - 1)
+    if (r2) {
+      r2.matches.slice(0, r2Half).forEach((m, mIdx) => {
+        const f1 = m.player1.sourceMatchId ? matchPositions[m.player1.sourceMatchId] : undefined;
+        const f2 = m.player2.sourceMatchId ? matchPositions[m.player2.sourceMatchId] : undefined;
+        const idealCenterY =
+          f1 && f2
+            ? (f1.centerY + f2.centerY) / 2
+            : matchesStartY + (mIdx * 2 + 0.5) * config.baseRowHeight;
+        const topY = idealCenterY - config.matchHeight / 2;
+        matchPositions[m.id] = {
+          matchId: m.id,
+          x: col1X,
+          y: topY,
+          width: config.matchWidth,
+          height: config.matchHeight,
+          centerY: idealCenterY,
+          centerX: col1X + config.matchWidth / 2,
+        };
+      });
+    }
 
-    r.matches.forEach((m, mIdx) => {
-      const f1 = m.player1.sourceMatchId ? matchPositions[m.player1.sourceMatchId] : undefined;
-      const f2 = m.player2.sourceMatchId ? matchPositions[m.player2.sourceMatchId] : undefined;
-      const idealCenterY =
-        f1 && f2
-          ? (f1.centerY + f2.centerY) / 2
-          : matchesStartY + (mIdx * 2 + 0.5) * config.baseRowHeight;
-      const topY = idealCenterY - config.matchHeight / 2;
+    // Col 2: R1 Group 2 (matches r1Half..end)
+    r1.matches.slice(r1Half).forEach((m, mIdx) => {
+      const topY = matchesStartY + mIdx * config.baseRowHeight;
+      const centerY = topY + config.matchHeight / 2;
       matchPositions[m.id] = {
         matchId: m.id,
-        x: col1X,
+        x: col2X,
         y: topY,
         width: config.matchWidth,
         height: config.matchHeight,
-        centerY: idealCenterY,
-        centerX: col1X + config.matchWidth / 2,
+        centerY,
+        centerX: col2X + config.matchWidth / 2,
       };
     });
+
+    // Col 3: R2 Group 2 (matches r2Half..end)
+    if (r2) {
+      r2.matches.slice(r2Half).forEach((m, mIdx) => {
+        const f1 = m.player1.sourceMatchId ? matchPositions[m.player1.sourceMatchId] : undefined;
+        const f2 = m.player2.sourceMatchId ? matchPositions[m.player2.sourceMatchId] : undefined;
+        const idealCenterY =
+          f1 && f2
+            ? (f1.centerY + f2.centerY) / 2
+            : matchesStartY + (mIdx * 2 + 0.5) * config.baseRowHeight;
+        const topY = idealCenterY - config.matchHeight / 2;
+        matchPositions[m.id] = {
+          matchId: m.id,
+          x: col3X,
+          y: topY,
+          width: config.matchWidth,
+          height: config.matchHeight,
+          centerY: idealCenterY,
+          centerX: col3X + config.matchWidth / 2,
+        };
+      });
+    }
+  } else {
+    // Standard 2-column layout for smaller brackets
+    if (r1) {
+      roundHeaders.push({
+        roundNumber: r1.roundNumber,
+        name: r1.name,
+        x: col0X,
+        y: headerY,
+        width: config.matchWidth,
+      });
+
+      r1.matches.forEach((m, mIdx) => {
+        const topY = matchesStartY + mIdx * config.baseRowHeight;
+        const centerY = topY + config.matchHeight / 2;
+        matchPositions[m.id] = {
+          matchId: m.id,
+          x: col0X,
+          y: topY,
+          width: config.matchWidth,
+          height: config.matchHeight,
+          centerY,
+          centerX: col0X + config.matchWidth / 2,
+        };
+      });
+    }
+
+    if (r2) {
+      roundHeaders.push({
+        roundNumber: r2.roundNumber,
+        name: r2.name,
+        x: col1X,
+        y: headerY,
+        width: config.matchWidth,
+      });
+
+      r2.matches.forEach((m, mIdx) => {
+        const f1 = m.player1.sourceMatchId ? matchPositions[m.player1.sourceMatchId] : undefined;
+        const f2 = m.player2.sourceMatchId ? matchPositions[m.player2.sourceMatchId] : undefined;
+        const idealCenterY =
+          f1 && f2
+            ? (f1.centerY + f2.centerY) / 2
+            : matchesStartY + (mIdx * 2 + 0.5) * config.baseRowHeight;
+        const topY = idealCenterY - config.matchHeight / 2;
+        matchPositions[m.id] = {
+          matchId: m.id,
+          x: col1X,
+          y: topY,
+          width: config.matchWidth,
+          height: config.matchHeight,
+          centerY: idealCenterY,
+          centerX: col1X + config.matchWidth / 2,
+        };
+      });
+    }
   }
 
   // Intra-panel SVG connectors: R1 -> R2
@@ -1039,7 +1162,8 @@ export function calculateAcceleratedHybridPreMergeUpperLayout(
 
   const allBottoms = Object.values(matchPositions).map((p) => p.y + p.height);
   const totalHeight = Math.max(...allBottoms, matchesStartY + config.matchHeight) + config.paddingBottom;
-  const totalWidth = (preUpperRounds.length > 1 ? col1X : col0X) + config.matchWidth + config.paddingRight;
+  const rightmostX = shouldSplit4Cols ? col3X : (preUpperRounds.length > 1 ? col1X : col0X);
+  const totalWidth = rightmostX + config.matchWidth + config.paddingRight;
 
   return {
     totalWidth,
@@ -1335,8 +1459,9 @@ export function calculateAcceleratedHybridLowerBracketLayout(
 ): BracketLayoutMetadata {
   const config: LayoutConfig = {
     ...DEFAULT_LAYOUT_CONFIG,
-    paddingLeft: 64,
-    paddingRight: 64,
+    paddingLeft: 12,
+    paddingRight: 12,
+    roundGap: 36,
     ...customConfig,
   };
   if (customConfig?.headerHeight === undefined) {

@@ -377,18 +377,36 @@ All entities include `id` (UUID) and `created_at` (timestamp).
 
 ## 11. Implementation Details & Backlog to Revisit Later
 
-### 11.1 Public-Facing, Mobile-Friendly Read-Only Bracket & Multi-View Display
-* **Spectator & Floor Read-Only Bracket View:**
-  * Publicly accessible, mobile-friendly read-only bracket view designed for sharing with competitors, spectators, and stream viewers.
-  * Mirrored after the Floor Judge view: displays full bracket trees, real-time match statuses, game scores, intentional topouts, and participant stats, but strictly with **no edit permissions** (no score editing inputs or administrative modals).
-  * All items remain interactive and clickable: clicking any competitor opens their `PlayerDetailDrawer` or match history; clicking a match node opens full game-by-game telemetry.
+### 11.1 Public-Facing, Mobile-Friendly Read-Only Bracket & Multi-View Display (Complete)
+* **Option 1 Routing Architecture (Strict Public Spectator vs Director Isolation):**
+  * **Public Spectator Portal (Clean Root `/:slug/*`):**
+    * Publicly accessible, mobile-friendly read-only experience designed for sharing with competitors, spectators, and stream viewers:
+      * `/:slug/brackets`, `/:slug/:tierSlug` – Live visual bracket tree, bilateral split wings, or mobile card feed.
+      * `/:slug/leaderboard` (with `/:slug/quals` shortcut) – Read-only qualifier rankings without score entry inputs.
+      * `/:slug/standings` – Read-only tournament final standings.
+    * Rendered in dedicated **`SpectatorLayout`** with zero admin sidebar, featuring a streamlined top bar (tournament branding, public tab switcher `[ Brackets | Qualifiers | Standings ]`, "Share" button, and "Admin" mode shortcut).
+    * Enforced `canManage={false}` across all public routes. Clicking any match node opens the **Read-Only Match Telemetry Modal** (`MatchTelemetryModal.tsx`) displaying series score, game-by-game point breakdowns, intentional topouts, and competitor profile links without edit inputs.
+  * **Tournament Director Management App (`/:slug/manage/*`):**
+    * Fully featured control center rendered in **`TournamentLayout`** with complete director sidebar navigation and "Public View ↗" shortcut:
+      * `/:slug/manage/bracket`, `/:slug/manage/bracket/:tierSlug` – **100% interactive match management restored directly on the visual bracket tree** (`canManage={true}`). Clicking any match card opens `MatchScoreDrawer` to enter game scores, forfeit overrides, and advance winners.
+      * `/:slug/manage/qualifiers` – Full qualifier score submission table.
+      * `/:slug/manage/standings` – Tournament standings.
+      * `/:slug/manage/sheet` – Master bracket matrix sheet.
+      * `/:slug/manage/judge` – Floor judge station.
+      * `/:slug/manage/players` – Tournament roster pool.
+      * `/:slug/manage/settings` – Tournament configuration and tier creator.
 * **Multi-View Display Toggle:**
-  * Dedicated switcher button allowing users and spectators to toggle dynamically between 3 layout modes:
-    1. **Full Bracket:** Panoramic pan/zoom SVG visualizer for desktop displays and large tablets.
-    2. **Mobile Bracket:** Vertically-stacked, responsive card-based progression feed optimized for handheld smartphone viewports.
-    3. **Split Bracket:** Divided wings layout (e.g. upper/lower or left/right halves converging on the finals node) tailored for medium screens, tablet viewports, and broadcast split scenes.
+  * Dedicated switcher button allowing users and spectators to toggle dynamically between 4 layout modes:
+    1. **Standard:** Panoramic pan/zoom SVG visualizer for desktop displays and large tablets.
+    2. **Fit Screen:** 1080p zero-scroll auto-fit layout.
+    3. **Split Wings:** Bilateral wings layout (East vs West converging on Finals node).
+    4. **Card Feed:** Vertically-stacked, responsive card-based progression feed (`MatchCardFeed.tsx` in read-only mode) optimized for smartphone viewports (auto-defaults on viewports $< 768\text{px}$).
 * **Streamlined Shareability:**
-  * Prominent "Share Bracket" button generating clean, direct URLs (e.g. `/:slug/bracket` or `/:slug/view`) with copy-to-clipboard shortcut and optional QR code generation for venue spectators.
+  * Prominent "Share Bracket" button in `BracketTierBar` and `SpectatorLayout` opening `ShareBracketModal.tsx`:
+    * Direct canonical URL copy with instant feedback.
+    * High-resolution smartphone vector QR code generation for venue spectators, posters, and live streams.
+    * 1-click Twitch chat command (`!bracket`) and Discord markdown snippets.
+    * Quick share to X / Twitter.
 
 ### 11.2 Mobile-Friendly Responsive Overhaul (Target: 360×800 Viewport)
 * **High-Priority Data-Dense Views (Prevent Information Truncation):**

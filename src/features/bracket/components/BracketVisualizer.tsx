@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { BracketStructure, BracketMatch, SeededPlayer, BracketRound, canonicalizeBracketRounds } from '../types';
 import { Tournament, TournamentTier, PlayerProfile } from '../../tournament/types';
 import { MatchScoreDrawer } from './MatchScoreDrawer';
+import { MatchTelemetryModal } from './MatchTelemetryModal';
 import {
   getTierCanvasBackground,
   getTierCardBackground,
@@ -37,6 +38,7 @@ interface BracketVisualizerProps {
   canManage?: boolean;
   obsView?: BracketViewMode;
   chroma?: string | null;
+  highlightedPlayerId?: string | null;
 }
 
 export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
@@ -46,6 +48,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
   canManage = true,
   obsView,
   chroma,
+  highlightedPlayerId,
 }) => {
   const [searchParams] = useSearchParams();
   const effectiveObsView = (obsView || (searchParams.get('view') as BracketViewMode) || (isObsMode ? 'fit' : 'standard')) as BracketViewMode;
@@ -54,7 +57,6 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
   const [selectedMatch, setSelectedMatch] = useState<{ match: BracketMatch; roundName: string } | null>(null);
   const [selectedPlayerForDrawer, setSelectedPlayerForDrawer] = useState<PlayerProfile | null>(null);
   const [isPlayerDrawerOpen, setIsPlayerDrawerOpen] = useState(false);
-  const [hoveredPlayerKey, setHoveredPlayerKey] = useState<string | null>(null);
   const [hoveredMatchId, setHoveredMatchId] = useState<string | null>(null);
   const [hoveredOriginMatchId, setHoveredOriginMatchId] = useState<string | null>(null);
   const [hoveredAncestry, setHoveredAncestry] = useState<{
@@ -75,7 +77,19 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
       journeyTimeoutRef.current = null;
     }
     if (!matchId || !slotNum || !bracket) {
-      setHoveredAncestry(null);
+      if (highlightedPlayerId) {
+        const journey = findPlayerJourney(
+          highlightedPlayerId,
+          null,
+          null,
+          bracket,
+          tournament.matchScores,
+          championPlayer?.id
+        );
+        setHoveredAncestry(journey);
+      } else {
+        setHoveredAncestry(null);
+      }
       return;
     }
     journeyTimeoutRef.current = setTimeout(() => {
@@ -90,7 +104,19 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
       journeyTimeoutRef.current = null;
     }
     if (!champPlayerId || !bracket) {
-      setHoveredAncestry(null);
+      if (highlightedPlayerId) {
+        const journey = findPlayerJourney(
+          highlightedPlayerId,
+          null,
+          null,
+          bracket,
+          tournament.matchScores,
+          championPlayer?.id
+        );
+        setHoveredAncestry(journey);
+      } else {
+        setHoveredAncestry(null);
+      }
       return;
     }
     journeyTimeoutRef.current = setTimeout(() => {
@@ -124,7 +150,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
 
   useEffect(() => {
     if (effectiveObsView !== 'fit') return;
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
 
     const updateDimensions = () => {
       if (fitContainerRef.current) {
@@ -247,14 +273,18 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
 
   const rawParamStage = (searchParams.get('stage') || searchParams.get('phase')) as string | null;
   const mappedParamStage: HybridStageTab | null =
-    rawParamStage === 'qualifiers' || rawParamStage === 'championship' || rawParamStage === 'combined' || rawParamStage === 'accel' || rawParamStage === 'premerge'
+    rawParamStage === 'qualifiers' || rawParamStage === 'championship' || rawParamStage === 'combined' || rawParamStage === 'accel' || rawParamStage === 'premerge' || rawParamStage === 'upper' || rawParamStage === 'lower'
       ? rawParamStage
-      : rawParamStage === 'phase1' || rawParamStage === 'pods' || rawParamStage === 'grid'
+      : rawParamStage === 'phase1' || rawParamStage === 'pods' || rawParamStage === 'grid' || rawParamStage === 'early'
       ? 'qualifiers'
-      : rawParamStage === 'phase2'
+      : rawParamStage === 'phase2' || rawParamStage === 'top16' || rawParamStage === 'finals'
       ? 'championship'
-      : rawParamStage === 'stacked'
+      : rawParamStage === 'stacked' || rawParamStage === 'all'
       ? 'combined'
+      : rawParamStage === 'pre_upper' || rawParamStage === 'pre-upper'
+      ? 'upper'
+      : rawParamStage === 'pre_lower' || rawParamStage === 'pre-lower' || rawParamStage === 'playin'
+      ? 'lower'
       : null;
 
   const [selectedPhaseTab, setSelectedPhaseTab] = useState<HybridStageTab | null>(null);
@@ -358,8 +388,10 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
     if (activeHybridTab === 'championship') return layoutChampionship!;
     if (activeHybridTab === 'accel') return layoutAccel!;
     if (activeHybridTab === 'premerge') return layoutPreMerge!;
+    if (activeHybridTab === 'upper') return layoutPreMergeUpper!;
+    if (activeHybridTab === 'lower') return layoutLowerBracket!;
     return layoutChampionship || layoutPreMerge || layoutAccel!;
-  }, [isAcceleratedHybrid, activeHybridTab, standardLayout, layoutAccel, layoutPreMerge, layoutChampionship]);
+  }, [isAcceleratedHybrid, activeHybridTab, standardLayout, layoutAccel, layoutPreMerge, layoutPreMergeUpper, layoutLowerBracket, layoutChampionship]);
 
   // Dynamic measurement of the combined view stage containers
   useEffect(() => {
@@ -390,21 +422,35 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
     if (!isAcceleratedHybrid) return null;
     const wAccel = layoutAccel?.totalWidth || 300;
     const hAccel = layoutAccel?.totalHeight || 700;
-    const wUpper = layoutPreMergeUpper?.totalWidth || 540;
-    const hUpper = layoutPreMergeUpper?.totalHeight || 1200;
+    const wUpper = layoutPreMergeUpper?.totalWidth || 1200;
+    const hUpper = layoutPreMergeUpper?.totalHeight || 750;
     const wLower = layoutLowerBracket?.totalWidth || 1080;
     const hLower = layoutLowerBracket?.totalHeight || 700;
     const wChamp = layoutChampionship?.totalWidth || 1200;
     const hChamp = layoutChampionship?.totalHeight || 700;
 
-    // Top row (Pod 1 & Pod 2) with pod header strip (55px) and padding (32px)
-    const topRowW = wAccel + 24 + wUpper + 64;
-    const topRowH = Math.max(hAccel, hUpper) + 90;
-    // Lower pod (Pod 3) with pod header strip (55px) and padding (32px)
-    const lowerH = hLower + 90;
-    const qualW = Math.max(topRowW, wLower + 64);
-    // Qualifiers height: header (55px) + top row + gap (20px) + lower row
-    const qualH = 55 + topRowH + 20 + lowerH;
+    const isSideBySide = effectiveObsView === 'fit' || effectiveObsView === 'split';
+    const effectiveUpperW = wUpper + 24;
+    const effectiveLowerW = wLower + 24;
+
+    let qualW: number;
+    let qualH: number;
+
+    if (isSideBySide) {
+      // 3 pods side-by-side: Pod 1 + gap (20px) + Pod 2 + gap (20px) + Pod 3 + container margins/padding
+      qualW = wAccel + 20 + effectiveUpperW + 20 + effectiveLowerW + 40;
+      // Single row height: Pod header strip (55px) + tallest pod + safety padding (90px)
+      qualH = 55 + Math.max(hAccel, hUpper, hLower) + 90;
+    } else {
+      // Top row (Pod 1 & Pod 2) with pod header strip (55px), pod borders and padding (24px)
+      const topRowW = wAccel + 20 + effectiveUpperW + 24;
+      const topRowH = Math.max(hAccel, hUpper) + 90;
+      // Lower pod (Pod 3) with pod header strip (55px) and padding (32px)
+      const lowerH = hLower + 90;
+      qualW = Math.max(topRowW, effectiveLowerW + 64);
+      // Qualifiers height: header (55px) + top row + gap (20px) + lower row
+      qualH = 55 + topRowH + 20 + lowerH;
+    }
 
     // Stage 1 to 2 gap (40px) + divider (45px) + Stage 2 Header (55px)
     const stageDividerH = 40 + 45 + 55;
@@ -526,6 +572,24 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
         : null;
   }
 
+  // Sync search-induced player highlight journey
+  useEffect(() => {
+    if (!bracket) return;
+    if (highlightedPlayerId) {
+      const journey = findPlayerJourney(
+        highlightedPlayerId,
+        null,
+        null,
+        bracket,
+        tournament.matchScores,
+        championPlayer?.id
+      );
+      setHoveredAncestry(journey);
+    } else {
+      setHoveredAncestry(null);
+    }
+  }, [highlightedPlayerId, bracket, tournament.matchScores, championPlayer?.id]);
+
   // Resolve chroma color if requested
   const getChromaColor = (param?: string | null) => {
     if (!param) return null;
@@ -577,8 +641,6 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
         scoreMinW={scoreMinW}
         scoreH={scoreH}
         isAcceleratedHybrid={isAcceleratedHybrid}
-        hoveredPlayerKey={hoveredPlayerKey}
-        setHoveredPlayerKey={setHoveredPlayerKey}
         hoveredMatchId={hoveredMatchId}
         setHoveredMatchId={setHoveredMatchId}
         hoveredOriginMatchId={hoveredOriginMatchId}
@@ -599,6 +661,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
   const renderQualifierPodGrid = () => {
     return (
       <BracketQualifierPodGrid
+        effectiveObsView={effectiveObsView}
         effectiveCardBg={effectiveCardBg}
         secondaryColor={secondaryColor}
         primaryColor={primaryColor}
@@ -628,16 +691,20 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
         flexDirection: 'column',
       }}
     >
-      {/* Tournament Name and Bracket Tier Header for OBS & In-Bracket Display */}
-      <BracketBroadcastHeader
-        tournamentName={tournament.name}
-        tierName={tier.name}
-        eliminationType={tier.eliminationType}
-        isAcceleratedHybrid={isAcceleratedHybrid}
-        isObsMode={isObsMode}
-        chromaHex={chromaHex}
-        primaryColor={primaryColor}
-      />
+      {/* Tournament Name and Bracket Tier Header for OBS Broadcasts Only */}
+      {isObsMode && (
+        <BracketBroadcastHeader
+          tournamentName={tournament.name}
+          tierName={tier.name}
+          eliminationType={tier.eliminationType}
+          isAcceleratedHybrid={isAcceleratedHybrid}
+          activeHybridTab={activeHybridTab}
+          finalsCutoff={bracket.finalsCutoff || 16}
+          isObsMode={isObsMode}
+          chromaHex={chromaHex}
+          primaryColor={primaryColor}
+        />
+      )}
 
       {/* Sticky Stage Navigation Bar for Accelerated Hybrid Tournaments */}
       {isAcceleratedHybrid && !isObsMode && (
@@ -647,6 +714,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
           effectiveObsView={effectiveObsView}
           primaryColor={primaryColor}
           finalsCutoff={bracket.finalsCutoff || 16}
+          topOffset={canManage ? 'var(--bracket-tier-bar-height, 48px)' : 'calc(56px + var(--bracket-tier-bar-height, 48px))'}
         />
       )}
 
@@ -779,6 +847,10 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
                     renderCanvas(layoutAccel!, accelRounds, true, false, null)
                   ) : activeHybridTab === 'premerge' ? (
                     renderCanvas(layoutPreMerge!, preMergeRounds, true, false, null)
+                  ) : activeHybridTab === 'upper' ? (
+                    renderCanvas(layoutPreMergeUpper!, preUpperRounds, true, false, null)
+                  ) : activeHybridTab === 'lower' ? (
+                    renderCanvas(layoutLowerBracket!, lowerBracketRounds, true, false, null)
                   ) : (
                     renderCanvas(layoutChampionship!, championshipRounds, false, true, championPlayer)
                   )
@@ -862,6 +934,10 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
               renderCanvas(layoutAccel!, accelRounds, true, false, null)
             ) : activeHybridTab === 'premerge' ? (
               renderCanvas(layoutPreMerge!, preMergeRounds, true, false, null)
+            ) : activeHybridTab === 'upper' ? (
+              renderCanvas(layoutPreMergeUpper!, preUpperRounds, true, false, null)
+            ) : activeHybridTab === 'lower' ? (
+              renderCanvas(layoutLowerBracket!, lowerBracketRounds, true, false, null)
             ) : (
               renderQualifierPodGrid()
             )
@@ -871,8 +947,8 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
         </div>
       )}
 
-      {/* Drawer */}
-      {selectedMatch && (
+      {/* Drawers & Modals */}
+      {selectedMatch && canManage && (
         <MatchScoreDrawer
           isOpen={true}
           onClose={() => setSelectedMatch(null)}
@@ -881,6 +957,22 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
           match={selectedMatch.match}
           matchScoreRecord={tournament.matchScores[selectedMatch.match.id]}
           roundName={selectedMatch.roundName}
+        />
+      )}
+
+      {selectedMatch && !canManage && (
+        <MatchTelemetryModal
+          isOpen={true}
+          onClose={() => setSelectedMatch(null)}
+          tournament={tournament}
+          tier={tier}
+          match={selectedMatch.match}
+          matchScoreRecord={tournament.matchScores[selectedMatch.match.id]}
+          roundName={selectedMatch.roundName}
+          onSelectPlayer={(pId, pName, country) => {
+            setSelectedMatch(null);
+            handlePlayerClick(pId, pName, country);
+          }}
         />
       )}
 

@@ -38,9 +38,59 @@ export const MatchupBanner: React.FC<MatchupBannerProps> = ({
   onBestOfChange,
 }) => {
   return (
-    <div style={matchupCardStyle}>
+    <div
+      style={{
+        ...matchupCardStyle,
+        background: `linear-gradient(180deg, ${colorWithAlpha(primaryColor, 0.10)} 0%, rgba(0, 0, 0, 0.35) 100%)`,
+        borderBottom: `1px solid ${colorWithAlpha(primaryColor, 0.25, 'var(--color-border)')}`,
+      }}
+    >
       {/* Player 1 Section */}
-      <div style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
+      <div
+        style={{
+          flex: 1,
+          textAlign: 'center',
+          minWidth: 0,
+          padding: '0.75rem 0.5rem',
+          borderRadius: 'var(--radius-md)',
+          background: p1Wins >= winThreshold
+            ? colorWithAlpha(primaryColor, 0.12)
+            : 'rgba(255, 255, 255, 0.02)',
+          border: p1Wins >= winThreshold
+            ? `2px solid ${primaryColor}`
+            : `1px solid ${colorWithAlpha(primaryColor, 0.2, 'rgba(255, 255, 255, 0.06)')}`,
+          boxShadow: p1Wins >= winThreshold
+            ? `0 0 16px ${colorWithAlpha(primaryColor, 0.3)}`
+            : 'none',
+          transition: 'all 0.15s ease',
+        }}
+      >
+        {/* Competitor Glowing Avatar Ring */}
+        <div
+          style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '50%',
+            background: `linear-gradient(135deg, ${colorWithAlpha(primaryColor, 0.25)} 0%, rgba(0, 0, 0, 0.5) 100%)`,
+            border: `2px solid ${p1Wins >= winThreshold ? primaryColor : colorWithAlpha(primaryColor, 0.4)}`,
+            boxShadow: p1Wins >= winThreshold ? `0 0 14px ${colorWithAlpha(primaryColor, 0.45)}` : 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 0.45rem auto',
+            fontSize: '1.05rem',
+            transition: 'all 0.2s ease',
+          }}
+        >
+          {p1?.country ? (
+            <CountryFlag country={p1.country} />
+          ) : (
+            <span style={{ fontSize: '0.85rem', fontWeight: 800, color: primaryColor }}>
+              {p1Name.slice(0, 2).toUpperCase()}
+            </span>
+          )}
+        </div>
+
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', marginBottom: '0.35rem' }}>
           {p1Seed !== undefined && (
             <span
@@ -58,7 +108,6 @@ export const MatchupBanner: React.FC<MatchupBannerProps> = ({
               #{p1Seed}
             </span>
           )}
-          {p1?.country && <CountryFlag country={p1.country} />}
         </div>
 
         <div
@@ -149,9 +198,52 @@ export const MatchupBanner: React.FC<MatchupBannerProps> = ({
       </div>
 
       {/* Player 2 Section */}
-      <div style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
+      <div
+        style={{
+          flex: 1,
+          textAlign: 'center',
+          minWidth: 0,
+          padding: '0.75rem 0.5rem',
+          borderRadius: 'var(--radius-md)',
+          background: p2Wins >= winThreshold
+            ? colorWithAlpha(primaryColor, 0.12)
+            : 'rgba(255, 255, 255, 0.02)',
+          border: p2Wins >= winThreshold
+            ? `2px solid ${primaryColor}`
+            : `1px solid ${colorWithAlpha(primaryColor, 0.2, 'rgba(255, 255, 255, 0.06)')}`,
+          boxShadow: p2Wins >= winThreshold
+            ? `0 0 16px ${colorWithAlpha(primaryColor, 0.3)}`
+            : 'none',
+          transition: 'all 0.15s ease',
+        }}
+      >
+        {/* Competitor Glowing Avatar Ring */}
+        <div
+          style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '50%',
+            background: `linear-gradient(135deg, ${colorWithAlpha(primaryColor, 0.25)} 0%, rgba(0, 0, 0, 0.5) 100%)`,
+            border: `2px solid ${p2Wins >= winThreshold ? primaryColor : colorWithAlpha(primaryColor, 0.4)}`,
+            boxShadow: p2Wins >= winThreshold ? `0 0 14px ${colorWithAlpha(primaryColor, 0.45)}` : 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 0.45rem auto',
+            fontSize: '1.05rem',
+            transition: 'all 0.2s ease',
+          }}
+        >
+          {p2?.country ? (
+            <CountryFlag country={p2.country} />
+          ) : (
+            <span style={{ fontSize: '0.85rem', fontWeight: 800, color: primaryColor }}>
+              {p2Name.slice(0, 2).toUpperCase()}
+            </span>
+          )}
+        </div>
+
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', marginBottom: '0.35rem' }}>
-          {p2?.country && <CountryFlag country={p2.country} />}
           {p2Seed !== undefined && (
             <span
               style={{
@@ -225,7 +317,5 @@ const matchupCardStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   padding: '1.25rem 1.5rem',
-  background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(0, 0, 0, 0.25) 100%)',
-  borderBottom: '1px solid var(--color-border)',
   gap: '1rem',
 };

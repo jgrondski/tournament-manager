@@ -246,10 +246,14 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
       <TournamentPageHeader
         eyebrow="Tournament Standings"
         title={tournament.name}
+        subtitle={
+          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', margin: 0 }}>
+            Final tournament standings and performance metrics across all tiers.
+          </p>
+        }
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
-        searchPlaceholder="Search player, country, style..."
-        obsUrl={`/${tournament.slug}/standings?obs=true`}
+        searchPlaceholder="Search competitor, country, style..."
         isObsMode={isObsMode}
       />
 

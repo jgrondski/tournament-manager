@@ -3,7 +3,7 @@ import { getContrastingTextColor } from '../../colorUtils';
 import { ACCELERATED_HYBRID_POD_PALETTE } from '../../routingChips';
 import { BracketViewMode } from '../../bracketLayout';
 
-export type HybridStageTab = 'qualifiers' | 'championship' | 'combined' | 'accel' | 'premerge';
+export type HybridStageTab = 'qualifiers' | 'championship' | 'combined' | 'accel' | 'premerge' | 'upper' | 'lower';
 
 interface BracketStageNavBarProps {
   activeHybridTab: HybridStageTab;
@@ -11,6 +11,7 @@ interface BracketStageNavBarProps {
   effectiveObsView: BracketViewMode;
   primaryColor: string;
   finalsCutoff?: number;
+  topOffset?: string;
 }
 
 export const BracketStageNavBar: React.FC<BracketStageNavBarProps> = ({
@@ -19,13 +20,14 @@ export const BracketStageNavBar: React.FC<BracketStageNavBarProps> = ({
   effectiveObsView,
   primaryColor,
   finalsCutoff = 16,
+  topOffset,
 }) => {
   return (
     <div
       id="bracket-stage-nav-bar"
       style={{
         position: effectiveObsView === 'fit' ? 'relative' : 'sticky',
-        top: effectiveObsView === 'fit' ? 0 : 'var(--bracket-tier-bar-height, 48px)',
+        top: effectiveObsView === 'fit' ? 0 : (topOffset || 'var(--bracket-tier-bar-height, 48px)'),
         zIndex: 41,
         backdropFilter: 'blur(10px)',
         WebkitBackdropFilter: 'blur(10px)',

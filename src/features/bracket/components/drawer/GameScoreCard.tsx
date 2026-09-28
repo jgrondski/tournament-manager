@@ -47,8 +47,8 @@ export const GameScoreCard: React.FC<GameScoreCardProps> = ({
         borderRadius: 'var(--radius-md)',
         border: isTiebreakerGame
           ? `1px solid ${colorWithAlpha(primaryColor, 0.45)}`
-          : '1px solid var(--color-border)',
-        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.2)',
+          : `1px solid ${colorWithAlpha(primaryColor, 0.22, 'var(--color-border)')}`,
+        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.25)',
       }}
     >
       {/* Game card top bar */}
