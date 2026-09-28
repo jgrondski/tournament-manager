@@ -151,3 +151,74 @@ npm run build
      - Left aligned: Organizer Sheet, Floor Judge, Visual Bracket.
      - Right aligned: Qualifiers, Standings, Register Players, Settings.
      - Tier tabs rendered on dedicated sub-bar for bracket views.
+
+---
+
+## 4. Operational Polish, Competitor Journey Highlighting & Accelerated Hybrid Layout
+
+### 4.1 Match Drawer Isolation & Design Consistency
+* **Files:**
+  * [MatchScoreDrawer.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/bracket/components/MatchScoreDrawer.tsx)
+  * [MatchupBanner.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/bracket/components/drawer/MatchupBanner.tsx)
+  * [MatchTelemetryModal.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/bracket/components/MatchTelemetryModal.tsx)
+* **Changes:**
+  * **Accent Gradient Bar Isolation**: Constrained the top accent gradient line to the exact width of `MatchScoreDrawer`, preventing horizontal bleed across the rest of the screen.
+  * **Header & Action Bar Solid Surfaces**: Updated the drawer title header and footer action bar (Save/Cancel buttons) to solid elevated backgrounds (`var(--color-bg-surface-elevated)`), matching individual game score cards and removing distracting gradient clutter.
+  * **Matchup Banner Gradient Preservation**: Separated the score/matchup portion of the header from the title header, preserving the rich gradient background specifically for the series score display.
+  * **Telemetry Modal Decluttering**: Removed "first to" labels and player playstyle chips from the read-only spectator match telemetry modal.
+
+### 4.2 Tournament Settings Ergonomics & Header Telemetry
+* **Files:**
+  * [OrgBrandPaletteSection.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/tournament/components/settings/OrgBrandPaletteSection.tsx)
+  * [BracketThemeEditor.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/bracket/components/BracketThemeEditor.tsx)
+  * [RoundOverridesEditor.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/tournament/components/RoundOverridesEditor.tsx)
+  * [TournamentInfoSection.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/tournament/components/settings/TournamentInfoSection.tsx)
+* **Changes:**
+  * **Inline Theme Controls**: Aligned the "Apply" button directly on the same line as the "Inherit Organizational Theme" checkbox.
+  * **Empty Overrides Banner Removal**: Removed the empty "No Round Specific Best of overrides" notification banner when no overrides are configured.
+  * **Header Metrics Telemetry**: Right-aligned "Qualifier Attempts" and "Recorded Matches" telemetry badges in the settings header and removed redundant description text to save vertical space.
+
+### 4.3 Search Competitor Input Unification
+* **Files:**
+  * [FinalStandingsPage.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/routes/FinalStandingsPage.tsx)
+  * [PublicLeaderboardPage.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/routes/PublicLeaderboardPage.tsx)
+* **Changes:**
+  * Unified input size, font size, padding, search icon alignment, and layout container styling across both the Final Standings and Qualifiers Leaderboard views for visual harmony.
+
+### 4.4 Bracket Competitor Search & Synchronized Player Journey Highlighting
+* **Files:**
+  * [BracketTierBar.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/bracket/components/BracketTierBar.tsx)
+  * [BracketMatchCard.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/bracket/components/visualizer/BracketMatchCard.tsx)
+  * [journeyHighlight.ts](file:///Users/jgrondski/src/repos/tournament-manager/src/features/bracket/journeyHighlight.ts)
+* **Changes:**
+  * **Interactive Bracket Search**: Integrated a player search input with auto-complete suggestions into the visual bracket toolbar (`BracketTierBar`).
+  * **Automatic Journey Illumination**: When a player is selected or the search resolves to a single unique competitor, the bracket automatically activates `highlightedPlayerId`, illuminating that competitor's path through all rounds, matches, and connecting lines while dimming non-relevant matches. Clearing the search restores standard viewing.
+  * **Hover Blip Removal**: Removed the legacy competitor name hover color change blip in `BracketMatchCard.tsx` that previously clashed with player journey highlighting.
+  * **Synchronized State Transitions**: Harmonized CSS transition timings across connecting lines, card borders, card backgrounds, and dimmed elements for instant, lag-free state flipping.
+
+### 4.5 Accelerated Hybrid Pod Layout & View Mode Ergonomics
+* **Files:**
+  * [hybridLayout.ts](file:///Users/jgrondski/src/repos/tournament-manager/src/features/bracket/layout/hybridLayout.ts)
+  * [BracketQualifierPodGrid.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/bracket/components/visualizer/BracketQualifierPodGrid.tsx)
+  * [BracketVisualizer.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/bracket/components/BracketVisualizer.tsx)
+  * [BracketTierBar.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/bracket/components/BracketTierBar.tsx)
+  * [routingChips.tsx](file:///Users/jgrondski/src/repos/tournament-manager/src/features/bracket/routingChips.tsx)
+  * [index.css](file:///Users/jgrondski/src/repos/tournament-manager/src/index.css)
+* **Changes:**
+  * **Pod Dimensions & Spacing**:
+    * Pod 1 (Accelerated Round) compacted with 50% breathing room to eliminate internal scrollbars.
+    * Pod 2 (Upper Bracket) fills remaining canvas with reduced margins, permitting scroll only when matches overlap pod boundaries.
+    * Aligned Lower Bracket routing chips with the Lower Bracket palette (`#10B981` / emerald borders and badges).
+  * **Multi-View Pod Layout**:
+    * **Fit View (`viewMode = 'fit'`)**: Places Pod 3 (Lower Bracket) horizontally to the right of Pod 1 and Pod 2 (arranging Pod 1 $\rightarrow$ Pod 2 $\rightarrow$ Pod 3 side-by-side).
+    * **Split View (`viewMode = 'split'`)**: Also puts Pod 3 to the right of Pod 2 side-by-side. Enabled the "Split Wings" view mode toggle in `BracketTierBar` for Accelerated Hybrid tiers.
+    * **Standard View (`viewMode = 'standard'`)**: Retains the classic stacked layout (Top row: Pod 1 & Pod 2; Bottom row: Pod 3).
+  * **Pod 2 Scrollbar Elimination in Fit View**:
+    * Grown Pod 2 container minimum width by 24px and updated `combinedBounds` to calculate true side-by-side dimensions (~2760px $\times$ ~895px) for the `fitScale` transform engine.
+    * Set `overflowX: effectiveObsView === 'fit' ? 'hidden' : 'auto'` on Pod 2 and Pod 3 containers.
+  * **Pod 3 Match Centering**:
+    * Reduced Pod 3 horizontal canvas padding to 12px and round gap to 36px in `calculateAcceleratedHybridLowerBracketLayout`, compacting width to ~1172px.
+    * Centered matches horizontally with `<div style={{ width: 'fit-content', minWidth: 'max-content', margin: '0 auto' }}>`, ensuring equal left and right margins across all views while preserving left-aligned scrolling on smaller screens.
+  * **Responsive Collapse**:
+    * Added `.qualifier-side-by-side-pods` to the `@media (max-width: 1024px)` media query in `index.css`.
+

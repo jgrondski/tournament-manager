@@ -42,6 +42,9 @@ The system prioritizes human readability, deterministic rules, minimal runtime o
     * Sequential double-elimination global standings: placement determined by Losers bracket exit round, with intra-round ties broken via competitive exit tiebreakers.
     * Canvas visualizer layout: Winners tree on top, Losers tree on the bottom half, Grand Finals centered on the right, and dynamic GF Reset insertion.
     * Floor Judge feed: Stage filter tabs (`All`, `Winners`, `Losers`, `Grand Finals`) and precise drop placeholder labeling.
+    * **Accelerated Hybrid Multi-Pod Engine:** Three distinct qualifier pods (Pod 1: Accelerated Round, Pod 2: Upper Bracket, Pod 3: Lower Bracket) feeding into a Single-Elimination Championship Tree (Top 16 / Top Cutoff).
+    * **Multi-View Pod Ergonomics:** Adaptive side-by-side layout (Pod 1 $\rightarrow$ Pod 2 $\rightarrow$ Pod 3) for Fit and Split views, classic stacked layout for Standard view, scrollbar elimination in Fit view, and equal margin match centering in Pod 3.
+    * **Competitor Journey Highlighting & Bracket Search:** Integrated toolbar search input with auto-complete, single-competitor path illumination across all feeder rounds, and synchronized zero-lag CSS transitions.
 * **Phase 6: Relational Persistence & RBAC Foundation (Upcoming)**
   * Translation of finalized TypeScript contracts into Neon serverless PostgreSQL tables via Drizzle ORM schemas and server functions.
   * Granular Role-Based Access Control (RBAC): `ORG_OWNER`, `ORG_ADMIN`, `TOURNAMENT_ADMIN`, and `FLOOR_JUDGE`.
@@ -427,3 +430,27 @@ All entities include `id` (UUID) and `created_at` (timestamp).
     * Implement a compact hamburger menu or mobile tab bar when viewport width $< 768\text{px}$.
     * Collapse breadcrumbs into an icon-only or single-tier `← Back` link on small screens.
     * Dynamically truncate or iconify the active tournament return chip on mobile viewports.
+
+### 11.3 Accelerated Hybrid Layout, Player Journey Highlighting & Operational Polish (Complete)
+* **Accelerated Hybrid Multi-Pod Architecture (`ACCELERATED_HYBRID`):**
+  * Models competitive structures featuring multiple qualification pods funneling into a single-elimination championship finals bracket (e.g. CTWC Accelerated Hybrid format):
+    * **Pod 1 (Accelerated Round):** High-seed qualification gauntlet (seeds 1–16). Compacted canvas with 50% breathing room to eliminate internal scrollbars.
+    * **Pod 2 (Upper Bracket):** Pre-Merge Upper bracket (seeds 17–48) divided into Part 1 and Part 2, filling remaining canvas space. Scrollbars only appear when match cards exceed pod boundaries.
+    * **Pod 3 (Lower Bracket):** Consolidates Pre-Merge Lower R1, Pre-Merge Lower R2, 2nd Chance, and Play-Offs into a cohesive 4-column panel with emerald theming (`#10B981`).
+    * **Championship Tree:** Single-elimination championship tree (Top 16 / Top Cutoff) crowning the tournament champion.
+* **Multi-View Pod Adaptability:**
+  * **Fit View (`?view=fit`):** Arranges Pod 1, Pod 2, and Pod 3 side-by-side horizontally. Eliminates internal scrollbars on Pod 2 by expanding minimum width allocation by 24px and computing precise 3-pod side-by-side bounding boxes (~2760px $\times$ ~895px) for the `fitScale` transform engine.
+  * **Split View (`?view=split`):** Puts Pod 3 to the right of Pod 2 side-by-side. Enabled the "Split Wings" view mode button in `BracketTierBar` for Accelerated Hybrid tiers.
+  * **Standard View (`?view=standard`):** Preserves the classic stacked layout with Pod 1 & 2 on the top row and Pod 3 spanning below.
+  * **Pod 3 Match Centering:** Horizontally centers matches in Pod 3 across both stacked and side-by-side views via `<div style={{ width: 'fit-content', minWidth: 'max-content', margin: '0 auto' }}>`, guaranteeing equal left and right margins while preserving left-aligned scrolling on smaller screens.
+  * **Responsive Collapse:** Automatically collapses `.qualifier-side-by-side-pods` into single-column layouts on viewports $\le 1024\text{px}$.
+* **Bracket Competitor Search & Player Journey Highlighting:**
+  * Added an interactive competitor search input directly in `BracketTierBar` with auto-complete dropdown suggestions.
+  * Resolving or selecting a single competitor immediately activates `highlightedPlayerId`, illuminating their entire journey through all feeder rounds, match nodes, and SVG connector paths while dimming unrelated matches.
+  * Clearing the search restores standard viewing.
+  * Removed legacy competitor name hover blip animation, and synchronized highlight CSS transitions across lines, borders, backgrounds, and dimmed nodes for instant, lag-free state changes.
+* **Match Drawer & Settings Ergonomics:**
+  * **Match Drawer Isolation:** Constrained top accent gradient bar strictly to drawer width; applied clean solid surface backgrounds (`var(--color-bg-surface-elevated)`) to the drawer title header and footer action bar; preserved vibrant gradient styling exclusively for the matchup score section (`MatchupBanner.tsx`).
+  * **Telemetry Modal Decluttering:** Removed "first to" label and playstyle chips on read-only match telemetry views (`MatchTelemetryModal.tsx`).
+  * **Settings Ergonomics:** Inline "Apply" button and "Inherit Organizational Theme" checkbox in theme settings; removed redundant empty overrides banner; right-aligned "Qualifier Attempts" and "Recorded Matches" telemetry badges in the settings header.
+  * **Search Input Unification:** Standardized competitor search input size, padding, icons, and alignment across Standings and Qualifiers pages.

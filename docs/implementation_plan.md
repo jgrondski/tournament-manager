@@ -81,7 +81,7 @@ To facilitate manual testing and focused reviews, the work is organized into **1
   * [TournamentNavbar.tsx](../src/components/TournamentNavbar.tsx): Remove the legacy "Reset Demo" button, use `isLocked`.
   * Update [BracketVisualizer.tsx](../src/features/bracket/components/BracketVisualizer.tsx), [MatchCardFeed.tsx](../src/features/bracket/components/MatchCardFeed.tsx), [OrganizerSheetMatrix.tsx](../src/features/bracket/components/OrganizerSheetMatrix.tsx), and [LeaderboardTable.tsx](../src/features/qualifiers/components/LeaderboardTable.tsx) to consume `isLocked`.
 
-#### Commit 2.2: Data Management & Simulation Controls in Settings [NEXT]
+#### Commit 2.2: Data Management & Simulation Controls in Settings [COMPLETE]
 * **Objective:** Provide sandbox simulation controls inside tournament settings: "Seed Qualifiers Only", "Simulate Full Tournament", and "Clear All Tournament Data".
 * **Note on Player Simulation & Global Pool:**
   * To enable seamless testing of brand-new tournaments from scratch, simulation controls will auto-generate realistic competitors (bracket capacity + 4 DNQ) with distinct names, playstyles, and personal bests if the tournament roster lacks competitors.
@@ -190,3 +190,58 @@ To facilitate manual testing and focused reviews, the work is organized into **1
     * Auto-imports global player into tournament roster upon selection.
   * [QualifierEntryModal.tsx](../src/features/qualifiers/components/QualifierEntryModal.tsx): Connected `globalPlayers` and `importPlayersToTournament` to `CreatablePlayerSelect`.
   * [players.test.ts](../src/features/players/__tests__/players.test.ts): Added 5 unit tests covering player generation, deduplication, fallback naming, import deduplication, and safe removal constraints.
+
+---
+
+### Priority 6: Operational Polish, Accelerated Hybrid Bracket Layout & Ergonomics [COMPLETE]
+
+#### Commit 6.1: Match Drawer Isolation, Theming Consistency & Settings Ergonomics [COMPLETE]
+* **Objective:** Polish `MatchScoreDrawer` aesthetics, header backgrounds, modal cleanliness, and streamline Settings controls and header density.
+* **Changes:**
+  * [MatchScoreDrawer.tsx](../src/features/bracket/components/MatchScoreDrawer.tsx):
+    * Constrained the top gradient accent line strictly to the drawer width, eliminating viewport-wide horizontal overflow.
+    * Replaced drawer header background with solid elevated surface background (`var(--color-bg-surface-elevated)`), matching individual game score cards.
+    * Removed gradient from the drawer footer action bar (Save/Cancel buttons).
+  * [MatchupBanner.tsx](../src/features/bracket/components/drawer/MatchupBanner.tsx):
+    * Separated matchup score section from the drawer title header, preserving the vibrant gradient background exclusively for the match score banner.
+  * [MatchTelemetryModal.tsx](../src/features/bracket/components/MatchTelemetryModal.tsx):
+    * Removed the "first to" label and competitor playstyle chips from the read-only match telemetry view to declutter spectator display.
+  * [OrgBrandPaletteSection.tsx](../src/features/tournament/components/settings/OrgBrandPaletteSection.tsx) & [BracketThemeEditor.tsx](../src/features/bracket/components/BracketThemeEditor.tsx):
+    * Moved the "Apply" button onto the same line as the "Inherit Organizational Theme" checkbox.
+    * Renamed button to "Apply" and checkbox to "Inherit Organizational Theme".
+  * [RoundOverridesEditor.tsx](../src/features/tournament/components/RoundOverridesEditor.tsx):
+    * Removed the empty "No Round Specific Best of overrides" notification banner when no overrides are configured.
+  * [TournamentInfoSection.tsx](../src/features/tournament/components/settings/TournamentInfoSection.tsx):
+    * Right-aligned "Qualifier Attempts" and "Recorded Matches" telemetry badges in the settings header.
+    * Removed redundant header description text to save vertical space.
+
+#### Commit 6.2: Search Bar Unification, Competitor Journey Highlighting & Accelerated Hybrid Layout [COMPLETE]
+* **Objective:** Unify search inputs across screens, implement bracket competitor search with instant journey path highlighting, synchronize highlight transition animations, and overhaul Accelerated Hybrid pod layout (side-by-side Fit/Split views, Pod 2 scrollbar elimination, and Pod 3 match centering).
+* **Changes:**
+  * [FinalStandingsPage.tsx](../src/routes/FinalStandingsPage.tsx) & [PublicLeaderboardPage.tsx](../src/routes/PublicLeaderboardPage.tsx):
+    * Unified search competitor input dimensions, padding, typography, icons, and container alignment across Standings and Qualifiers pages.
+  * [BracketTierBar.tsx](../src/features/bracket/components/BracketTierBar.tsx):
+    * Added interactive Competitor Search input to the desktop bracket toolbar with auto-complete suggestions.
+    * Automatically activates `highlightedPlayerId` (Player Journey Highlight) when a player is selected or search resolves to a single unique competitor.
+    * Clearing search restores standard bracket view.
+    * Enabled the "Split Wings" view mode button for Accelerated Hybrid brackets.
+  * [BracketMatchCard.tsx](../src/features/bracket/components/visualizer/BracketMatchCard.tsx) & [journeyHighlight.ts](../src/features/bracket/journeyHighlight.ts):
+    * Removed legacy competitor name hover color flicker animation.
+    * Synchronized highlight transition timings across SVG connector lines, match card borders, card backgrounds, and dimmed nodes for instant, lag-free state flipping.
+  * [hybridLayout.ts](../src/features/bracket/layout/hybridLayout.ts):
+    * Reduced Pod 3 (Lower Bracket) padding to 12px and round gap to 36px in `calculateAcceleratedHybridLowerBracketLayout`, compacting width to ~1172px.
+    * Pod 1 (Accelerated Round) compacted with 50% breathing room to eliminate internal scrollbars.
+    * Pod 2 (Upper Bracket) fills remaining canvas, allowing scroll only when matches overlap pod margins.
+  * [routingChips.tsx](../src/features/bracket/routingChips.tsx):
+    * Aligned Lower Bracket routing chips and badges with the Lower Bracket palette (`#10B981` / emerald borders and badges) for visual consistency.
+  * [BracketQualifierPodGrid.tsx](../src/features/bracket/components/visualizer/BracketQualifierPodGrid.tsx):
+    * Implemented `isSideBySide` layout (`effectiveObsView === 'fit' || effectiveObsView === 'split'`), placing Pod 1, Pod 2, and Pod 3 side-by-side.
+    * Maintained stacked layout (Top row: Pod 1 & Pod 2; Bottom row: Pod 3) for Standard view (`viewMode === 'standard'`).
+    * Expanded Pod 2 minimum width allocation by 24px and suppressed fit-view scrollbars (`overflowX: effectiveObsView === 'fit' ? 'hidden' : 'auto'`).
+    * Centered matches in Pod 3 with equal left and right margins using `<div style={{ width: 'fit-content', minWidth: 'max-content', margin: '0 auto' }}>`.
+  * [BracketVisualizer.tsx](../src/features/bracket/components/BracketVisualizer.tsx):
+    * Passed `effectiveObsView` to `BracketQualifierPodGrid`.
+    * Updated `combinedBounds` to calculate true side-by-side dimensions (~2760px $\times$ ~895px) for `fitScale` computation, eliminating subpixel clipping.
+  * [index.css](../src/index.css):
+    * Added `.qualifier-side-by-side-pods` to the `@media (max-width: 1024px)` responsive stylesheet to collapse to a single column on smaller viewports.
+
