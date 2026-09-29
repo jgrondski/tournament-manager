@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Tournament, TournamentTier, PlayerProfile } from '../../tournament/types';
 import { BracketMatch, isMatchPlayable, canonicalizeBracketRounds } from '../types';
 import { MatchScoreDrawer } from './MatchScoreDrawer';
@@ -25,7 +25,7 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({
   tier,
   canManage = true,
 }) => {
-  const [selectedRoundIdx, setSelectedRoundIdx] = useState<number | 'ALL'>('ALL');
+  const [selectedRoundKey, setSelectedRoundKey] = useState<string | 'ALL'>('ALL');
   const [selectedStage, setSelectedStage] = useState<'ALL' | 'WINNERS' | 'LOSERS' | 'GRAND_FINALS'>('ALL');
   const [activeMatch, setActiveMatch] = useState<BracketMatch | null>(null);
   const [selectedPlayerForDrawer, setSelectedPlayerForDrawer] = useState<PlayerProfile | null>(null);
@@ -33,6 +33,14 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({
   const [hoveredPlayerKey, setHoveredPlayerKey] = useState<string | null>(null);
   const [hoveredMatchId, setHoveredMatchId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Automatically reset filter state when switching tiers
+  useEffect(() => {
+    setSelectedStage('ALL');
+    setSelectedRoundKey('ALL');
+    setSearchTerm('');
+    setActiveMatch(null);
+  }, [tier.id]);
 
   // Tier color theming matching Master Sheet, Quals, and Standings
   const defaults = getDefaultTierColors(tier);
@@ -54,40 +62,56 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({
       return rounds;
     }
     return rounds.filter((r) => {
-      if (selectedStage === 'WINNERS') {
-        return (
-          (r.stage === 'WINNERS' || r.roundIdentifier?.startsWith('W') || r.roundIdentifier === 'AR' || r.roundIdentifier?.startsWith('PRE_W')) &&
-          r.roundIdentifier !== 'PO'
-        );
-      }
-      if (selectedStage === 'LOSERS') {
-        return (
-          r.stage === 'LOSERS' ||
-          r.roundIdentifier?.startsWith('L') ||
-          r.roundIdentifier?.startsWith('PRE_L') ||
-          r.roundIdentifier === '2C' ||
-          r.roundIdentifier === 'PO'
-        );
-      }
-      if (selectedStage === 'GRAND_FINALS') {
-        return (
-          r.stage === 'GRAND_FINALS' ||
-          r.roundIdentifier?.startsWith('GF') ||
-          r.phase === 'CHAMPIONSHIP' ||
-          r.roundIdentifier?.startsWith('CHAMP')
-        );
-      }
+      const isWinner =
+        (r.stage === 'WINNERS' ||
+          r.roundIdentifier?.startsWith('W') ||
+          r.roundIdentifier === 'AR' ||
+          r.roundIdentifier?.startsWith('PRE_W') ||
+          r.name?.toLowerCase().includes('winner')) &&
+        r.roundIdentifier !== 'PO' &&
+        r.stage !== 'LOSERS' &&
+        r.stage !== 'GRAND_FINALS';
+
+      const isLoser =
+        r.stage === 'LOSERS' ||
+        r.roundIdentifier?.startsWith('L') ||
+        r.roundIdentifier?.startsWith('PRE_L') ||
+        r.roundIdentifier === '2C' ||
+        r.roundIdentifier === 'PO' ||
+        r.name?.toLowerCase().includes('loser');
+
+      const isFinals =
+        r.stage === 'GRAND_FINALS' ||
+        r.roundIdentifier?.startsWith('GF') ||
+        r.phase === 'CHAMPIONSHIP' ||
+        r.roundIdentifier?.startsWith('CHAMP') ||
+        r.name?.toLowerCase() === 'finals' ||
+        r.name?.toLowerCase() === 'grand finals';
+
+      if (selectedStage === 'WINNERS') return isWinner;
+      if (selectedStage === 'LOSERS') return isLoser;
+      if (selectedStage === 'GRAND_FINALS') return isFinals;
       return true;
     });
   }, [rounds, isDoubleElim, selectedStage]);
 
+  const getRoundKey = (round: (typeof visibleRounds)[0], idx: number) => {
+    return `${round.stage || 'R'}_${round.roundIdentifier || round.roundNumber}_${idx}`;
+  };
+
+  const activeRoundKey = useMemo(() => {
+    if (selectedRoundKey === 'ALL') return 'ALL';
+    const exists = visibleRounds.some((r, idx) => getRoundKey(r, idx) === selectedRoundKey);
+    return exists ? selectedRoundKey : 'ALL';
+  }, [selectedRoundKey, visibleRounds]);
+
   const roundsToDisplay = useMemo(() => {
-    if (selectedRoundIdx === 'ALL') {
+    if (activeRoundKey === 'ALL') {
       return visibleRounds;
     }
-    const target = visibleRounds[selectedRoundIdx];
+    const target = visibleRounds.find((r, idx) => getRoundKey(r, idx) === activeRoundKey);
     return target ? [target] : visibleRounds;
-  }, [selectedRoundIdx, visibleRounds]);
+  }, [activeRoundKey, visibleRounds]);
 
   const getFilteredRoundMatches = (round: (typeof visibleRounds)[0]) => {
     const matches = round?.matches || [];
@@ -157,7 +181,7 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({
                 key={stage}
                 onClick={() => {
                   setSelectedStage(stage);
-                  setSelectedRoundIdx('ALL');
+                  setSelectedRoundKey('ALL');
                 }}
                 style={{
                   fontSize: '0.72rem',
@@ -193,33 +217,34 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({
       >
         <button
           key="ALL_ROUNDS"
-          onClick={() => setSelectedRoundIdx('ALL')}
+          onClick={() => setSelectedRoundKey('ALL')}
           style={{
             padding: '0.35rem 0.75rem',
             fontSize: '0.76rem',
-            fontWeight: selectedRoundIdx === 'ALL' ? 800 : 600,
+            fontWeight: activeRoundKey === 'ALL' ? 800 : 600,
             borderRadius: 'var(--radius-full)',
-            border: selectedRoundIdx === 'ALL' ? `1px solid ${primaryColor}` : `1px solid ${colorWithAlpha(secondaryColor, 0.4, 'var(--color-border)')}`,
-            background: selectedRoundIdx === 'ALL' ? primaryColor : getAlternateShade(cardColor, 6),
-            color: selectedRoundIdx === 'ALL' ? getContrastingTextColor(primaryColor) : 'var(--color-text-secondary)',
+            border: activeRoundKey === 'ALL' ? `1px solid ${primaryColor}` : `1px solid ${colorWithAlpha(secondaryColor, 0.4, 'var(--color-border)')}`,
+            background: activeRoundKey === 'ALL' ? primaryColor : getAlternateShade(cardColor, 6),
+            color: activeRoundKey === 'ALL' ? getContrastingTextColor(primaryColor) : 'var(--color-text-secondary)',
             cursor: 'pointer',
             whiteSpace: 'nowrap',
             transition: 'all 0.12s ease',
             flexShrink: 0,
-            boxShadow: selectedRoundIdx === 'ALL' ? `0 0 8px ${colorWithAlpha(primaryColor, 0.35)}` : 'none',
+            boxShadow: activeRoundKey === 'ALL' ? `0 0 8px ${colorWithAlpha(primaryColor, 0.35)}` : 'none',
           }}
         >
           All Rounds
         </button>
         {visibleRounds.map((round, idx) => {
-          const isSelected = selectedRoundIdx === idx;
+          const rKey = getRoundKey(round, idx);
+          const isSelected = activeRoundKey === rKey;
           const isRoundLoser = round.stage === 'LOSERS' || Boolean(round.name?.toLowerCase().includes('loser'));
           const rColor = isRoundLoser ? lowerBracketColor : primaryColor;
           const contrast = getContrastingTextColor(rColor);
           return (
             <button
-              key={round.roundNumber}
-              onClick={() => setSelectedRoundIdx(idx)}
+              key={rKey}
+              onClick={() => setSelectedRoundKey(isSelected ? 'ALL' : rKey)}
               style={{
                 padding: '0.35rem 0.75rem',
                 fontSize: '0.76rem',
@@ -291,7 +316,7 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({
             {searchTerm ? `No matches found matching "${searchTerm}".` : 'No matches available.'}
           </div>
         ) : (
-          roundsToDisplay.map((round) => {
+          roundsToDisplay.map((round, rIdx) => {
             const roundMatches = getFilteredRoundMatches(round);
             if (roundMatches.length === 0) return null;
 
@@ -305,7 +330,7 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({
 
             return (
               <div
-                key={round.roundNumber}
+                key={getRoundKey(round, rIdx)}
                 style={{
                   display: 'flex',
                   flexDirection: 'column',

@@ -206,8 +206,16 @@ export function getCanonicalRoundName(name: string, roundIdentifier?: string): s
  * Normalizes all rounds in-place to ensure canonical naming across the entire tournament.
  */
 export function canonicalizeBracketRounds(rounds: BracketRound[]): void {
-  for (const round of rounds) {
+  for (let i = 0; i < rounds.length; i++) {
+    const round = rounds[i];
     round.name = getCanonicalRoundName(round.name, round.roundIdentifier);
+    if (round.roundNumber !== i + 1) {
+      round.roundNumber = i + 1;
+      for (const m of round.matches) {
+        m.roundNumber = i + 1;
+        m.roundIndex = i;
+      }
+    }
     if (
       round.roundIdentifier === 'PO' ||
       round.name === 'Lower Bracket R4' ||

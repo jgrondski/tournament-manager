@@ -694,8 +694,8 @@ export function generateFlatDoubleElim(
   }
 
   const totalPlayers = players.length;
-  if (totalPlayers < 2 * flatWidth) {
-    throw new Error(`Flat staged double elimination requires at least 2 * flatWidth (${2 * flatWidth}) players, received ${totalPlayers}`);
+  if (flatWidth < 4 || totalPlayers <= 2 * flatWidth) {
+    return generateTraditionalDoubleElim({ players, options });
   }
   if (totalPlayers % flatWidth !== 0) {
     throw new Error(`Participant count (${totalPlayers}) must be a multiple of flat width (${flatWidth}) for flat staged double elimination.`);
@@ -1252,6 +1252,13 @@ export function generateFlatDoubleElim(
   applyDoubleElimRoundNames(winnersRounds, losersRounds, grandFinalsRound);
 
   const allRounds = [...winnersRounds, ...losersRounds, grandFinalsRound];
+  for (let rIdx = 0; rIdx < allRounds.length; rIdx++) {
+    allRounds[rIdx].roundNumber = rIdx + 1;
+    for (const match of allRounds[rIdx].matches) {
+      match.roundNumber = rIdx + 1;
+      match.roundIndex = rIdx;
+    }
+  }
 
   return {
     tierId,

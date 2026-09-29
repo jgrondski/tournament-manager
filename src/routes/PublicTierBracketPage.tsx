@@ -242,6 +242,7 @@ export const PublicTierBracketPage: React.FC = () => {
           </div>
 
           <MatchCardFeed
+            key={tier.id}
             tournament={tournament}
             tier={tier}
             canManage={canManage}

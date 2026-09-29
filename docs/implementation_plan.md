@@ -245,3 +245,25 @@ To facilitate manual testing and focused reviews, the work is organized into **1
   * [index.css](../src/index.css):
     * Added `.qualifier-side-by-side-pods` to the `@media (max-width: 1024px)` responsive stylesheet to collapse to a single column on smaller viewports.
 
+#### Commit 6.3: Double Elimination Feed Filtering, Tier Switching Hygiene & Regression Testing [COMPLETE]
+* **Objective:** Resolve double elimination judge and mobile feed view filtering breakdowns across stage and round filters, eliminate key collisions from non-sequential round numbering, prevent state leakage across tier switches, and introduce automated regression test suite.
+* **Changes:**
+  * [MatchCardFeed.tsx](../src/features/bracket/components/MatchCardFeed.tsx):
+    * Replaced index-based `selectedRoundIdx` with stable, unique `selectedRoundKey` (`${round.stage || 'R'}_${round.roundIdentifier || round.roundNumber}_${idx}`).
+    * Added `activeRoundKey` calculation that automatically defaults to `'ALL'` if the selected round key does not exist in the active stage filter (preventing out-of-bounds or misaligned round displays).
+    * Added round toggle behavior (clicking the active round pill deselects it and restores "All Rounds").
+    * Added automated reset effect on `tier.id` change (`setSelectedStage('ALL')`, `setSelectedRoundKey('ALL')`, `setSearchTerm('')`, `setActiveMatch(null)`).
+    * Replaced non-unique `round.roundNumber` React keys on buttons and feed sections with guaranteed unique composite keys (`getRoundKey(round, idx)`).
+  * [ManageJudgePage.tsx](../src/routes/ManageJudgePage.tsx) & [PublicTierBracketPage.tsx](../src/routes/PublicTierBracketPage.tsx):
+    * Added `key={tier.id}` to `<MatchCardFeed>` to force clean React remounting and complete state hygiene whenever switching tiers (e.g. Silver $\rightarrow$ Bronze $\rightarrow$ Silver).
+  * [double-elimination.ts](../src/features/bracket/math/double-elimination.ts):
+    * Renumbered `allRounds` in `generateFlatDoubleElim` strictly sequentially (`roundNumber = rIdx + 1`, `matchNumber`), preventing duplicate round numbers between Winners and Losers rounds.
+    * Added guard in `generateFlatDoubleElim` and `generateDoubleEliminationBracket` to safely route player counts $\le 2 \times \text{flatWidth}$ or `flatWidth < 4` to traditional double elimination, preventing undefined match feeder exceptions.
+  * [types.ts](../src/features/bracket/types.ts):
+    * Updated `canonicalizeBracketRounds` to automatically verify and heal sequential round numbering 1..N on all existing and loaded brackets.
+  * [doubleElimFeedFiltering.test.ts](../src/features/bracket/__tests__/doubleElimFeedFiltering.test.ts):
+    * Created comprehensive regression test suite with 9 unit tests verifying sequential round numbers, key collision prevention, small player count / flat width resilience, round key uniqueness across stages, stage filter recovery, and tier-switching hygiene.
+  * [.agents/rules/testing-and-bug-prevention.md](../.agents/rules/testing-and-bug-prevention.md) & [AGENTS.md](../AGENTS.md):
+    * Added permanent workspace rules mandating automated regression tests for all bug fixes and issue resolutions.
+
+
