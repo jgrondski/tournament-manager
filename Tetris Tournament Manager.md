@@ -45,11 +45,19 @@ The system prioritizes human readability, deterministic rules, minimal runtime o
     * **Accelerated Hybrid Multi-Pod Engine:** Three distinct qualifier pods (Pod 1: Accelerated Round, Pod 2: Upper Bracket, Pod 3: Lower Bracket) feeding into a Single-Elimination Championship Tree (Top 16 / Top Cutoff).
     * **Multi-View Pod Ergonomics:** Adaptive side-by-side layout (Pod 1 $\rightarrow$ Pod 2 $\rightarrow$ Pod 3) for Fit and Split views, classic stacked layout for Standard view, scrollbar elimination in Fit view, and equal margin match centering in Pod 3.
     * **Competitor Journey Highlighting & Bracket Search:** Integrated toolbar search input with auto-complete, single-competitor path illumination across all feeder rounds, and synchronized zero-lag CSS transitions.
-* **Phase 6: Relational Persistence & RBAC Foundation (Upcoming)**
+* **Phase 6: Direct / Manual Seeding & Roster Seeding Engine (Upcoming Immediate Phase)**
+  * Full tournament seeding capability without requiring qualifier submissions:
+    * `seedingMethod: 'QUALIFIERS' | 'MANUAL'` per tournament.
+    * Bulk import participants via raw multiline paste (ordered top seeds first, auto-parsed and matched against global player pool).
+    * Interactive manual seeding and reordering (drag-and-drop, move up/down, direct seed entry, and randomize/shuffle).
+    * Dynamic tier cutoff distribution with visual tier dividers (Tier 1 Gold, Tier 2 Silver, etc.) and alternate/reserve tracking.
+    * Seamless mathematical bracket generator hook bypassing `deriveLeaderboard` when in manual mode.
+    * Standings, simulation sandbox, and verification/lock lifecycle support for manual seeds.
+* **Phase 7: Relational Persistence & RBAC Foundation (Upcoming)**
   * Translation of finalized TypeScript contracts into Neon serverless PostgreSQL tables via Drizzle ORM schemas and server functions.
   * Granular Role-Based Access Control (RBAC): `ORG_OWNER`, `ORG_ADMIN`, `TOURNAMENT_ADMIN`, and `FLOOR_JUDGE`.
   * Serverless API endpoints and migration pipeline from browser LocalStorage.
-* **Phase 7: Online Qualifiers & Competitor Self-Service Portal (2nd Highest Priority)**
+* **Phase 8: Online Qualifiers & Competitor Self-Service Portal (Upcoming)**
   * Dedicated public competitor self-serve flow (`/:slug/qualify`) with Twitch OAuth 2.0 login and profile linking.
   * 6–8 character NES-compatible Authword Engine: family-friendly curated dictionary + admin custom word additions; $\ge 6$ letters dedicated to a real English word; no spaces; optional NES symbols/numbers (`!`, `.`, `-`, `♥`, `0-9`).
   * Optional countdown timer (inherits tournament/org duration, start/finish/pause logging, non-blocking submit).
@@ -57,10 +65,15 @@ The system prioritizes human readability, deterministic rules, minimal runtime o
   * Online Judge Review Queue / Drawer: VOD link/embed, authword verification at 10k topout, timer log inspection, one-click verify, score edits, and DNQ/DQ flagging.
   * Discord Webhook dispatch: tournament-level webhook with fallback to org webhook (qual started, qual submitted).
   * Tournament mode setting: `IN_PERSON`, `ONLINE`, or `HYBRID`.
-* **Phase 8: Production Deployment, PIN Security & Polish (Upcoming)**
+* **Phase 9: Match Data Export & Custom Analytics (Upcoming)**
+  * Universal match data exporter with customizable field selection, reorderable columns, and presets:
+    * Output formats: CSV, TSV (direct paste into Google Sheets), and Excel-compatible downloads.
+    * Customizable field selection: Match ID, Tier, Stage, Round, Player 1/2 Names, Seeds, Game Scores, Winner, Duration, Forfeit.
+    * Column reordering for seamless integration into community spreadsheets and tournament archives.
+* **Phase 10: Production Deployment, PIN Security & Polish (Upcoming)**
   * Shared Passphrase (PIN) gating all `/manage/*` routes.
   * Vercel edge deployment and custom domain routing.
-* **Future Polish & Mobile View Backlog (Detailed in Section 11):**
+* **Future Polish & Mobile View Backlog (Detailed in Section 13):**
   * Publicly-accessible, mobile-friendly read-only bracket view with multi-view toggles (`Full Bracket`, `Mobile Bracket`, `Split Bracket`) and sharing links.
   * Mobile-responsive overhauls for the 4 data-dense views (Qualifiers, Standings, Roster, Global Players) and compact 360×800 global navigation & breadcrumbs.
 
@@ -290,22 +303,86 @@ The system prioritizes human readability, deterministic rules, minimal runtime o
 
 ---
 
-## 8. Phase 6 Detailed Specifications: Relational Persistence & RBAC Foundation
+## 8. Phase 6 Detailed Specifications: Direct / Manual Seeding & Roster Seeding Engine
 
-### 8.1 Database Schema (Neon PostgreSQL + Drizzle ORM)
+### 8.1 Configuration & Data Model
+* **Seeding Method on Tournament:**
+  ```typescript
+  export type SeedingMethod = 'QUALIFIERS' | 'MANUAL';
+
+  export interface Tournament {
+    // ...
+    seedingMethod: SeedingMethod; // default 'QUALIFIERS'
+    manualSeeds?: string[]; // ordered array of playerIds: index 0 = Seed 1, index 1 = Seed 2, etc.
+  }
+  ```
+* **Setting Configuration (`TournamentAdminForm`):**
+  * Admin toggle under Tournament Details: **Seeding Mode** (`Qualifiers Leaderboard` vs `Direct / Manual Seeding`).
+  * When `MANUAL` is selected, `qualFormat`, `qualAverageCount`, and `qualWindowMinutes` are cleanly hidden or grayed out.
+  * Can be switched back and forth in Qualifiers/Draft mode, but locked once match play begins (`isLocked === true`).
+
+### 8.2 Bulk Import via Textarea
+* **Raw Multiline Paste Modal / Component (`BulkSeedImportModal.tsx`):**
+  * Large textarea accepting multiline text.
+  * Robust line parser:
+    * Strips line numbers, ranks, bullets, hashes (e.g. `1. `, `1) `, `#1 `, `- `, `1 - `).
+    * Trims leading/trailing whitespace; filters out empty lines.
+  * Player Resolution & Creation Pipeline:
+    * Checks if name exists in tournament roster (`tournament.playersPool`).
+    * If not in tournament, checks Master Global Player Pool (`classic_tetris_global_players`). If found, automatically imports them with their PB, country, and playstyle.
+    * If completely new, creates a new `PlayerProfile` in the global pool and registers them to the tournament roster.
+  * Seed Sequence:
+    * The ordered list from top to bottom directly defines `manualSeeds` (line 1 $\rightarrow$ Seed 1, line 2 $\rightarrow$ Seed 2, ...).
+
+### 8.3 Interactive Seeding & Reordering Interface (`ManualSeedingManager.tsx`)
+* **Dedicated Management Screen (`/:slug/manage/seeding` or adaptive `/manage/qualifiers`):**
+  * When `seedingMethod === 'MANUAL'`, the navigation tab adapts to **"Seeding"** (with quick link to switch to Qualifiers if desired).
+  * **Visual Tier Boundary Dividers:**
+    * Automatically calculates and renders colored tier divider bars across the seed list:
+      * e.g., Seeds 1–16: **Gold Bracket** (with gold border/badge).
+      * Seeds 17–32: **Silver Bracket** (with silver border/badge).
+      * Seeds 33+: **Reserves / Alternate / Unassigned** (neutral styling).
+  * **Reordering Controls:**
+    * Drag-and-drop handles for instant pointer-based reordering.
+    * Keyboard-accessible "Move Up" / "Move Down" / "Move to Top" / "Move to Bottom" buttons.
+    * Direct "Set Seed Number" modal/input (e.g., jump player from Seed 28 to Seed 4, shifting others down).
+    * "Randomize / Shuffle Seeds" button with confirmation speedbump modal (for casual/blind draw events).
+    * "Reverse Seeds" button.
+  * Quick "+ Add Competitor" search autocomplete dropdown from global pool.
+
+### 8.4 Mathematical Bracket Generation & Standings Integration
+* **`generateDraftBracketsForTournament` Hook:**
+  * When `tournament.seedingMethod === 'MANUAL'`:
+    * Bypasses `deriveLeaderboard(tournament)`.
+    * Reads `tournament.manualSeeds`.
+    * Distributes seeds into sorted tiers according to `tier.numPlayers`:
+      * Tier 1 receives seeds $1 \dots \text{capacity}_1$, normalized to tier seeds $1 \dots \text{capacity}_1$.
+      * Tier 2 receives seeds $\text{capacity}_1 + 1 \dots \text{capacity}_1 + \text{capacity}_2$, normalized to tier seeds $1 \dots \text{capacity}_2$, etc.
+    * Bracket visualizer, match card feeds, and sheet matrices update reactively on every drag or paste.
+* **Standings Integration (`standings.ts`):**
+  * Initial seed baseline is derived directly from `manualSeeds`.
+  * `rankDelta = initialSeed - finalRank` correctly computes over/underperformance relative to manual seed.
+* **Simulation Controls (`simulation.ts`):**
+  * Adapts "Seed Qualifiers Only" to "Generate Realistic Seeding" when in manual mode.
+
+---
+
+## 9. Phase 7 Detailed Specifications: Relational Persistence & RBAC Foundation
+
+### 9.1 Database Schema (Neon PostgreSQL + Drizzle ORM)
 All entities include `id` (UUID) and `created_at` (timestamp).
 
 * **organizations:** `id`, `name`, `slug` (unique), `description`, `logo_url`, `website`, `brand_color`, `discord_webhook_url`, `default_rules` (jsonb).
 * **org_memberships:** `id`, `organization_id` (FK), `user_id` (FK), `role` (enum: `ORG_OWNER`, `ORG_ADMIN`, `ORG_JUDGE`).
 * **players:** `id`, `name` (unique), `pb` (int, manual), `is_disqualified` (boolean, default false), `notes` (text), `twitch_username` (text, nullable), `twitch_channel_id` (text, nullable).
-* **tournaments:** `id`, `organization_id` (FK), `name`, `slug` (text, unique), `qual_format` (enum), `qual_mode` (enum: `IN_PERSON`, `ONLINE`, `HYBRID`), `qual_average_count` (int, nullable), `qual_window_minutes` (int, nullable), `discord_webhook_url` (text, nullable), `points_config` (jsonb, nullable), `is_locked` (boolean, default false).
+* **tournaments:** `id`, `organization_id` (FK), `name`, `slug` (text, unique), `seeding_method` (enum: `QUALIFIERS`, `MANUAL`), `qual_format` (enum, nullable), `qual_mode` (enum: `IN_PERSON`, `ONLINE`, `HYBRID`), `qual_average_count` (int, nullable), `qual_window_minutes` (int, nullable), `discord_webhook_url` (text, nullable), `points_config` (jsonb, nullable), `manual_seeds` (jsonb, nullable), `is_locked` (boolean, default false).
 * **bracket_tiers:** `id`, `tournament_id` (FK), `priority_order` (int), `name` (text), `bracket_type` (enum: `TRADITIONAL`, `FLAT`), `elimination_type` (enum: `SINGLE`, `DOUBLE`), `flat_width` (int, nullable), `num_players` (int), `best_of` (int), `round_overrides` (jsonb), `primary_color` (text), `secondary_color` (text).
 * **tournament_players:** `tournament_id` (FK), `player_id` (FK), `organization_id` (FK), `tier_id` (FK, nullable), `seed` (int, nullable).
 * **qualifier_submissions:** `id`, `tournament_id` (FK), `player_id` (FK), `organization_id` (FK), `score` (int), `submission_source` (enum: `IN_PERSON`, `ONLINE`), `auth_word` (text, nullable), `twitch_vod_url` (text, nullable), `is_verified` (boolean, default false), `timer_log` (jsonb, nullable), `status` (enum: `NOT_STARTED`, `IN_PROGRESS`, `SUBMITTED`, `VERIFIED`, `DNQ`).
 * **matches:** `id`, `tier_id` (FK), `organization_id` (FK), `bracket_stage` (enum: `WINNERS`, `LOSERS`, `GRAND_FINALS`, `GRAND_FINALS_RESET`), `round_identifier` (text), `player1_id` (FK, nullable), `player2_id` (FK, nullable), `winner_id` (FK, nullable), `loser_id` (FK, nullable), `best_of` (int), `is_forfeit` (boolean, default false).
 * **games:** `id`, `match_id` (FK), `player1_score` (int), `player2_score` (int), `winner_id` (FK), `loser_id` (FK), `is_intentional_topout` (boolean, default false).
 
-### 8.2 Granular RBAC Permissions Architecture
+### 9.2 Granular RBAC Permissions Architecture
 * **Org Owner:** Full administrative control over organization settings, billing, webhooks, and assigning Org Admins.
 * **Org Admin:** Create and manage tournaments under that organization, edit org defaults, manage player pool.
 * **Tournament Admin / Floor Judge:** Scoped to specific tournaments; enter match scores, verify qualifiers, lock/unlock brackets.
@@ -313,9 +390,9 @@ All entities include `id` (UUID) and `created_at` (timestamp).
 
 ---
 
-## 9. Phase 7 Detailed Specifications: Online Qualifiers & Competitor Portal
+## 10. Phase 8 Detailed Specifications: Online Qualifiers & Competitor Portal
 
-### 9.1 Competitor User Journey
+### 10.1 Competitor User Journey
 1. Competitor visits public tournament qual portal at `/:slug/qualify`.
 2. Authenticates via Twitch OAuth 2.0 (retrieves Twitch handle, avatar, and channel link).
 3. Views live qual leaderboard; clicks **"Start Official Qual"**.
@@ -330,7 +407,7 @@ All entities include `id` (UUID) and `created_at` (timestamp).
 8. **Immediate Leaderboard Impact:** The submission posts immediately to the live qual board with compact status badge `awaiting verification` (unverified).
 9. If configured, Discord webhook posts: *"🏆 [Player] submitted qual score: [Score]. VOD: [link]"*.
 
-### 9.2 Authword Engine Constraints
+### 10.2 Authword Engine Constraints
 * Length: **6 to 8 characters**.
 * Words: At least 6 characters dedicated to a real, family-friendly English word.
 * Valid Characters: Restricted strictly to NES Tetris high-score character set:
@@ -340,7 +417,7 @@ All entities include `id` (UUID) and `created_at` (timestamp).
   - **Spaces are strictly forbidden.**
 * Dictionary Pool: Built-in curated list of ~1,000 family-friendly words + Tournament Settings field allowing admins to add custom approved words.
 
-### 9.3 Optional Countdown Timer & Session Log
+### 10.3 Optional Countdown Timer & Session Log
 * Countdown timer displays on the competitor screen (inherits `qualWindowMinutes` from tournament settings or org default).
 * Player can start, pause, and resume timer.
 * Timer is non-blocking: expiring timer does **not** hard-disable the submit button.
@@ -355,7 +432,7 @@ All entities include `id` (UUID) and `created_at` (timestamp).
   }
   ```
 
-### 9.4 Online Judge Review Queue & Mobile-Friendly Verification
+### 10.4 Online Judge Review Queue & Mobile-Friendly Verification
 * **Leaderboard Status Column:**
   - Compact, mobile-responsive indicator (`✓` green for verified, `⏳` amber for awaiting verification, `—` gray for unstarted, `DNQ` red for disqualified).
 * **Judge Review Drawer:**
@@ -369,7 +446,38 @@ All entities include `id` (UUID) and `created_at` (timestamp).
 
 ---
 
-## 10. Phase 8 Detailed Specifications: Production Deployment & Security Polish
+## 11. Phase 9 Detailed Specifications: Match Data Export & Custom Analytics
+
+### 11.1 Configurable Field Selection & Reordering
+* Export modal accessible via Tournament Management:
+  * Selectable columns with toggles:
+    * `[x] Tournament Name`
+    * `[x] Tier Name`
+    * `[x] Stage (Winners / Losers / Grand Finals)`
+    * `[x] Round Identifier / Round Number`
+    * `[x] Match ID`
+    * `[x] Player 1 Name`
+    * `[x] Player 1 Seed`
+    * `[x] Player 1 Match Wins`
+    * `[x] Player 2 Name`
+    * `[x] Player 2 Seed`
+    * `[x] Player 2 Match Wins`
+    * `[x] Winner Name`
+    * `[x] Loser Name`
+    * `[x] Game-by-Game Scores (e.g. Game 1: 520k - 480k, Game 2: ...)`
+    * `[x] Forfeit Status`
+    * `[x] Intentional Topouts`
+  * Drag-and-drop or up/down column reordering to match exact personal spreadsheet layouts.
+  * Presets: "Default CTWC Match Sheet", "Detailed Audit", "Simple Bracket Results".
+
+### 11.2 Export Formats
+* **CSV:** Standard comma-separated values with UTF-8 BOM encoding for seamless Excel import.
+* **TSV / Copy to Clipboard:** Tab-separated text copied directly to system clipboard for immediate `Ctrl+V` into Google Sheets.
+* **JSON:** Full raw tournament dump for external developers and archive tools.
+
+---
+
+## 12. Phase 10 Detailed Specifications: Production Deployment & Security Polish
 
 * **Access Security:** Shared Passphrase (PIN) gating all `/manage/*` routes.
 * **OBS Broadcast Displays (Complete in Phase 3):** Clean 16:9 transparent canvases with chroma key presets, auto-fit, and split wings.
@@ -378,7 +486,7 @@ All entities include `id` (UUID) and `created_at` (timestamp).
 
 ---
 
-## 11. Implementation Details & Backlog to Revisit Later
+## 13. Implementation Details & Backlog to Revisit Later
 
 ### 11.1 Public-Facing, Mobile-Friendly Read-Only Bracket & Multi-View Display (Complete)
 * **Option 1 Routing Architecture (Strict Public Spectator vs Director Isolation):**

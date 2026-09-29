@@ -7,6 +7,7 @@ import {
   QualifierScore,
   PlayerProfile,
   QualifierSubmission,
+  SeedingMethod,
 } from './types';
 import { advanceMatchWinner, retractMatchWinner, swapMatchSlots } from '../bracket/math';
 import { canonicalizeBracketRounds } from '../bracket/types';
@@ -108,6 +109,16 @@ interface TournamentContextType {
       targetSlot: 1 | 2;
     }
   ) => { success: boolean; error?: string };
+  setSeedingMethod: (tournamentId: string, method: SeedingMethod) => void;
+  setManualSeeds: (tournamentId: string, playerIds: string[]) => void;
+  reorderManualSeed: (tournamentId: string, fromIndex: number, toIndex: number) => void;
+  shuffleManualSeeds: (tournamentId: string) => void;
+  addManualSeed: (tournamentId: string, playerId: string) => void;
+  removeManualSeed: (tournamentId: string, playerId: string) => void;
+  batchMoveManualSeeds: (tournamentId: string, playerIds: string[], direction: 'UP' | 'DOWN') => void;
+  batchJumpManualSeeds: (tournamentId: string, playerIds: string[], targetSeed: number) => void;
+  batchRemoveManualSeeds: (tournamentId: string, playerIds: string[]) => void;
+  batchAddManualSeeds: (tournamentId: string, playerIds: string[], position: 'TOP' | 'BOTTOM') => void;
 }
 
 import {
@@ -118,6 +129,100 @@ import {
   saveStoredGlobalPlayers,
   saveStoredActiveTournamentId,
 } from './store/tournamentStorage';
+
+/**
+ * Shifts clusters of selected seeds UP or DOWN.
+ * Non-contiguous items move independently by 1 step (e.g. 3, 6, 9 -> 2, 5, 8).
+ * Contiguous blocks shift together as a cluster, displacing the adjacent boundary item.
+ */
+export function shiftSeedsCluster(
+  seeds: string[],
+  playerIds: string[],
+  direction: 'UP' | 'DOWN'
+): string[] {
+  if (!seeds || seeds.length <= 1 || !playerIds || playerIds.length === 0) {
+    return seeds ? [...seeds] : [];
+  }
+
+  const selectedSet = new Set(playerIds);
+  const result = [...seeds];
+
+  if (direction === 'UP') {
+    let i = 0;
+    while (i < result.length) {
+      if (selectedSet.has(result[i])) {
+        const start = i;
+        while (i < result.length && selectedSet.has(result[i])) {
+          i++;
+        }
+        const end = i - 1;
+
+        if (start > 0) {
+          // Shift cluster up by 1, displacing the item at start - 1 to end
+          const displaced = result[start - 1];
+          for (let k = start; k <= end; k++) {
+            result[k - 1] = result[k];
+          }
+          result[end] = displaced;
+        }
+      } else {
+        i++;
+      }
+    }
+  } else {
+    // DOWN
+    let i = result.length - 1;
+    while (i >= 0) {
+      if (selectedSet.has(result[i])) {
+        const end = i;
+        while (i >= 0 && selectedSet.has(result[i])) {
+          i--;
+        }
+        const start = i + 1;
+
+        if (end < result.length - 1) {
+          // Shift cluster down by 1, displacing the item at end + 1 to start
+          const displaced = result[end + 1];
+          for (let k = end; k >= start; k--) {
+            result[k + 1] = result[k];
+          }
+          result[start] = displaced;
+        }
+      } else {
+        i--;
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Bunches selected seeds contiguously at the target seed in their existing relative order.
+ * E.g., selecting 3, 6, 9 and jumping to 1 produces 1, 2, 3 (from 3, 6, 9 respectively).
+ */
+export function jumpSeedsBunched(
+  seeds: string[],
+  playerIds: string[],
+  targetSeed: number
+): string[] {
+  if (!seeds || seeds.length <= 1 || !playerIds || playerIds.length === 0) {
+    return seeds ? [...seeds] : [];
+  }
+
+  const selectedSet = new Set(playerIds);
+  const selectedOrdered = seeds.filter(id => selectedSet.has(id));
+  const remaining = seeds.filter(id => !selectedSet.has(id));
+
+  const targetIndex = targetSeed - 1;
+  const clampedIndex = Math.max(0, Math.min(targetIndex, remaining.length));
+
+  return [
+    ...remaining.slice(0, clampedIndex),
+    ...selectedOrdered,
+    ...remaining.slice(clampedIndex),
+  ];
+}
 
 const TournamentContext = createContext<TournamentContextType | null>(null);
 
@@ -189,6 +294,8 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       playersPool: [],
       qualifierSubmissions: [],
       tournamentPlayers: {},
+      seedingMethod: data.seedingMethod || 'QUALIFIERS',
+      manualSeeds: data.manualSeeds || [],
       isLocked: Boolean(data.isLocked),
       tiers: data.tiers || [],
       useOrgBranding: data.useOrgBranding !== undefined ? data.useOrgBranding : true,
@@ -1039,6 +1146,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           ...t,
           qualifierSubmissions: [],
           qualifiers: [],
+          manualSeeds: [],
           isLocked: hasRecordedMatches ? t.isLocked : false,
           tiers: t.tiers.map(tier => ({
             ...tier,
@@ -1062,6 +1170,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           playersPool: [],
           qualifierSubmissions: [],
           qualifiers: [],
+          manualSeeds: [],
           matchScores: {},
           tournamentPlayers: {},
           isLocked: false,
@@ -1081,6 +1190,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const updated: Tournament = {
           ...t,
           playersPool: players,
+          manualSeeds: t.seedingMethod === 'MANUAL' ? players.map(p => p.id) : (t.manualSeeds || []),
           qualifierSubmissions: submissions,
           qualifiers: [],
           matchScores: {},
@@ -1218,14 +1328,24 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const updatedPool = (t.playersPool || []).filter(p => p.id !== playerId);
         const updatedSubs = (t.qualifierSubmissions || []).filter(s => s.playerId !== playerId);
         const updatedQuals = (t.qualifiers || []).filter(q => q.playerId !== playerId);
+        const updatedManualSeeds = (t.manualSeeds || []).filter(id => id !== playerId);
         const updatedTournamentPlayers = { ...(t.tournamentPlayers || {}) };
         delete updatedTournamentPlayers[playerId];
+        updatedManualSeeds.forEach((id, idx) => {
+          if (updatedTournamentPlayers[id]) {
+            updatedTournamentPlayers[id] = {
+              ...updatedTournamentPlayers[id],
+              seed: idx + 1,
+            };
+          }
+        });
 
         const updated: Tournament = {
           ...t,
           playersPool: updatedPool,
           qualifierSubmissions: updatedSubs,
           qualifiers: updatedQuals,
+          manualSeeds: updatedManualSeeds,
           tournamentPlayers: updatedTournamentPlayers,
         };
         if (!updated.isLocked) {
@@ -1236,6 +1356,310 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     );
 
     return { success: true };
+  };
+
+  const setSeedingMethod = (tournamentId: string, method: SeedingMethod) => {
+    setTournaments(prev =>
+      prev.map(t => {
+        if (t.id !== tournamentId) return t;
+        const updated = { ...t, seedingMethod: method };
+        // If switching to MANUAL and manualSeeds is empty, initialize from playersPool
+        if (method === 'MANUAL' && (!updated.manualSeeds || updated.manualSeeds.length === 0)) {
+          updated.manualSeeds = (updated.playersPool || []).map(p => p.id);
+          const updatedTournamentPlayers = { ...(updated.tournamentPlayers || {}) };
+          updated.manualSeeds.forEach((id, idx) => {
+            if (updatedTournamentPlayers[id]) {
+              updatedTournamentPlayers[id] = {
+                ...updatedTournamentPlayers[id],
+                seed: idx + 1,
+              };
+            }
+          });
+          updated.tournamentPlayers = updatedTournamentPlayers;
+        }
+        if (!updated.isLocked) {
+          updated.tiers = generateDraftBracketsForTournament(updated);
+        }
+        return updated;
+      })
+    );
+  };
+
+  const setManualSeeds = (tournamentId: string, playerIds: string[]) => {
+    setTournaments(prev =>
+      prev.map(t => {
+        if (t.id !== tournamentId) return t;
+        const updatedTournamentPlayers = { ...(t.tournamentPlayers || {}) };
+        playerIds.forEach((id, idx) => {
+          if (updatedTournamentPlayers[id]) {
+            updatedTournamentPlayers[id] = {
+              ...updatedTournamentPlayers[id],
+              seed: idx + 1,
+            };
+          }
+        });
+
+        const updated = {
+          ...t,
+          manualSeeds: playerIds,
+          tournamentPlayers: updatedTournamentPlayers,
+        };
+        if (!updated.isLocked) {
+          updated.tiers = generateDraftBracketsForTournament(updated);
+        }
+        return updated;
+      })
+    );
+  };
+
+  const reorderManualSeed = (tournamentId: string, fromIndex: number, toIndex: number) => {
+    setTournaments(prev =>
+      prev.map(t => {
+        if (t.id !== tournamentId) return t;
+        const seeds = [...(t.manualSeeds || [])];
+        if (fromIndex < 0 || fromIndex >= seeds.length || toIndex < 0 || toIndex >= seeds.length) {
+          return t;
+        }
+        const [moved] = seeds.splice(fromIndex, 1);
+        seeds.splice(toIndex, 0, moved);
+
+        const updatedTournamentPlayers = { ...(t.tournamentPlayers || {}) };
+        seeds.forEach((id, idx) => {
+          if (updatedTournamentPlayers[id]) {
+            updatedTournamentPlayers[id] = {
+              ...updatedTournamentPlayers[id],
+              seed: idx + 1,
+            };
+          }
+        });
+
+        const updated = {
+          ...t,
+          manualSeeds: seeds,
+          tournamentPlayers: updatedTournamentPlayers,
+        };
+        if (!updated.isLocked) {
+          updated.tiers = generateDraftBracketsForTournament(updated);
+        }
+        return updated;
+      })
+    );
+  };
+
+  const shuffleManualSeeds = (tournamentId: string) => {
+    setTournaments(prev =>
+      prev.map(t => {
+        if (t.id !== tournamentId) return t;
+        const seeds = [...(t.manualSeeds || [])];
+        for (let i = seeds.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [seeds[i], seeds[j]] = [seeds[j], seeds[i]];
+        }
+
+        const updatedTournamentPlayers = { ...(t.tournamentPlayers || {}) };
+        seeds.forEach((id, idx) => {
+          if (updatedTournamentPlayers[id]) {
+            updatedTournamentPlayers[id] = {
+              ...updatedTournamentPlayers[id],
+              seed: idx + 1,
+            };
+          }
+        });
+
+        const updated = {
+          ...t,
+          manualSeeds: seeds,
+          tournamentPlayers: updatedTournamentPlayers,
+        };
+        if (!updated.isLocked) {
+          updated.tiers = generateDraftBracketsForTournament(updated);
+        }
+        return updated;
+      })
+    );
+  };
+
+  const addManualSeed = (tournamentId: string, playerId: string) => {
+    setTournaments(prev =>
+      prev.map(t => {
+        if (t.id !== tournamentId) return t;
+        const seeds = t.manualSeeds || [];
+        if (seeds.includes(playerId)) return t;
+        const updatedSeeds = [...seeds, playerId];
+
+        const updatedTournamentPlayers = { ...(t.tournamentPlayers || {}) };
+        if (updatedTournamentPlayers[playerId]) {
+          updatedTournamentPlayers[playerId] = {
+            ...updatedTournamentPlayers[playerId],
+            seed: updatedSeeds.length,
+          };
+        }
+
+        const updated = {
+          ...t,
+          manualSeeds: updatedSeeds,
+          tournamentPlayers: updatedTournamentPlayers,
+        };
+        if (!updated.isLocked) {
+          updated.tiers = generateDraftBracketsForTournament(updated);
+        }
+        return updated;
+      })
+    );
+  };
+
+  const removeManualSeed = (tournamentId: string, playerId: string) => {
+    batchRemoveManualSeeds(tournamentId, [playerId]);
+  };
+
+  const batchRemoveManualSeeds = (tournamentId: string, playerIds: string[]) => {
+    if (playerIds.length === 0) return;
+    const toRemoveSet = new Set(playerIds);
+    setTournaments(prev =>
+      prev.map(t => {
+        if (t.id !== tournamentId) return t;
+        const updatedSeeds = (t.manualSeeds || []).filter(id => !toRemoveSet.has(id));
+        const updatedTournamentPlayers = { ...(t.tournamentPlayers || {}) };
+        playerIds.forEach(id => {
+          if (updatedTournamentPlayers[id]) {
+            updatedTournamentPlayers[id] = {
+              ...updatedTournamentPlayers[id],
+              seed: undefined,
+            };
+          }
+        });
+        updatedSeeds.forEach((id, idx) => {
+          if (updatedTournamentPlayers[id]) {
+            updatedTournamentPlayers[id] = {
+              ...updatedTournamentPlayers[id],
+              seed: idx + 1,
+            };
+          }
+        });
+
+        const updated = {
+          ...t,
+          manualSeeds: updatedSeeds,
+          tournamentPlayers: updatedTournamentPlayers,
+        };
+        if (!updated.isLocked) {
+          updated.tiers = generateDraftBracketsForTournament(updated);
+        }
+        return updated;
+      })
+    );
+  };
+
+  const batchAddManualSeeds = (
+    tournamentId: string,
+    playerIds: string[],
+    position: 'TOP' | 'BOTTOM'
+  ) => {
+    if (playerIds.length === 0) return;
+    setTournaments(prev =>
+      prev.map(t => {
+        if (t.id !== tournamentId) return t;
+        const existingSeeds = t.manualSeeds || [];
+        const existingSet = new Set(existingSeeds);
+        const uniqueToAdd = playerIds.filter(id => !existingSet.has(id));
+        if (uniqueToAdd.length === 0) return t;
+
+        const updatedSeeds =
+          position === 'TOP'
+            ? [...uniqueToAdd, ...existingSeeds]
+            : [...existingSeeds, ...uniqueToAdd];
+
+        const updatedTournamentPlayers = { ...(t.tournamentPlayers || {}) };
+        updatedSeeds.forEach((id, idx) => {
+          if (updatedTournamentPlayers[id]) {
+            updatedTournamentPlayers[id] = {
+              ...updatedTournamentPlayers[id],
+              seed: idx + 1,
+            };
+          }
+        });
+
+        const updated = {
+          ...t,
+          manualSeeds: updatedSeeds,
+          tournamentPlayers: updatedTournamentPlayers,
+        };
+        if (!updated.isLocked) {
+          updated.tiers = generateDraftBracketsForTournament(updated);
+        }
+        return updated;
+      })
+    );
+  };
+
+  const batchMoveManualSeeds = (
+    tournamentId: string,
+    playerIds: string[],
+    direction: 'UP' | 'DOWN'
+  ) => {
+    if (playerIds.length === 0) return;
+    setTournaments(prev =>
+      prev.map(t => {
+        if (t.id !== tournamentId) return t;
+        const seeds = t.manualSeeds || [];
+        const updatedSeeds = shiftSeedsCluster(seeds, playerIds, direction);
+
+        const updatedTournamentPlayers = { ...(t.tournamentPlayers || {}) };
+        updatedSeeds.forEach((id, idx) => {
+          if (updatedTournamentPlayers[id]) {
+            updatedTournamentPlayers[id] = {
+              ...updatedTournamentPlayers[id],
+              seed: idx + 1,
+            };
+          }
+        });
+
+        const updated = {
+          ...t,
+          manualSeeds: updatedSeeds,
+          tournamentPlayers: updatedTournamentPlayers,
+        };
+        if (!updated.isLocked) {
+          updated.tiers = generateDraftBracketsForTournament(updated);
+        }
+        return updated;
+      })
+    );
+  };
+
+  const batchJumpManualSeeds = (
+    tournamentId: string,
+    playerIds: string[],
+    targetSeed: number
+  ) => {
+    if (playerIds.length === 0) return;
+    setTournaments(prev =>
+      prev.map(t => {
+        if (t.id !== tournamentId) return t;
+        const seeds = t.manualSeeds || [];
+        const updatedSeeds = jumpSeedsBunched(seeds, playerIds, targetSeed);
+
+        const updatedTournamentPlayers = { ...(t.tournamentPlayers || {}) };
+        updatedSeeds.forEach((id, idx) => {
+          if (updatedTournamentPlayers[id]) {
+            updatedTournamentPlayers[id] = {
+              ...updatedTournamentPlayers[id],
+              seed: idx + 1,
+            };
+          }
+        });
+
+        const updated = {
+          ...t,
+          manualSeeds: updatedSeeds,
+          tournamentPlayers: updatedTournamentPlayers,
+        };
+        if (!updated.isLocked) {
+          updated.tiers = generateDraftBracketsForTournament(updated);
+        }
+        return updated;
+      })
+    );
   };
 
   return (
@@ -1280,6 +1704,16 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         importPlayersToTournament,
         removePlayerFromTournament,
         swapMatchSlots: swapMatchSlotsAction,
+        setSeedingMethod,
+        setManualSeeds,
+        reorderManualSeed,
+        shuffleManualSeeds,
+        addManualSeed,
+        removeManualSeed,
+        batchMoveManualSeeds,
+        batchJumpManualSeeds,
+        batchRemoveManualSeeds,
+        batchAddManualSeeds,
       }}
     >
       {children}

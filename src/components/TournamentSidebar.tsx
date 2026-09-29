@@ -190,7 +190,7 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
   const navItems = [
     {
       key: 'leaderboard' as const,
-      label: 'Qualifiers',
+      label: activeTourney?.seedingMethod === 'MANUAL' ? 'Seeding' : 'Qualifiers',
       icon: BarChart3,
       to: slug ? `/${slug}/manage/qualifiers` : '/',
       badge: null,
@@ -712,7 +712,7 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
                   <AlertTriangle size={11} color="var(--color-gold-bright)" style={{ flexShrink: 0 }} />
                   {!isCollapsed && (
                     <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      Quals Mode (Lock)
+                      {activeTourney.seedingMethod === 'MANUAL' ? 'Seeding (Lock)' : 'Quals Mode (Lock)'}
                     </span>
                   )}
                 </button>

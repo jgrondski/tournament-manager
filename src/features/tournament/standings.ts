@@ -608,6 +608,73 @@ export function calculateTierStandings(
   return placements;
 }
 
+export function getLeaderboardForStandings(tournament: Tournament): LeaderboardRankRow[] {
+  if (tournament.seedingMethod !== 'MANUAL') {
+    return deriveLeaderboard(tournament);
+  }
+
+  // In manual seeding mode, derive rank rows directly from manualSeeds and tier capacities
+  const playerMap = new Map((tournament.playersPool || []).map(p => [p.id, p]));
+  const sortedTiers = [...(tournament.tiers || [])].sort((a, b) => a.priority - b.priority);
+
+  let running = 0;
+  const cutoffs = sortedTiers.map(t => {
+    const start = running + 1;
+    const end = running + t.playerCount;
+    running = end;
+    return { tier: t, start, end };
+  });
+
+  const manualIds = tournament.manualSeeds || [];
+  const rows: LeaderboardRankRow[] = [];
+
+  manualIds.forEach((id, idx) => {
+    const player = playerMap.get(id);
+    if (!player) return;
+    const rank = idx + 1;
+    const cutoff = cutoffs.find(c => rank >= c.start && rank <= c.end);
+    const tierSeed = cutoff ? rank - cutoff.start + 1 : undefined;
+
+    rows.push({
+      player,
+      rank,
+      globalRank: rank,
+      finalScore: 0,
+      attempts: [],
+      formattedDetail: `Seed ${rank}`,
+      status: 'verified',
+      earliestTimestamp: 0,
+      assignedTier: cutoff?.tier,
+      tierSeed,
+      isDNQ: cutoff === undefined,
+      isDisqualified: player.isDisqualified || false,
+    });
+  });
+
+  // Also include any players in playersPool not in manualSeeds as DNQ
+  const manualSet = new Set(manualIds);
+  (tournament.playersPool || []).forEach(player => {
+    if (manualSet.has(player.id)) return;
+    const rank = rows.length + 1;
+    rows.push({
+      player,
+      rank,
+      globalRank: rank,
+      finalScore: 0,
+      attempts: [],
+      formattedDetail: 'Unassigned Seed',
+      status: 'verified',
+      earliestTimestamp: 0,
+      assignedTier: undefined,
+      tierSeed: undefined,
+      isDNQ: true,
+      isDisqualified: player.isDisqualified || false,
+    });
+  });
+
+  return rows;
+}
+
 /**
  * Calculates continuous, sequential #1 to #N Global Standings across all tiers,
  * applying the exact mathematical Competitive Intra-Round Exit Tiebreaker hierarchy,
@@ -619,7 +686,7 @@ export function calculateGlobalStandings(tournament: Tournament): GlobalStanding
   const profileMap = new Map((tournament.playersPool || []).map(p => [p.id, p]));
 
   // 1. Derive qualifiers leaderboard for seeding, score, and rank baseline
-  const leaderboard: LeaderboardRankRow[] = deriveLeaderboard(tournament);
+  const leaderboard: LeaderboardRankRow[] = getLeaderboardForStandings(tournament);
   const qualRankMap = new Map<string, number>();
   const qualScoreMap = new Map<string, number>();
 

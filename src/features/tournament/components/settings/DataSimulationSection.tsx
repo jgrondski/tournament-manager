@@ -1,7 +1,11 @@
 import React from 'react';
 import { CheckCircle2, Sparkles, Play, Trash2 } from 'lucide-react';
 
+import { SeedingMethod } from '../../types';
+
 interface DataSimulationSectionProps {
+  seedingMethod?: SeedingMethod;
+  manualSeedsCount?: number;
   qualifierCount: number;
   recordedMatchCount: number;
   hasTiers: boolean;
@@ -12,6 +16,8 @@ interface DataSimulationSectionProps {
 }
 
 export const DataSimulationSection: React.FC<DataSimulationSectionProps> = ({
+  seedingMethod = 'QUALIFIERS',
+  manualSeedsCount = 0,
   qualifierCount,
   recordedMatchCount,
   hasTiers,
@@ -20,7 +26,9 @@ export const DataSimulationSection: React.FC<DataSimulationSectionProps> = ({
   onSimulate,
   onRequestDataAction,
 }) => {
-  const hasQualifiers = qualifierCount > 0;
+  const isManual = seedingMethod === 'MANUAL';
+  const seedCount = isManual ? manualSeedsCount : qualifierCount;
+  const hasSeeds = seedCount > 0;
   const hasRecordedMatches = recordedMatchCount > 0;
 
   return (
@@ -54,10 +62,10 @@ export const DataSimulationSection: React.FC<DataSimulationSectionProps> = ({
             }}
           >
             <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>
-              Qualifier Attempts
+              {isManual ? 'Registered Seeds' : 'Qualifier Attempts'}
             </span>
-            <span style={{ fontSize: '0.95rem', fontWeight: 800, color: qualifierCount > 0 ? 'var(--color-gold-bright)' : 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
-              {qualifierCount}
+            <span style={{ fontSize: '0.95rem', fontWeight: 800, color: seedCount > 0 ? 'var(--color-gold-bright)' : 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
+              {seedCount}
             </span>
           </div>
           <div
@@ -121,7 +129,7 @@ export const DataSimulationSection: React.FC<DataSimulationSectionProps> = ({
               Sandbox Simulation
             </div>
             <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-              Seed simulated scores or run full tournament matches.
+              {isManual ? 'Generate simulated player seeds or run full tournament matches.' : 'Seed simulated scores or run full tournament matches.'}
             </div>
           </div>
 
@@ -129,7 +137,7 @@ export const DataSimulationSection: React.FC<DataSimulationSectionProps> = ({
             <button
               type="button"
               onClick={onSeedQualifiers}
-              disabled={hasQualifiers || hasRecordedMatches}
+              disabled={hasSeeds || hasRecordedMatches}
               className="btn btn-secondary"
               style={{
                 padding: '0.4rem 0.85rem',
@@ -137,19 +145,19 @@ export const DataSimulationSection: React.FC<DataSimulationSectionProps> = ({
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '0.4rem',
-                opacity: (hasQualifiers || hasRecordedMatches) ? 0.45 : 1,
-                cursor: (hasQualifiers || hasRecordedMatches) ? 'not-allowed' : 'pointer',
+                opacity: (hasSeeds || hasRecordedMatches) ? 0.45 : 1,
+                cursor: (hasSeeds || hasRecordedMatches) ? 'not-allowed' : 'pointer',
               }}
               title={
                 hasRecordedMatches
                   ? 'Match play has begun. Clear match scores or all tournament data to re-seed.'
-                  : hasQualifiers
-                  ? 'Qualifiers have already been seeded. Clear qualifier scores to re-seed.'
-                  : 'Generate realistic competitors and qualifier attempts'
+                  : hasSeeds
+                  ? (isManual ? 'Manual seeds have already been registered. Clear seeds to re-seed.' : 'Qualifiers have already been seeded. Clear qualifier scores to re-seed.')
+                  : (isManual ? 'Generate realistic competitors and manual seed order' : 'Generate realistic competitors and qualifier attempts')
               }
             >
               <Sparkles size={14} style={{ color: 'var(--color-gold-bright)' }} />
-              Seed Qualifiers
+              {isManual ? 'Generate Seeds' : 'Seed Qualifiers'}
             </button>
 
             <button
@@ -171,13 +179,13 @@ export const DataSimulationSection: React.FC<DataSimulationSectionProps> = ({
                   ? 'Add at least one bracket tier first before simulating tournament matches'
                   : hasRecordedMatches
                   ? 'Match results have already been recorded. Clear match scores to simulate again.'
-                  : hasQualifiers
-                  ? 'Lock brackets from current qualifiers and simulate all match results to champion'
-                  : 'Seed qualifiers, lock brackets, and simulate all tournament matches'
+                  : hasSeeds
+                  ? (isManual ? 'Lock brackets from current seeds and simulate all match results to champion' : 'Lock brackets from current qualifiers and simulate all match results to champion')
+                  : (isManual ? 'Generate seeds, lock brackets, and simulate all tournament matches' : 'Seed qualifiers, lock brackets, and simulate all tournament matches')
               }
             >
               <Play size={14} style={{ color: '#60a5fa' }} />
-              {hasQualifiers ? 'Simulate Matches' : 'Seed & Simulate'}
+              {hasSeeds ? 'Simulate Matches' : 'Seed & Simulate'}
             </button>
           </div>
         </div>
@@ -199,7 +207,7 @@ export const DataSimulationSection: React.FC<DataSimulationSectionProps> = ({
               Data Maintenance
             </div>
             <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-              Clear match results or qualifier submissions.
+              {isManual ? 'Clear match results or registered player seeds.' : 'Clear match results or qualifier submissions.'}
             </div>
           </div>
 
@@ -223,31 +231,31 @@ export const DataSimulationSection: React.FC<DataSimulationSectionProps> = ({
             <button
               type="button"
               onClick={() => onRequestDataAction('QUALS')}
-              disabled={qualifierCount === 0}
+              disabled={seedCount === 0}
               className="btn btn-secondary"
               style={{
                 padding: '0.38rem 0.75rem',
                 fontSize: '0.78rem',
-                opacity: qualifierCount === 0 ? 0.4 : 1,
-                cursor: qualifierCount === 0 ? 'not-allowed' : 'pointer',
+                opacity: seedCount === 0 ? 0.4 : 1,
+                cursor: seedCount === 0 ? 'not-allowed' : 'pointer',
               }}
-              title={qualifierCount === 0 ? 'No qualifier scores to clear' : 'Clear all qualifier submissions'}
+              title={seedCount === 0 ? (isManual ? 'No registered seeds to clear' : 'No qualifier scores to clear') : (isManual ? 'Clear all registered player seeds' : 'Clear all qualifier submissions')}
             >
-              Clear Quals ({qualifierCount})
+              {isManual ? `Clear Seeds (${seedCount})` : `Clear Quals (${seedCount})`}
             </button>
 
             <button
               type="button"
               onClick={() => onRequestDataAction('ALL')}
-              disabled={qualifierCount === 0 && recordedMatchCount === 0}
+              disabled={seedCount === 0 && recordedMatchCount === 0}
               className="btn btn-danger"
               style={{
                 padding: '0.38rem 0.75rem',
                 fontSize: '0.78rem',
-                opacity: (qualifierCount === 0 && recordedMatchCount === 0) ? 0.4 : 1,
-                cursor: (qualifierCount === 0 && recordedMatchCount === 0) ? 'not-allowed' : 'pointer',
+                opacity: (seedCount === 0 && recordedMatchCount === 0) ? 0.4 : 1,
+                cursor: (seedCount === 0 && recordedMatchCount === 0) ? 'not-allowed' : 'pointer',
               }}
-              title={qualifierCount === 0 && recordedMatchCount === 0 ? 'No data to clear' : 'Clear all tournament data'}
+              title={seedCount === 0 && recordedMatchCount === 0 ? 'No data to clear' : 'Clear all tournament data'}
             >
               <Trash2 size={13} /> Clear All
             </button>

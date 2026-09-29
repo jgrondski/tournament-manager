@@ -1,8 +1,9 @@
 import React from 'react';
 import { Trash2, X } from 'lucide-react';
-import { TournamentTier } from '../../types';
+import { TournamentTier, SeedingMethod } from '../../types';
 
 interface AdminFormModalsProps {
+  seedingMethod?: SeedingMethod;
   tierToDelete: { index: number; tier: TournamentTier } | null;
   tiersCount: number;
   onConfirmDeleteTier: (index: number) => void;
@@ -15,6 +16,7 @@ interface AdminFormModalsProps {
 }
 
 export const AdminFormModals: React.FC<AdminFormModalsProps> = ({
+  seedingMethod = 'QUALIFIERS',
   tierToDelete,
   tiersCount,
   onConfirmDeleteTier,
@@ -25,6 +27,7 @@ export const AdminFormModals: React.FC<AdminFormModalsProps> = ({
   onConfirmDataAction,
   onCancelDataAction,
 }) => {
+  const isManual = seedingMethod === 'MANUAL';
   return (
     <>
       {/* Speedbump Modal for Deleting Bracket Tier */}
@@ -172,7 +175,7 @@ export const AdminFormModals: React.FC<AdminFormModalsProps> = ({
                 <Trash2 size={20} />
                 <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
                   {dataActionToConfirm === 'MATCHES' && 'Clear Match Scores'}
-                  {dataActionToConfirm === 'QUALS' && 'Clear Qualifier Scores'}
+                  {dataActionToConfirm === 'QUALS' && (isManual ? 'Clear Registered Seeds' : 'Clear Qualifier Scores')}
                   {dataActionToConfirm === 'ALL' && 'Clear All Tournament Data'}
                 </h3>
               </div>
@@ -188,13 +191,17 @@ export const AdminFormModals: React.FC<AdminFormModalsProps> = ({
             <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <p style={{ fontSize: '0.9rem', color: 'var(--color-text-primary)', lineHeight: 1.5 }}>
                 {dataActionToConfirm === 'MATCHES' && (
-                  <>Are you sure you want to delete all <strong>{recordedMatchCount} recorded match score(s)</strong> across all tiers? Tournament will revert to Qualifiers Mode.</>
+                  <>Are you sure you want to delete all <strong>{recordedMatchCount} recorded match score(s)</strong> across all tiers? Tournament will revert to {isManual ? 'Seeding Mode' : 'Qualifiers Mode'}.</>
                 )}
                 {dataActionToConfirm === 'QUALS' && (
-                  <>Are you sure you want to delete all <strong>{qualifierCount} qualifier score(s)</strong>? The qualifiers leaderboard will be emptied.</>
+                  isManual ? (
+                    <>Are you sure you want to delete all <strong>{qualifierCount} registered seed(s)</strong>? The tournament bracket seeding will be cleared.</>
+                  ) : (
+                    <>Are you sure you want to delete all <strong>{qualifierCount} qualifier score(s)</strong>? The qualifiers leaderboard will be emptied.</>
+                  )
                 )}
                 {dataActionToConfirm === 'ALL' && (
-                  <>Are you sure you want to clear <strong>all qualifier and match score data</strong> for this tournament? This will reset the tournament data to a clean slate, allowing you to delete it or re-seed.</>
+                  <>Are you sure you want to clear <strong>all {isManual ? 'seed' : 'qualifier'} and match score data</strong> for this tournament? This will reset the tournament data to a clean slate, allowing you to delete it or re-seed.</>
                 )}
               </p>
               <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', lineHeight: 1.4 }}>

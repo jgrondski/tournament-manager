@@ -412,9 +412,19 @@ export function runFullSimulation(
 ): Tournament {
   let tourney = { ...tournament };
 
-  // 1. Seed qualifiers if fewer than total bracket capacity
+  // 1. Seed qualifiers or manual seeds if fewer than total bracket capacity
   const totalCapacity = tourney.tiers.reduce((acc, t) => acc + t.playerCount, 0);
-  if ((tourney.qualifierSubmissions?.length || 0) < totalCapacity) {
+  if (tourney.seedingMethod === 'MANUAL') {
+    if ((tourney.manualSeeds?.length || 0) < totalCapacity) {
+      const { players } = generateSimulatedQualifiers(tourney, globalPlayersPool);
+      tourney = {
+        ...tourney,
+        playersPool: players,
+        manualSeeds: players.map(p => p.id),
+        isLocked: false,
+      };
+    }
+  } else if ((tourney.qualifierSubmissions?.length || 0) < totalCapacity) {
     const { players, submissions } = generateSimulatedQualifiers(tourney, globalPlayersPool);
     tourney = {
       ...tourney,

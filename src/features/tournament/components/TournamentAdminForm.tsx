@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Tournament, TournamentTier, QualFormat, PointsThreshold, DEFAULT_POINTS_THRESHOLDS } from '../types';
+import { Tournament, TournamentTier, QualFormat, PointsThreshold, DEFAULT_POINTS_THRESHOLDS, SeedingMethod } from '../types';
 import { useTournament } from '../store';
 import {
   Save,
@@ -71,6 +71,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
 
   const [date, setDate] = useState(tournament.date);
   const [location, setLocation] = useState(tournament.location || '');
+  const [seedingMethod, setSeedingMethod] = useState<SeedingMethod>(tournament.seedingMethod || 'QUALIFIERS');
   const [qualFormat, setQualFormat] = useState<QualFormat>(tournament.qualFormat || 'AVERAGE_OF_X');
   const [qualAverageCount, setQualAverageCount] = useState<number | undefined>(tournament.qualAverageCount || 2);
   const [avgCountError, setAvgCountError] = useState<string | null>(null);
@@ -168,6 +169,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
     if ((bannerUrl || '').trim() !== (tournament.bannerUrl || '').trim()) return true;
     if (date.trim() !== (tournament.date || '').trim()) return true;
     if (location.trim() !== (tournament.location || '').trim()) return true;
+    if (seedingMethod !== (tournament.seedingMethod || 'QUALIFIERS')) return true;
     if (qualFormat !== tournament.qualFormat) return true;
     if (qualAverageCount !== (tournament.qualAverageCount || 2)) return true;
 
@@ -218,6 +220,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
     slug,
     date,
     location,
+    seedingMethod,
     qualFormat,
     qualAverageCount,
     pointsConfig,
@@ -259,6 +262,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
       setBannerUrl(tournament.bannerUrl || '');
       setDate(tournament.date || '');
       setLocation(tournament.location || '');
+      setSeedingMethod(tournament.seedingMethod || 'QUALIFIERS');
       setQualFormat(tournament.qualFormat || 'AVERAGE_OF_X');
       setQualAverageCount(tournament.qualAverageCount || 2);
       setAvgCountError(null);
@@ -281,6 +285,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
     setBannerUrl(tournament.bannerUrl || '');
     setDate(tournament.date || '');
     setLocation(tournament.location || '');
+    setSeedingMethod(tournament.seedingMethod || 'QUALIFIERS');
     setQualFormat(tournament.qualFormat || 'AVERAGE_OF_X');
     setQualAverageCount(tournament.qualAverageCount || 2);
     setAvgCountError(null);
@@ -564,6 +569,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
       bannerUrl,
       date,
       location,
+      seedingMethod,
       qualFormat,
       qualAverageCount: parsedAvg,
       pointsConfig,
@@ -591,13 +597,21 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
   const handleSeedQualifiers = () => {
     saveCurrentConfig();
     seedQualifiers(tournament.id);
-    setSimFeedback('Realistic competitors and qualifier attempts seeded successfully!');
+    setSimFeedback(
+      seedingMethod === 'MANUAL'
+        ? 'Competitors and manual seeds generated successfully!'
+        : 'Realistic competitors and qualifier attempts seeded successfully!'
+    );
   };
 
   const handleSimulate = () => {
     saveCurrentConfig();
     simulateFullTournament(tournament.id);
-    setSimFeedback('Full tournament simulated: qualifiers, locked seeds, and complete match outcomes!');
+    setSimFeedback(
+      seedingMethod === 'MANUAL'
+        ? 'Full tournament simulated: manual seeds, locked brackets, and complete match outcomes!'
+        : 'Full tournament simulated: qualifiers, locked seeds, and complete match outcomes!'
+    );
   };
 
   // Derive cutoffs
@@ -719,6 +733,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
         slug={slug}
         date={date}
         location={location}
+        seedingMethod={seedingMethod}
         qualFormat={qualFormat}
         qualAverageCount={qualAverageCount}
         avgCountError={avgCountError}
@@ -728,6 +743,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
         onSlugChange={setSlug}
         onDateChange={setDate}
         onLocationChange={setLocation}
+        onSeedingMethodChange={setSeedingMethod}
         onQualFormatChange={setQualFormat}
         onQualAverageCountChange={setQualAverageCount}
         onAvgCountErrorChange={setAvgCountError}
@@ -768,6 +784,8 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
 
       {/* Section 4: Data Management & Simulation */}
       <DataSimulationSection
+        seedingMethod={seedingMethod}
+        manualSeedsCount={tournament.manualSeeds?.length || 0}
         qualifierCount={qualifierCount}
         recordedMatchCount={recordedMatchCount}
         hasTiers={tiers.length > 0}
@@ -851,6 +869,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
 
       {/* Modals */}
       <AdminFormModals
+        seedingMethod={seedingMethod}
         tierToDelete={tierToDelete}
         tiersCount={tiers.length}
         onConfirmDeleteTier={idx => {
@@ -859,7 +878,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
         }}
         onCancelDeleteTier={() => setTierToDelete(null)}
         dataActionToConfirm={dataActionToConfirm}
-        qualifierCount={qualifierCount}
+        qualifierCount={seedingMethod === 'MANUAL' ? (tournament.manualSeeds?.length || 0) : qualifierCount}
         recordedMatchCount={recordedMatchCount}
         onConfirmDataAction={() => {
           if (dataActionToConfirm === 'MATCHES') {
@@ -867,7 +886,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
             setSimFeedback('Match scores cleared.');
           } else if (dataActionToConfirm === 'QUALS') {
             clearQualifierScores(tournament.id);
-            setSimFeedback('Qualifier scores cleared.');
+            setSimFeedback(seedingMethod === 'MANUAL' ? 'Registered seeds cleared.' : 'Qualifier scores cleared.');
           } else if (dataActionToConfirm === 'ALL') {
             clearAllTournamentData(tournament.id);
             setSimFeedback('All tournament data cleared.');

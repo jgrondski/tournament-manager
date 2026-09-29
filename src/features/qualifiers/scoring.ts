@@ -322,8 +322,61 @@ export function deriveLeaderboard(tournament: Tournament): LeaderboardRankRow[] 
  * Used during DRAFT mode to keep bracket previews live and reactive.
  */
 export function generateDraftBracketsForTournament(tournament: Tournament): TournamentTier[] {
-  const leaderboard = deriveLeaderboard(tournament);
   const sortedTiers = [...tournament.tiers].sort((a, b) => a.priority - b.priority);
+
+  // If manual seeding is active, bypass qualifiers leaderboard and seed directly from manualSeeds
+  if (tournament.seedingMethod === 'MANUAL') {
+    const manualIds = tournament.manualSeeds || [];
+    const playerMap = new Map((tournament.playersPool || []).map(p => [p.id, p]));
+    const validIds = manualIds.filter(id => playerMap.has(id));
+
+    let currentOffset = 0;
+    return sortedTiers.map(tier => {
+      const tierCapacity = tier.playerCount;
+      const tierPlayerIds = validIds.slice(currentOffset, currentOffset + tierCapacity);
+      currentOffset += tierCapacity;
+
+      const seededPlayers: SeededPlayer[] = tierPlayerIds.map((id, idx) => {
+        const p = playerMap.get(id);
+        return {
+          id,
+          name: p?.name || 'Unknown',
+          seed: idx + 1,
+          country: p?.country,
+          playstyle: p?.playstyle,
+        };
+      });
+
+      if (seededPlayers.length >= 2) {
+        const options = {
+          tierId: tier.id,
+          bestOf: tier.bestOf,
+          roundBestOfOverrides: tier.roundBestOfOverrides,
+          bracketRouting: tier.bracketRouting,
+          flatWidth: tier.flatWidth,
+          finalsCutoff: tier.finalsCutoff,
+        };
+        const newBracket =
+          tier.eliminationType === 'DOUBLE'
+            ? generateDoubleEliminationBracket(seededPlayers, options)
+            : tier.bracketType === 'FLAT'
+              ? generateFlatBracket(seededPlayers, tier.flatWidth || 4, options)
+              : generateTraditionalBracket(seededPlayers, options);
+
+        return {
+          ...tier,
+          bracket: newBracket,
+        };
+      }
+
+      return {
+        ...tier,
+        bracket: { rounds: [], totalMatches: 0 } as any,
+      };
+    });
+  }
+
+  const leaderboard = deriveLeaderboard(tournament);
 
   return sortedTiers.map(tier => {
     // Get seeded players for this tier

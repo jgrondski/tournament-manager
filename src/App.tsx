@@ -48,6 +48,7 @@ export const App: React.FC = () => {
           <Route path="/:slug/manage/sheet" element={<ManageSheetPage />} />
           <Route path="/:slug/manage/judge" element={<ManageJudgePage />} />
           <Route path="/:slug/manage/qualifiers" element={<PublicLeaderboardPage />} />
+          <Route path="/:slug/manage/seeding" element={<PublicLeaderboardPage />} />
           <Route path="/:slug/manage/standings" element={<FinalStandingsPage />} />
           <Route path="/:slug/manage/players" element={<ManageTournamentPlayersPage />} />
           <Route path="/:slug/manage/settings" element={<ManageTournamentSettingsPage />} />
@@ -56,6 +57,7 @@ export const App: React.FC = () => {
           <Route path="/:slug/view" element={<PublicTierBracketPage />} />
           <Route path="/:slug/brackets" element={<PublicTierBracketPage />} />
           <Route path="/:slug/bracket" element={<PublicTierBracketPage />} />
+          <Route path="/:slug/seeding" element={<PublicLeaderboardPage />} />
           <Route path="/:slug/sheet" element={<ManageSheetPage />} />
           <Route path="/:slug/judge" element={<ManageJudgePage />} />
           <Route path="/:slug/players" element={<ManageTournamentPlayersPage />} />

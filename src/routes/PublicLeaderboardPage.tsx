@@ -4,6 +4,7 @@ import { useTournament } from '../features/tournament/store';
 import { TournamentLayout } from '../components/TournamentLayout';
 import { SpectatorLayout } from '../components/SpectatorLayout';
 import { LeaderboardTable } from '../features/qualifiers/components/LeaderboardTable';
+import { ManualSeedingManager } from '../features/tournament/components/seeding/ManualSeedingManager';
 import { ShareBracketModal } from '../features/bracket/components/ShareBracketModal';
 
 export const PublicLeaderboardPage: React.FC = () => {
@@ -38,6 +39,47 @@ export const PublicLeaderboardPage: React.FC = () => {
           Back to Tournaments
         </button>
       </div>
+    );
+  }
+
+  // If manual seeding is active, render the Manual Seeding Manager
+  if (tournament.seedingMethod === 'MANUAL') {
+    if (isObsMode) {
+      return (
+        <div className="obs-mode-canvas" style={{ width: '100%', minHeight: '100vh', background: 'transparent', padding: '2rem 1.5rem', boxSizing: 'border-box' }}>
+          <div style={{ maxWidth: '1200px', width: '100%', margin: '0 auto' }}>
+            <ManualSeedingManager tournament={tournament} canManage={false} isObsMode={true} />
+          </div>
+        </div>
+      );
+    }
+
+    if (isManageRoute) {
+      return (
+        <TournamentLayout tournament={tournament} activeView="leaderboard">
+          <main style={{ flex: 1, padding: '2rem 1.5rem', maxWidth: '1200px', width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
+            <ManualSeedingManager tournament={tournament} canManage={true} />
+          </main>
+        </TournamentLayout>
+      );
+    }
+
+    return (
+      <SpectatorLayout
+        tournament={tournament}
+        activeView="leaderboard"
+        onOpenShare={() => setIsShareModalOpen(true)}
+      >
+        <main style={{ flex: 1, padding: '2rem 1.5rem', maxWidth: '1200px', width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
+          <ManualSeedingManager tournament={tournament} canManage={false} />
+        </main>
+
+        <ShareBracketModal
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+          tournament={tournament}
+        />
+      </SpectatorLayout>
     );
   }
 

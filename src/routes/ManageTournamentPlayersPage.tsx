@@ -17,6 +17,7 @@ import {
   UserX,
   AlertTriangle,
   X,
+  Layers,
 } from 'lucide-react';
 
 export const ManageTournamentPlayersPage: React.FC = () => {
@@ -157,6 +158,18 @@ export const ManageTournamentPlayersPage: React.FC = () => {
               >
                 <DownloadCloud size={15} color="#38bdf8" />
                 Import All Available ({availableGlobalPlayers.length})
+              </button>
+            )}
+            {tournament.seedingMethod === 'MANUAL' && (
+              <button
+                type="button"
+                onClick={() => navigate(`/${tournament.slug}/manage/seeding`)}
+                className="btn btn-secondary"
+                style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', gap: '0.45rem' }}
+                title="Open Seeding Manager to arrange seeds and tier cutoffs"
+              >
+                <Layers size={15} color="var(--color-brand)" />
+                Arrange Seeds & Brackets
               </button>
             )}
             <button

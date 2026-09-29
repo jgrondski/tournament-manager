@@ -157,6 +157,8 @@ export interface PlayerProfile {
   isDisqualified?: boolean;
 }
 
+export type SeedingMethod = 'QUALIFIERS' | 'MANUAL';
+
 export interface Tournament {
   id: string;
   organizationId: string; // required association to parent Organization
@@ -164,6 +166,8 @@ export interface Tournament {
   name: string; // e.g. 'KC Regional 2026 Open'
   date: string;
   location: string;
+  seedingMethod?: SeedingMethod; // default 'QUALIFIERS'
+  manualSeeds?: string[]; // ordered array of playerIds: index 0 = Seed 1, index 1 = Seed 2, etc.
   qualFormat: QualFormat;
   qualAverageCount?: number; // target count X for AVERAGE_OF_X
   pointsConfig?: PointsThreshold[]; // array of { minScore, points } for POINTS

@@ -270,7 +270,7 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
               title="Click to Lock Brackets and Begin Formal Match Play"
             >
               <AlertTriangle size={12} />
-              <span>QUALIFIERS MODE</span>
+              <span>{tournament.seedingMethod === 'MANUAL' ? 'SEEDING MODE' : 'QUALIFIERS MODE'}</span>
               <span style={{ fontSize: '0.65rem', opacity: 0.85, textDecoration: 'underline' }}>(Click to Lock)</span>
             </button>
           ) : (
@@ -631,7 +631,7 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
               fontWeight: activeView === 'leaderboard' ? 700 : 500,
             }}
           >
-            🏆 Qualifiers
+            {tournament.seedingMethod === 'MANUAL' ? '✍️ Seeding' : '🏆 Qualifiers'}
           </Link>
 
           <Link

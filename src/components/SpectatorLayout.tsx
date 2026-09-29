@@ -49,7 +49,7 @@ export const SpectatorLayout: React.FC<SpectatorLayoutProps> = ({
     },
     {
       id: 'leaderboard' as const,
-      label: 'Qualifiers',
+      label: tournament.seedingMethod === 'MANUAL' ? 'Seeding' : 'Qualifiers',
       icon: BarChart3,
       to: `/${tournament.slug}/leaderboard`,
     },
