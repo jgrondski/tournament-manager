@@ -1,4 +1,6 @@
 import React from 'react';
+import * as Flags from 'country-flag-icons/react/3x2';
+import { hasFlag } from 'country-flag-icons';
 
 /**
  * Standard list of countries with 2-letter ISO codes and names.
@@ -61,23 +63,32 @@ COUNTRIES.forEach((c) => {
 });
 
 /**
- * Converts a 2-letter ISO country code or country name to a Unicode flag emoji.
- * e.g., 'US' -> 🇺🇸, 'JP' -> 🇯🇵
+ * Resolves a 2-letter ISO country code from a code or name.
  */
-export function getCountryFlag(country?: string): string {
+export function getCountryCode(country?: string): string {
   if (!country) return '';
-  const trimmed = country.trim();
+  const trimmed = country.trim().toUpperCase();
   if (!trimmed) return '';
 
-  let code = trimmed.toUpperCase();
-  if (code.length !== 2) {
-    const matched = countryMap.get(code);
-    if (matched) {
-      code = matched;
-    } else {
-      return '';
-    }
+  if (trimmed.length === 2 && hasFlag(trimmed)) {
+    return trimmed;
   }
+
+  const matched = countryMap.get(trimmed);
+  if (matched) return matched;
+
+  if (trimmed.length === 2) return trimmed;
+  return '';
+}
+
+/**
+ * Converts a 2-letter ISO country code or country name to a Unicode flag emoji.
+ * e.g., 'US' -> 🇺🇸, 'JP' -> 🇯🇵
+ * Retained for backward-compatibility and text contexts.
+ */
+export function getCountryFlag(country?: string): string {
+  const code = getCountryCode(country);
+  if (!code || code.length !== 2) return '';
 
   // Unicode Regional Indicator Symbols (A = 0x1F1E6 = 127462)
   // 'A'.charCodeAt(0) is 65. 127462 - 65 = 127397
@@ -94,18 +105,39 @@ export function getCountryName(country?: string): string {
   const found = COUNTRIES.find(
     (c) => c.code.toUpperCase() === trimmed || c.name.toUpperCase() === trimmed
   );
-  return found ? found.name : country;
+  if (found) return found.name;
+
+  if (trimmed.length === 2) {
+    try {
+      const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
+      const resolved = regionNames.of(trimmed);
+      if (resolved) return resolved;
+    } catch {
+      // Ignore and fallback
+    }
+  }
+
+  return country;
 }
 
 /**
- * Reusable CountryFlag component
+ * Reusable CountryFlag component rendering crisp vector SVGs across all operating systems.
  */
-interface CountryFlagProps {
+export interface CountryFlagProps {
   country?: string;
   showName?: boolean;
   className?: string;
   style?: React.CSSProperties;
 }
+
+const flagComponentMap = Flags as unknown as Record<
+  string,
+  React.ComponentType<{
+    title?: string;
+    style?: React.CSSProperties;
+    className?: string;
+  }>
+>;
 
 export const CountryFlag: React.FC<CountryFlagProps> = ({
   country,
@@ -113,8 +145,30 @@ export const CountryFlag: React.FC<CountryFlagProps> = ({
   className,
   style,
 }) => {
-  const flag = getCountryFlag(country);
-  if (!flag) return null;
+  const code = getCountryCode(country);
+  const name = getCountryName(country);
+
+  if (!code && !country) return null;
+
+  const FlagComponent = code && hasFlag(code) ? flagComponentMap[code] : null;
+
+  const flagNode = FlagComponent ? (
+    React.createElement(FlagComponent, {
+      title: name,
+      style: {
+        width: '1.2em',
+        height: '0.8em',
+        borderRadius: '2px',
+        boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.15)',
+        display: 'inline-block',
+        flexShrink: 0,
+        verticalAlign: 'middle',
+      },
+    })
+  ) : (
+    // Fallback to unicode emoji if specific SVG flag not found
+    React.createElement('span', { style: { fontSize: '1.05em' } }, getCountryFlag(country))
+  );
 
   return React.createElement(
     'span',
@@ -123,16 +177,16 @@ export const CountryFlag: React.FC<CountryFlagProps> = ({
       style: {
         display: 'inline-flex',
         alignItems: 'center',
-        gap: '0.3rem',
+        gap: '0.35rem',
         fontSize: '1em',
         lineHeight: 1,
         verticalAlign: 'middle',
         userSelect: 'none',
         ...style,
       },
-      title: getCountryName(country),
+      title: name,
     },
-    React.createElement('span', { style: { fontSize: '1.05em' } }, flag),
-    showName ? React.createElement('span', null, getCountryName(country)) : null
+    flagNode,
+    showName ? React.createElement('span', null, name) : null
   );
 };
