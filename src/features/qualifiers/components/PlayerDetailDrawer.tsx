@@ -22,7 +22,7 @@ import {
   getAlternateShade,
   getContrastingTextColor,
 } from '../../bracket/colorUtils';
-import { CountryFlag } from '../../players/flagUtils';
+import { PlayerAvatar } from '../../players/components/PlayerAvatar';
 import { PlaystyleChip } from '../../players/components/PlaystyleChip';
 
 export interface PlayerDetailDrawerProps {
@@ -421,8 +421,8 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
                   fontSize: '1.25rem',
                 }}
               >
-                {player.country ? (
-                  <CountryFlag country={player.country} />
+                {player.country || player.avatarUrl ? (
+                  <PlayerAvatar player={player} country={player.country} />
                 ) : (
                   <span style={{ fontSize: '1rem', fontWeight: 800, color: primaryColor }}>
                     {player.name.slice(0, 2).toUpperCase()}
@@ -1026,7 +1026,7 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.45rem' }}>
                           <div style={{ fontSize: '0.88rem', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                             <span style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem', fontWeight: 600 }}>vs</span>
-                            <CountryFlag country={m.opponentCountry} />
+                            <PlayerAvatar country={m.opponentCountry} />
                             <strong style={{ color: '#ffffff', fontSize: '0.95rem' }}>{m.opponentName}</strong>
                             {m.opponentSeed && (
                               <span

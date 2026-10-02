@@ -4,7 +4,7 @@ import { Tournament, TournamentTier } from '../../../tournament/types';
 import { BracketMatch, isMatchPlayable } from '../../types';
 import { SheetSizeTokens, getMatchStatus } from '../../sheetUtils';
 import { colorWithAlpha, getAlternateShade } from '../../colorUtils';
-import { CountryFlag } from '../../../players/flagUtils';
+import { PlayerAvatar } from '../../../players/components/PlayerAvatar';
 
 interface SheetMatchRowProps {
   match: BracketMatch;
@@ -216,7 +216,7 @@ export const SheetMatchRow: React.FC<SheetMatchRowProps> = ({
             title={p1?.id ? "View competitor tournament profile" : undefined}
           >
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', width: `${sizeTokens.countrySeedWidth}px`, flexShrink: 0 }}>
-              {p1?.country && <CountryFlag country={p1.country} style={{ fontSize: sizeTokens.flagSize, lineHeight: 1 }} />}
+              {(p1?.country || (p1 as any)?.avatarUrl) && <PlayerAvatar player={p1 as any} country={p1?.country} style={{ fontSize: sizeTokens.flagSize, lineHeight: 1 }} />}
               {p1?.seed && (
                 <span
                   style={{
@@ -497,7 +497,7 @@ export const SheetMatchRow: React.FC<SheetMatchRowProps> = ({
             title={p2?.id ? "View competitor tournament profile" : undefined}
           >
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', width: `${sizeTokens.countrySeedWidth}px`, flexShrink: 0 }}>
-              {p2?.country && <CountryFlag country={p2.country} style={{ fontSize: sizeTokens.flagSize, lineHeight: 1 }} />}
+              {(p2?.country || (p2 as any)?.avatarUrl) && <PlayerAvatar player={p2 as any} country={p2?.country} style={{ fontSize: sizeTokens.flagSize, lineHeight: 1 }} />}
               {p2?.seed && (
                 <span
                   style={{

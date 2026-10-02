@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { Tournament, PlayerProfile } from '../../types';
 import { useTournament } from '../../store';
-import { CountryFlag } from '../../../players/flagUtils';
+import { PlayerAvatar } from '../../../players/components/PlayerAvatar';
 import { PlaystyleChip } from '../../../players/components/PlaystyleChip';
 
 interface DualListSeedingModalProps {
@@ -571,7 +571,7 @@ export const DualListSeedingModal: React.FC<DualListSeedingModalProps> = ({
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
-                          {player.country && <CountryFlag country={player.country} />}
+                          <PlayerAvatar player={player} />
                           {player.playstyle && <PlaystyleChip style={player.playstyle} />}
                         </div>
                       </div>
@@ -879,7 +879,7 @@ export const DualListSeedingModal: React.FC<DualListSeedingModalProps> = ({
                           </div>
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
-                            {item.country && <CountryFlag country={item.country} />}
+                            <PlayerAvatar player={item} />
                             {item.playstyle && <PlaystyleChip style={item.playstyle} />}
                           </div>
                         </div>

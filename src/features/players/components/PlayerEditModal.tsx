@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { PlayerProfile, Playstyle } from '../../tournament/types';
-import { User, X, AlertTriangle, Check } from 'lucide-react';
-import { COUNTRIES, CountryFlag } from '../flagUtils';
+import React, { useState, useEffect, useRef } from 'react';
+import { PlayerProfile, Playstyle, AvatarType } from '../../tournament/types';
+import { User, Check, X, AlertTriangle, Upload } from 'lucide-react';
+import { COUNTRIES } from '../flagUtils';
+import { PlayerAvatar } from './PlayerAvatar';
 import { PlaystyleChip } from './PlaystyleChip';
+import { processAvatarImage } from '../../../utils/image';
+import { generatePresignedAvatarUrls } from '../../../api/uploads';
 
 interface PlayerEditModalProps {
   isOpen: boolean;
@@ -23,16 +26,23 @@ export const PlayerEditModal: React.FC<PlayerEditModalProps> = ({
 }) => {
   const [name, setName] = useState('');
   const [country, setCountry] = useState('');
+  const [avatarType, setAvatarType] = useState<AvatarType>('flag');
+  const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
+  const [avatarThumbnailUrl, setAvatarThumbnailUrl] = useState<string | undefined>(undefined);
   const [personalBest, setPersonalBest] = useState<string>('1000000');
   const [playstyle, setPlaystyle] = useState<Playstyle>('Rolling');
   const [notes, setNotes] = useState('');
   const [isDisqualified, setIsDisqualified] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (initialPlayer) {
       setName(initialPlayer.name);
       setCountry(initialPlayer.country || '');
+      setAvatarType(initialPlayer.avatarType || 'flag');
+      setAvatarUrl(initialPlayer.avatarUrl);
+      setAvatarThumbnailUrl(initialPlayer.avatarThumbnailUrl);
       setPersonalBest(String(initialPlayer.personalBest || 1000000));
       setPlaystyle(initialPlayer.playstyle || 'Rolling');
       setNotes(initialPlayer.notes || '');
@@ -41,6 +51,9 @@ export const PlayerEditModal: React.FC<PlayerEditModalProps> = ({
     } else {
       setName('');
       setCountry('US');
+      setAvatarType('flag');
+      setAvatarUrl(undefined);
+      setAvatarThumbnailUrl(undefined);
       setPersonalBest('1000000');
       setPlaystyle('Rolling');
       setNotes('');
@@ -48,6 +61,7 @@ export const PlayerEditModal: React.FC<PlayerEditModalProps> = ({
       setError(null);
     }
   }, [initialPlayer, isOpen]);
+
 
   if (!isOpen) return null;
 
@@ -74,6 +88,9 @@ export const PlayerEditModal: React.FC<PlayerEditModalProps> = ({
     onSave({
       name: trimmedName,
       country: country.trim().toUpperCase() || undefined,
+      avatarType,
+      avatarUrl: avatarType === 'custom' ? avatarUrl : undefined,
+      avatarThumbnailUrl: avatarType === 'custom' ? avatarThumbnailUrl : undefined,
       personalBest: pbNum,
       playstyle,
       notes: notes.trim() || undefined,
@@ -215,7 +232,7 @@ export const PlayerEditModal: React.FC<PlayerEditModalProps> = ({
               <div>
                 <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '0.35rem' }}>
                   <span>Country</span>
-                  {country && <CountryFlag country={country} />}
+                  <PlayerAvatar player={{ name, country, avatarType, avatarUrl }} country={country} />
                 </label>
                 <input
                   type="text"
@@ -242,6 +259,102 @@ export const PlayerEditModal: React.FC<PlayerEditModalProps> = ({
                     </option>
                   ))}
                 </datalist>
+              </div>
+            </div>
+
+            {/* Avatar Section */}
+            <div
+              style={{
+                padding: '0.75rem 1rem',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--color-border)',
+                background: 'rgba(255, 255, 255, 0.02)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '1rem',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <PlayerAvatar player={{ name, country, avatarType, avatarUrl }} size={36} />
+                <div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                    Avatar Display
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                    {avatarType === 'custom' && avatarUrl ? 'Custom uploaded avatar' : 'Flag badge (default)'}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  style={{ display: 'none' }}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      const res = await processAvatarImage(file);
+                      const urls = generatePresignedAvatarUrls(initialPlayer?.id || crypto.randomUUID());
+                      try {
+                        await fetch(urls.avatarUploadUrl, { method: 'PUT', body: res.avatarBlob });
+                        await fetch(urls.thumbnailUploadUrl, { method: 'PUT', body: res.thumbnailBlob });
+                      } catch {
+                        // ignore local dev network upload error
+                      }
+                      setAvatarUrl(urls.avatarPublicUrl);
+                      setAvatarThumbnailUrl(urls.thumbnailPublicUrl);
+                      setAvatarType('custom');
+                    } catch {
+                      setError('Failed to process avatar image');
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    padding: '0.4rem 0.75rem',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--color-border)',
+                    background: avatarType === 'custom' ? 'var(--color-primary-dark, #3b82f6)' : 'var(--color-bg-base)',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                  }}
+                >
+                  <Upload size={14} />
+                  <span>{avatarUrl ? 'Change Photo' : 'Upload Photo'}</span>
+                </button>
+
+                {avatarType === 'custom' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAvatarType('flag');
+                      setAvatarUrl(undefined);
+                      setAvatarThumbnailUrl(undefined);
+                    }}
+                    style={{
+                      padding: '0.4rem 0.6rem',
+                      fontSize: '0.75rem',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--color-border)',
+                      background: 'transparent',
+                      color: 'var(--color-text-muted)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Reset to Flag
+                  </button>
+                )}
               </div>
             </div>
 

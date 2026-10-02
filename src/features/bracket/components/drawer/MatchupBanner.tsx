@@ -1,6 +1,6 @@
 import React from 'react';
 import { SeededPlayer } from '../../types';
-import { CountryFlag } from '../../../players/flagUtils';
+import { PlayerAvatar } from '../../../players/components/PlayerAvatar';
 import { BestOfSelect } from '../BestOfSelect';
 import { colorWithAlpha } from '../../colorUtils';
 
@@ -82,8 +82,8 @@ export const MatchupBanner: React.FC<MatchupBannerProps> = ({
             transition: 'all 0.2s ease',
           }}
         >
-          {p1?.country ? (
-            <CountryFlag country={p1.country} />
+          {p1?.country || (p1 as any)?.avatarUrl ? (
+            <PlayerAvatar player={p1 as any} country={p1?.country} />
           ) : (
             <span style={{ fontSize: '0.85rem', fontWeight: 800, color: primaryColor }}>
               {p1Name.slice(0, 2).toUpperCase()}
@@ -234,8 +234,8 @@ export const MatchupBanner: React.FC<MatchupBannerProps> = ({
             transition: 'all 0.2s ease',
           }}
         >
-          {p2?.country ? (
-            <CountryFlag country={p2.country} />
+          {p2?.country || (p2 as any)?.avatarUrl ? (
+            <PlayerAvatar player={p2 as any} country={p2?.country} />
           ) : (
             <span style={{ fontSize: '0.85rem', fontWeight: 800, color: primaryColor }}>
               {p2Name.slice(0, 2).toUpperCase()}

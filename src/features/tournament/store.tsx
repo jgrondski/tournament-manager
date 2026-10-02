@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import {
   Tournament,
   TournamentTier,
@@ -121,14 +121,7 @@ interface TournamentContextType {
   batchAddManualSeeds: (tournamentId: string, playerIds: string[], position: 'TOP' | 'BOTTOM') => void;
 }
 
-import {
-  loadStoredTournaments,
-  loadStoredGlobalPlayers,
-  loadStoredActiveTournamentId,
-  saveStoredTournaments,
-  saveStoredGlobalPlayers,
-  saveStoredActiveTournamentId,
-} from './store/tournamentStorage';
+import { assertDatabaseConfig } from '../../db';
 
 /**
  * Shifts clusters of selected seeds UP or DOWN.
@@ -227,14 +220,10 @@ export function jumpSeedsBunched(
 const TournamentContext = createContext<TournamentContextType | null>(null);
 
 export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [tournaments, setTournaments] = useState<Tournament[]>(loadStoredTournaments);
-  const [globalPlayers, setGlobalPlayers] = useState<PlayerProfile[]>(loadStoredGlobalPlayers);
-  const [activeTournamentId, setActiveTournamentIdState] = useState<string | null>(loadStoredActiveTournamentId);
-
-  const setActiveTournamentId = (id: string | null) => {
-    setActiveTournamentIdState(id);
-    saveStoredActiveTournamentId(id);
-  };
+  assertDatabaseConfig();
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [globalPlayers, setGlobalPlayers] = useState<PlayerProfile[]>([]);
+  const [activeTournamentId, setActiveTournamentId] = useState<string | null>(null);
 
   const activeTournament = tournaments.find(
     t => t.id === activeTournamentId || t.slug === activeTournamentId
@@ -246,14 +235,6 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
     });
   }
-
-  useEffect(() => {
-    saveStoredTournaments(tournaments);
-  }, [tournaments]);
-
-  useEffect(() => {
-    saveStoredGlobalPlayers(globalPlayers);
-  }, [globalPlayers]);
 
   const getTournamentBySlug = (slug: string) => {
     const t = tournaments.find(t => t.slug === slug || t.id === slug);

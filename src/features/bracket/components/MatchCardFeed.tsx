@@ -11,7 +11,7 @@ import {
 } from '../colorUtils';
 import { Clock, CheckCircle2, ChevronRight, Lock, Search } from 'lucide-react';
 import { PlayerDetailDrawer } from '../../qualifiers/components/PlayerDetailDrawer';
-import { CountryFlag } from '../../players/flagUtils';
+import { PlayerAvatar } from '../../players/components/PlayerAvatar';
 import { getInheritedRoundBestOf } from './OrganizerSheetMatrix';
 
 interface MatchCardFeedProps {
@@ -607,8 +607,8 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({
                       }}
                       title={p1?.id ? "View competitor tournament profile" : undefined}
                     >
-                      {p1?.country && (
-                        <CountryFlag country={p1.country} style={{ opacity: isComplete && p2Won ? 0.45 : 1 }} />
+                      {(p1?.country || (p1 as any)?.avatarUrl) && (
+                        <PlayerAvatar player={p1 as any} country={p1?.country} style={{ opacity: isComplete && p2Won ? 0.45 : 1 }} />
                       )}
                       {p1?.seed && (
                         <span
@@ -736,8 +736,8 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({
                       }}
                       title={p2?.id ? "View competitor tournament profile" : undefined}
                     >
-                      {p2?.country && (
-                        <CountryFlag country={p2.country} style={{ opacity: isComplete && p1Won ? 0.45 : 1 }} />
+                      {(p2?.country || (p2 as any)?.avatarUrl) && (
+                        <PlayerAvatar player={p2 as any} country={p2?.country} style={{ opacity: isComplete && p1Won ? 0.45 : 1 }} />
                       )}
                       {p2?.seed && (
                         <span

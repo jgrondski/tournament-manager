@@ -20,7 +20,7 @@ import { Tournament } from '../../types';
 import { useTournament } from '../../store';
 import { BulkSeedImportModal } from './BulkSeedImportModal';
 import { DualListSeedingModal } from './DualListSeedingModal';
-import { CountryFlag } from '../../../players/flagUtils';
+import { PlayerAvatar } from '../../../players/components/PlayerAvatar';
 import { PlaystyleChip } from '../../../players/components/PlaystyleChip';
 
 interface ManualSeedingManagerProps {
@@ -1109,13 +1109,9 @@ export const ManualSeedingManager: React.FC<ManualSeedingManagerProps> = ({
                         </span>
                       </div>
 
-                      {/* Flag (to the left of player name) */}
+                      {/* Flag / Avatar (to the left of player name) */}
                       <div style={{ width: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        {item.country ? (
-                          <CountryFlag country={item.country} />
-                        ) : (
-                          <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>—</span>
-                        )}
+                        <PlayerAvatar player={item} />
                       </div>
 
                       {/* Competitor Name */}

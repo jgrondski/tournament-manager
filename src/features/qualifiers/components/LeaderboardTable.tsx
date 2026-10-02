@@ -5,7 +5,7 @@ import { QualifierEntryModal } from './QualifierEntryModal';
 import { PlayerDetailDrawer } from './PlayerDetailDrawer';
 import { TournamentPageHeader } from '../../../components/TournamentPageHeader';
 import { Plus, Sparkles, ChevronRight, Check } from 'lucide-react';
-import { CountryFlag } from '../../players/flagUtils';
+import { PlayerAvatar } from '../../players/components/PlayerAvatar';
 import { PlaystyleChip } from '../../players/components/PlaystyleChip';
 import { getContrastingTextColor, getAlternateShade } from '../../bracket/colorUtils';
 
@@ -222,7 +222,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                       {/* Player Info */}
                       <td style={tdStyle}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                          <CountryFlag country={row.player.country} />
+                          <PlayerAvatar player={row.player} />
                           <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
                             {row.player.name}
                           </span>

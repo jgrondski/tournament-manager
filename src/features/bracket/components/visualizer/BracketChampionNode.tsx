@@ -3,7 +3,7 @@ import { Trophy } from 'lucide-react';
 import { SeededPlayer } from '../../types';
 import { PlayerProfile } from '../../../tournament/types';
 import { getContrastingTextColor } from '../../colorUtils';
-import { CountryFlag } from '../../../players/flagUtils';
+import { PlayerAvatar } from '../../../players/components/PlayerAvatar';
 
 interface BracketChampionNodeProps {
   championPosition: { x: number; y: number; width: number; height: number };
@@ -113,8 +113,8 @@ export const BracketChampionNode: React.FC<BracketChampionNodeProps> = ({
           }}
           title={targetChampPlayer?.id ? 'View champion profile' : undefined}
         >
-          {champProfile?.country && (
-            <CountryFlag country={champProfile.country} style={{ fontSize: '1.25rem' }} />
+          {(champProfile?.country || champProfile?.avatarUrl) && (
+            <PlayerAvatar player={champProfile} country={champProfile?.country} style={{ fontSize: '1.25rem' }} />
           )}
           <span>{targetChampPlayer ? targetChampPlayer.name : 'TBD'}</span>
         </div>

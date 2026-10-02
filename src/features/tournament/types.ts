@@ -147,15 +147,21 @@ export interface QualifierScore {
   personalBest?: number;
 }
 
+export type AvatarType = 'flag' | 'custom';
+
 export interface PlayerProfile {
   id: string;
   name: string;
   country?: string;
+  avatarType?: AvatarType;
+  avatarUrl?: string;
+  avatarThumbnailUrl?: string;
   personalBest: number;
   playstyle: Playstyle;
   notes?: string;
   isDisqualified?: boolean;
 }
+
 
 export type SeedingMethod = 'QUALIFIERS' | 'MANUAL';
 

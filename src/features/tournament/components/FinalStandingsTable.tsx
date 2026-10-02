@@ -4,7 +4,7 @@ import { Tournament, TournamentTier, PlayerProfile, Playstyle } from '../types';
 import { calculateGlobalStandings, GlobalStandingRow } from '../standings';
 import { colorWithAlpha, getContrastingTextColor, getAlternateShade } from '../../bracket/colorUtils';
 import { PlayerDetailDrawer } from '../../qualifiers/components/PlayerDetailDrawer';
-import { CountryFlag } from '../../players/flagUtils';
+import { PlayerAvatar } from '../../players/components/PlayerAvatar';
 import { PlaystyleChip } from '../../players/components/PlaystyleChip';
 import { TournamentPageHeader } from '../../../components/TournamentPageHeader';
 import {
@@ -564,7 +564,7 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
                         {/* 2. Competitor Info */}
                         <td style={tdStyle}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
-                            <CountryFlag country={row.player.country} style={{ fontSize: '1.25rem', lineHeight: 1 }} />
+                            <PlayerAvatar player={row.player} style={{ fontSize: '1.25rem', lineHeight: 1 }} />
                             <button
                               type="button"
                               onClick={() => handlePlayerClick(row.player.id, row.player.name, row.player.country, row.player.playstyle)}

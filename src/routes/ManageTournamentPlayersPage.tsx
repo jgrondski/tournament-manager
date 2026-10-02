@@ -6,7 +6,7 @@ import { TournamentLayout } from '../components/TournamentLayout';
 import { ImportFromGlobalModal } from '../features/players/components/ImportFromGlobalModal';
 import { PlayerEditModal } from '../features/players/components/PlayerEditModal';
 import { PlayerDetailDrawer } from '../features/qualifiers/components/PlayerDetailDrawer';
-import { CountryFlag } from '../features/players/flagUtils';
+import { PlayerAvatar } from '../features/players/components/PlayerAvatar';
 import { PlaystyleChip } from '../features/players/components/PlaystyleChip';
 import {
   Users,
@@ -348,7 +348,7 @@ export const ManageTournamentPlayersPage: React.FC = () => {
                         </td>
                         <td style={{ padding: '0.75rem 1rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                            <CountryFlag country={player.country} />
+                            <PlayerAvatar player={player} />
                             <button
                               type="button"
                               onClick={() => {
@@ -383,7 +383,7 @@ export const ManageTournamentPlayersPage: React.FC = () => {
                         <td style={{ padding: '0.75rem 1rem' }}>
                           {player.country ? (
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.15rem 0.45rem', borderRadius: 'var(--radius-sm)', background: 'var(--color-bg-surface-highlight)', fontSize: '0.75rem', fontWeight: 700 }}>
-                              <CountryFlag country={player.country} />
+                              <PlayerAvatar player={player} country={player.country} />
                               <span>{player.country}</span>
                             </span>
                           ) : '—'}

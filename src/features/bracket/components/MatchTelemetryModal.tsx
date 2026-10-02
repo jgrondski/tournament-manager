@@ -7,7 +7,7 @@ import {
   getContrastingTextColor,
   getAlternateShade,
 } from '../colorUtils';
-import { CountryFlag } from '../../players/flagUtils';
+import { PlayerAvatar } from '../../players/components/PlayerAvatar';
 import {
   X,
   Trophy,
@@ -306,8 +306,8 @@ export const MatchTelemetryModal: React.FC<MatchTelemetryModalProps> = ({
                   transition: 'all 0.2s ease',
                 }}
               >
-                {p1?.country ? (
-                  <CountryFlag country={p1.country} />
+                {p1?.country || (p1 as any)?.avatarUrl ? (
+                  <PlayerAvatar player={p1 as any} country={p1?.country} />
                 ) : (
                   <span style={{ fontSize: '0.9rem', fontWeight: 800, color: primaryColor }}>
                     {(p1?.name || 'TBD').slice(0, 2).toUpperCase()}
@@ -477,8 +477,8 @@ export const MatchTelemetryModal: React.FC<MatchTelemetryModalProps> = ({
                   transition: 'all 0.2s ease',
                 }}
               >
-                {p2?.country ? (
-                  <CountryFlag country={p2.country} />
+                {p2?.country || (p2 as any)?.avatarUrl ? (
+                  <PlayerAvatar player={p2 as any} country={p2?.country} />
                 ) : (
                   <span style={{ fontSize: '0.9rem', fontWeight: 800, color: primaryColor }}>
                     {(p2?.name || 'TBD').slice(0, 2).toUpperCase()}

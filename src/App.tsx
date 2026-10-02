@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { TournamentProvider } from './features/tournament/store';
 import { OrganizationProvider } from './features/organizations/store';
@@ -15,8 +15,79 @@ import { FinalStandingsPage } from './routes/FinalStandingsPage';
 import { SlugRedirectPage } from './routes/SlugRedirectPage';
 import { PlayerDirectoryPage } from './routes/PlayerDirectoryPage';
 import { OBSHubPage } from './routes/OBSHubPage';
+import { assertDatabaseConfig } from './db';
+import { Database, AlertTriangle } from 'lucide-react';
 
 export const App: React.FC = () => {
+  const [configError, setConfigError] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      assertDatabaseConfig();
+    } catch (err) {
+      setConfigError(err instanceof Error ? err.message : 'Database configuration error');
+    }
+  }, []);
+
+  if (configError) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'var(--color-bg-base, #0d1117)',
+          color: 'var(--color-text-primary, #ffffff)',
+          padding: '2rem',
+          fontFamily: 'Inter, system-ui, sans-serif',
+        }}
+      >
+        <div
+          style={{
+            maxWidth: '560px',
+            background: 'var(--color-bg-surface, #161b22)',
+            border: '1px solid rgba(239, 68, 68, 0.4)',
+            borderRadius: '12px',
+            padding: '2rem',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem', color: '#f87171' }}>
+            <AlertTriangle size={28} />
+            <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>Database Configuration Missing</h2>
+          </div>
+          <p style={{ color: 'var(--color-text-secondary, #8b949e)', fontSize: '0.95rem', lineHeight: 1.5, marginBottom: '1.5rem' }}>
+            {configError}
+          </p>
+          <div
+            style={{
+              background: '#0d1117',
+              border: '1px solid #30363d',
+              borderRadius: '8px',
+              padding: '1rem',
+              fontFamily: 'monospace',
+              fontSize: '0.88rem',
+              color: '#58a6ff',
+              marginBottom: '1.5rem',
+            }}
+          >
+            <div># 1. Copy environment template:</div>
+            <div style={{ color: '#e6edf3', marginBottom: '0.75rem' }}>cp .env.example .env</div>
+            <div># 2. Start PostgreSQL container:</div>
+            <div style={{ color: '#e6edf3', marginBottom: '0.75rem' }}>npm run db:up</div>
+            <div># 3. Push schema:</div>
+            <div style={{ color: '#e6edf3' }}>npm run db:push</div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#8b949e', fontSize: '0.82rem' }}>
+            <Database size={16} />
+            <span>PostgreSQL via Drizzle ORM is required for all application state.</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <OrganizationProvider>
       <TournamentProvider>
@@ -32,45 +103,45 @@ export const App: React.FC = () => {
             {/* Global Player Directory */}
             <Route path="/players" element={<PlayerDirectoryPage />} />
 
-          {/* Tournament Shortlinks & Cutoffs */}
-          <Route path="/:slug" element={<SlugRedirectPage />} />
-          <Route path="/:slug/leaderboard" element={<PublicLeaderboardPage />} />
-          <Route path="/:slug/quals" element={<Navigate to="../leaderboard" relative="path" replace />} />
-          <Route path="/:slug/standings" element={<FinalStandingsPage />} />
+            {/* Tournament Shortlinks & Cutoffs */}
+            <Route path="/:slug" element={<SlugRedirectPage />} />
+            <Route path="/:slug/leaderboard" element={<PublicLeaderboardPage />} />
+            <Route path="/:slug/quals" element={<Navigate to="../leaderboard" relative="path" replace />} />
+            <Route path="/:slug/standings" element={<FinalStandingsPage />} />
 
-          {/* OBS Broadcast Studio Hub */}
-          <Route path="/:slug/obs" element={<OBSHubPage />} />
+            {/* OBS Broadcast Studio Hub */}
+            <Route path="/:slug/obs" element={<OBSHubPage />} />
 
-          {/* Management Views */}
-          <Route path="/:slug/manage" element={<PublicTierBracketPage />} />
-          <Route path="/:slug/manage/bracket" element={<PublicTierBracketPage />} />
-          <Route path="/:slug/manage/bracket/:tierSlug" element={<PublicTierBracketPage />} />
-          <Route path="/:slug/manage/sheet" element={<ManageSheetPage />} />
-          <Route path="/:slug/manage/judge" element={<ManageJudgePage />} />
-          <Route path="/:slug/manage/qualifiers" element={<PublicLeaderboardPage />} />
-          <Route path="/:slug/manage/seeding" element={<PublicLeaderboardPage />} />
-          <Route path="/:slug/manage/standings" element={<FinalStandingsPage />} />
-          <Route path="/:slug/manage/players" element={<ManageTournamentPlayersPage />} />
-          <Route path="/:slug/manage/settings" element={<ManageTournamentSettingsPage />} />
+            {/* Management Views */}
+            <Route path="/:slug/manage" element={<PublicTierBracketPage />} />
+            <Route path="/:slug/manage/bracket" element={<PublicTierBracketPage />} />
+            <Route path="/:slug/manage/bracket/:tierSlug" element={<PublicTierBracketPage />} />
+            <Route path="/:slug/manage/sheet" element={<ManageSheetPage />} />
+            <Route path="/:slug/manage/judge" element={<ManageJudgePage />} />
+            <Route path="/:slug/manage/qualifiers" element={<PublicLeaderboardPage />} />
+            <Route path="/:slug/manage/seeding" element={<PublicLeaderboardPage />} />
+            <Route path="/:slug/manage/standings" element={<FinalStandingsPage />} />
+            <Route path="/:slug/manage/players" element={<ManageTournamentPlayersPage />} />
+            <Route path="/:slug/manage/settings" element={<ManageTournamentSettingsPage />} />
 
-          {/* Route Aliases for Direct Friendly URLs */}
-          <Route path="/:slug/view" element={<PublicTierBracketPage />} />
-          <Route path="/:slug/brackets" element={<PublicTierBracketPage />} />
-          <Route path="/:slug/bracket" element={<PublicTierBracketPage />} />
-          <Route path="/:slug/seeding" element={<PublicLeaderboardPage />} />
-          <Route path="/:slug/sheet" element={<ManageSheetPage />} />
-          <Route path="/:slug/judge" element={<ManageJudgePage />} />
-          <Route path="/:slug/players" element={<ManageTournamentPlayersPage />} />
-          <Route path="/:slug/settings" element={<ManageTournamentSettingsPage />} />
+            {/* Route Aliases for Direct Friendly URLs */}
+            <Route path="/:slug/view" element={<PublicTierBracketPage />} />
+            <Route path="/:slug/brackets" element={<PublicTierBracketPage />} />
+            <Route path="/:slug/bracket" element={<PublicTierBracketPage />} />
+            <Route path="/:slug/seeding" element={<PublicLeaderboardPage />} />
+            <Route path="/:slug/sheet" element={<ManageSheetPage />} />
+            <Route path="/:slug/judge" element={<ManageJudgePage />} />
+            <Route path="/:slug/players" element={<ManageTournamentPlayersPage />} />
+            <Route path="/:slug/settings" element={<ManageTournamentSettingsPage />} />
 
-          {/* Public Dynamic Tier Bracket (e.g. /kc-2026-open/gold, /kc-2026-open/silver, etc.) */}
-          <Route path="/:slug/:tierSlug" element={<PublicTierBracketPage />} />
+            {/* Public Dynamic Tier Bracket */}
+            <Route path="/:slug/:tierSlug" element={<PublicTierBracketPage />} />
 
-          {/* Fallback to Home */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </TournamentProvider>
-  </OrganizationProvider>
+            {/* Fallback to Home */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </TournamentProvider>
+    </OrganizationProvider>
   );
 };

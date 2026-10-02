@@ -1,0 +1,154 @@
+import { players } from '../db/schema';
+import { eq, sql } from 'drizzle-orm';
+import { getDb } from '../db';
+
+export interface PlayerRecord {
+  id: string;
+  name: string;
+  country: string | null;
+  avatarType: 'flag' | 'custom';
+  avatarUrl: string | null;
+  avatarThumbnailUrl: string | null;
+  personalBest: number;
+  playstyle: string | null;
+  notes: string | null;
+  isDisqualified: boolean;
+  createdAt: Date;
+}
+
+export async function createPlayer(data: {
+  name: string;
+  country?: string;
+  avatarType?: 'flag' | 'custom';
+  avatarUrl?: string;
+  avatarThumbnailUrl?: string;
+  personalBest?: number;
+  playstyle?: string;
+  notes?: string;
+}): Promise<PlayerRecord> {
+  const trimmed = data.name.trim();
+  if (!trimmed) throw new Error('Player name is required');
+  const lower = trimmed.toLowerCase();
+
+  const db = getDb();
+  const existing = await db
+    .select()
+    .from(players)
+    .where(sql`lower(trim(${players.name})) = ${lower}`)
+    .limit(1);
+  if (existing.length > 0) {
+    throw new Error(`Player with name "${trimmed}" already exists`);
+  }
+
+  const [created] = await db
+    .insert(players)
+    .values({
+      name: trimmed,
+      country: data.country || null,
+      avatarType: data.avatarType || 'flag',
+      avatarUrl: data.avatarUrl || null,
+      avatarThumbnailUrl: data.avatarThumbnailUrl || null,
+      personalBest: data.personalBest ?? 0,
+      playstyle: data.playstyle || null,
+      notes: data.notes || null,
+    })
+    .returning();
+  return created as PlayerRecord;
+}
+
+export async function listPlayers(): Promise<PlayerRecord[]> {
+  const db = getDb();
+  return (await db.select().from(players)) as PlayerRecord[];
+}
+
+export async function getPlayer(id: string): Promise<PlayerRecord | null> {
+  const db = getDb();
+  const res = await db.select().from(players).where(eq(players.id, id)).limit(1);
+  return (res[0] as PlayerRecord) || null;
+}
+
+export async function updatePlayer(
+  id: string,
+  updates: Partial<Omit<PlayerRecord, 'id' | 'createdAt'>>
+): Promise<PlayerRecord | null> {
+  const db = getDb();
+  const [updated] = await db
+    .update(players)
+    .set(updates)
+    .where(eq(players.id, id))
+    .returning();
+  return (updated as PlayerRecord) || null;
+}
+
+export async function deletePlayer(id: string): Promise<boolean> {
+  const db = getDb();
+  const res = await db.delete(players).where(eq(players.id, id)).returning();
+  return res.length > 0;
+}
+
+export interface CareerStats {
+  playerId: string;
+  matchesPlayed: number;
+  matchesWon: number;
+  matchesLost: number;
+  matchWinRate: number;
+  gamesPlayed: number;
+  gamesWon: number;
+  gamesLost: number;
+  gameWinRate: number;
+  averageScore: number;
+  highestScore: number;
+}
+
+export async function getPlayerCareerStats(
+  playerId: string,
+  seededMatches?: Array<{
+    player1Id: string | null;
+    player2Id: string | null;
+    winnerId: string | null;
+    games: Array<{ player1Score: number; player2Score: number; winnerId: string | null }>;
+  }>
+): Promise<CareerStats> {
+  let matchesPlayed = 0;
+  let matchesWon = 0;
+  let gamesPlayed = 0;
+  let gamesWon = 0;
+  let totalScore = 0;
+  let highestScore = 0;
+
+  if (seededMatches) {
+    for (const m of seededMatches) {
+      const isP1 = m.player1Id === playerId;
+      const isP2 = m.player2Id === playerId;
+      if (!isP1 && !isP2) continue;
+
+      matchesPlayed++;
+      if (m.winnerId === playerId) matchesWon++;
+
+      for (const g of m.games) {
+        gamesPlayed++;
+        const myScore = isP1 ? g.player1Score : g.player2Score;
+        totalScore += myScore;
+        if (myScore > highestScore) highestScore = myScore;
+        if (g.winnerId === playerId) gamesWon++;
+      }
+    }
+  }
+
+  const matchesLost = matchesPlayed - matchesWon;
+  const gamesLost = gamesPlayed - gamesWon;
+
+  return {
+    playerId,
+    matchesPlayed,
+    matchesWon,
+    matchesLost,
+    matchWinRate: matchesPlayed > 0 ? Number((matchesWon / matchesPlayed).toFixed(4)) : 0,
+    gamesPlayed,
+    gamesWon,
+    gamesLost,
+    gameWinRate: gamesPlayed > 0 ? Number((gamesWon / gamesPlayed).toFixed(4)) : 0,
+    averageScore: gamesPlayed > 0 ? Math.round(totalScore / gamesPlayed) : 0,
+    highestScore,
+  };
+}

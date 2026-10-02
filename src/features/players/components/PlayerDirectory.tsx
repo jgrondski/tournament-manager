@@ -4,7 +4,7 @@ import { useOrganization } from '../../organizations/store';
 import { PlayerProfile } from '../../tournament/types';
 import { GenerateFakePlayersModal } from './GenerateFakePlayersModal';
 import { PlayerEditModal } from './PlayerEditModal';
-import { CountryFlag } from '../flagUtils';
+import { PlayerAvatar } from './PlayerAvatar';
 import { PlaystyleChip } from './PlaystyleChip';
 import {
   Users,
@@ -620,7 +620,7 @@ export const PlayerDirectory: React.FC = () => {
                           </div>
                           <div>
                             <div style={{ fontWeight: 700, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                              <CountryFlag country={player.country} />
+                              <PlayerAvatar player={player} />
                               <span>{player.name}</span>
                             </div>
                             <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
@@ -647,7 +647,7 @@ export const PlayerDirectory: React.FC = () => {
                               border: '1px solid var(--color-border-subtle)',
                             }}
                           >
-                            <CountryFlag country={player.country} />
+                            <PlayerAvatar player={player} country={player.country} />
                             <span>{player.country}</span>
                           </span>
                         ) : (

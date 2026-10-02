@@ -6,7 +6,7 @@ import {
   isMatchPlayable,
 } from '../../types';
 import { Tournament, TournamentTier, PlayerProfile, GameScoreEntry } from '../../../tournament/types';
-import { CountryFlag } from '../../../players/flagUtils';
+import { PlayerAvatar } from '../../../players/components/PlayerAvatar';
 import {
   colorWithAlpha,
   getAlternateShade,
@@ -520,9 +520,10 @@ export const BracketMatchCard: React.FC<BracketMatchCardProps> = ({
                 </span>
               )}
 
-              {p1Profile?.country && (
-                <CountryFlag
-                  country={p1Profile.country}
+              {(p1Profile?.country || p1Profile?.avatarUrl) && (
+                <PlayerAvatar
+                  player={p1Profile}
+                  country={p1Profile?.country}
                   style={{
                     fontSize: flagFontSize,
                     lineHeight: 1,
@@ -710,9 +711,10 @@ export const BracketMatchCard: React.FC<BracketMatchCardProps> = ({
                 </span>
               )}
 
-              {p2Profile?.country && (
-                <CountryFlag
-                  country={p2Profile.country}
+              {(p2Profile?.country || p2Profile?.avatarUrl) && (
+                <PlayerAvatar
+                  player={p2Profile}
+                  country={p2Profile?.country}
                   style={{
                     fontSize: flagFontSize,
                     lineHeight: 1,
