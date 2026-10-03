@@ -6,7 +6,8 @@ import path from 'path';
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const databaseUrl = env.DATABASE_URL || process.env.DATABASE_URL || '';
+  const defaultDbUrl = 'postgresql://postgres:postgres@localhost:5432/tournament_manager';
+  const databaseUrl = env.DATABASE_URL || process.env.DATABASE_URL || defaultDbUrl;
 
   return {
     plugins: [react()],
