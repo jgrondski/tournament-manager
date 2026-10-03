@@ -121,7 +121,7 @@ interface TournamentContextType {
   batchAddManualSeeds: (tournamentId: string, playerIds: string[], position: 'TOP' | 'BOTTOM') => void;
 }
 
-import { assertDatabaseConfig } from '../../db';
+import { assertDatabaseConfig } from '../../db/config';
 
 /**
  * Shifts clusters of selected seeds UP or DOWN.

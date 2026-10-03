@@ -7,15 +7,8 @@ import * as schema from './schema';
 let pgPool: pg.Pool | null = null;
 let currentDbInstance: any = null;
 
-export function assertDatabaseConfig(): string {
-  const url = (typeof process !== 'undefined' ? process.env?.DATABASE_URL : '') || '';
-  if (!url) {
-    throw new Error(
-      'Configuration Error: DATABASE_URL is missing. Please copy .env.example to .env and run "npm run db:up".'
-    );
-  }
-  return url;
-}
+export { assertDatabaseConfig } from './config';
+import { assertDatabaseConfig } from './config';
 
 export function setDb(dbInstance: any) {
   currentDbInstance = dbInstance;

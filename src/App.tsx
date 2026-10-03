@@ -15,7 +15,7 @@ import { FinalStandingsPage } from './routes/FinalStandingsPage';
 import { SlugRedirectPage } from './routes/SlugRedirectPage';
 import { PlayerDirectoryPage } from './routes/PlayerDirectoryPage';
 import { OBSHubPage } from './routes/OBSHubPage';
-import { assertDatabaseConfig } from './db';
+import { assertDatabaseConfig } from './db/config';
 import { Database, AlertTriangle } from 'lucide-react';
 
 export const App: React.FC = () => {
