@@ -1,6 +1,6 @@
 export type BracketType = 'TRADITIONAL' | 'FLAT';
 export type EliminationType = 'SINGLE' | 'DOUBLE';
-export type BracketRouting = 'TRADITIONAL_TREE' | 'FLAT_STAGED' | 'ACCELERATED_HYBRID';
+export type BracketRouting = 'TRADITIONAL_TREE' | 'TRADITIONAL' | 'FLAT_STAGED' | 'ACCELERATED_HYBRID';
 export type BracketStage = 'WINNERS' | 'LOSERS' | 'GRAND_FINALS' | 'GRAND_FINALS_RESET';
 
 export interface SeededPlayer {

@@ -63,7 +63,8 @@ export async function importAuthenticPlayers() {
 }
 
 // Execute if run directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+const isDirectExecution = process.argv[1]?.replace(/\\/g, '/').endsWith('scripts/importPlayers.ts');
+if (isDirectExecution || import.meta.url === `file://${process.argv[1]}`) {
   importAuthenticPlayers()
     .then(() => process.exit(0))
     .catch(err => {

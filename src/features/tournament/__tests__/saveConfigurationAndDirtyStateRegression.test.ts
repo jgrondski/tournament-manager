@@ -1,8 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { Tournament, TournamentTier } from '../types';
 import { generateUUID } from '../store';
 import { getDefaultTierColors, TierThemeColors } from '../../bracket/colorUtils';
-import { generateTraditionalBracket, generateFlatBracket, generateDoubleEliminationBracket } from '../../bracket/math';
+import { generateTraditionalBracket, generateDoubleEliminationBracket } from '../../bracket/math';
 import { isUuid } from '../../../api/tournaments';
 
 describe('Save Configuration & Dirty State Regression (All Bracket Types)', () => {
@@ -29,7 +29,7 @@ describe('Save Configuration & Dirty State Regression (All Bracket Types)', () =
       bannerUrl: string;
       date: string;
       location: string;
-      seedingMethod: string;
+      seedingMethod?: string;
       qualFormat: string;
       qualAverageCount: number;
       pointsConfig: any[];

@@ -1,269 +1,233 @@
-# Phase 3 Implementation Plan: Unified In-Memory Pipeline & Refinements
+# Master Implementation Plan: Tournament Manager
 
-This implementation plan details the resumption and execution of **Phase 3** as specified in [Tetris Tournament Manager.md](../Tetris%20Tournament%20Manager.md).
-
-Phase 3 transitions the application to a polished in-memory tournament operations platform across 5 structured priorities:
-1. **Priority 1:** UI Rebranding, Ergonomics, Modal Guards & Mode Terminology
-2. **Priority 2:** Tournament Lifecycle & Data Simulation Controls
-3. **Priority 3:** Global Tournament Standings & Competitive Exit Tiebreakers
-4. **Priority 4:** Qualifiers Table Density & Competitor Detail Drawer
-5. **Priority 5:** Global Player Pool Directory (`classic_tetris_global_players`) & Tournament Roster
-
-To facilitate manual testing and focused reviews, the work is organized into **10 scoped, logical commits** (2 per priority).
+This document is the consolidated, single source of truth for the implementation of **Tournament Manager** as specified in [SPEC.md / Tetris Tournament Manager.md](../Tetris%20Tournament%20Manager.md). It tracks completed execution, out-of-scope capabilities added along the way, and the prioritized roadmap for all remaining work.
 
 ---
 
-## User Review & Decisions Incorporated
+## 1. Master Roadmap & Global Status (Phases 1–10)
 
-> [!NOTE]
-> The following explicit user design decisions are locked into the plan:
-> 1. **Rebranding:** Remove all references to "CTWC" across the entire UI in favor of **"Tournament Manager"** (generic Classic Tetris tournament manager, versatile for competitive gaming).
-> 2. **Global Player Storage:** Dedicated shared pool persisted under the key `classic_tetris_global_players` in LocalStorage.
-> 3. **Fresh Experience Flow:** On a brand-new experience with 0 tournaments, land on the home page with a prominent clean state and "+ Create New Tournament". Completing the modal and clicking **"Create & Configure"** navigates straight to `/:slug/manage/settings`, where the user sees the settings page with Phase 3 simulation and seeding buttons.
-> 4. **Tournament Deletion on Landing Page:** Option on the home switcher cards to delete tournaments if they have no qualifier data and no recorded match scores, guarded by a confirmation speedbump modal.
-> 5. **Destroying All Brackets in Settings:** Allow users to delete all brackets/tiers (even the final one), guarded by a confirmation speedbump modal for each tier deletion.
-
----
-
-## Proposed Scoped Commits & Execution Plan
-
-### Priority 1: UI Rebranding, Ergonomics, Modal Guards & Mode Terminology
-
-#### Commit 1.1: UI Rebranding, Mode Terminology, Modal Backdrop Guards & Match Lockdown [COMPLETE]
-* **Objective:** Rebrand UI to "Tournament Manager" (remove "CTWC"), replace "Draft"/"Verified" with "Qualifiers Mode"/"Match Play Mode", lock down match cards in Qualifiers Mode across all views, and disable backdrop dismissal on modals and drawers.
-* **Changes:**
-  * [index.html](../index.html): Update `<title>` from `Tetris Tournament Manager` to `Tournament Manager`.
-  * [TournamentSwitcherPage.tsx](../src/routes/TournamentSwitcherPage.tsx): Rebrand logo to `TOURNAMENT MANAGER` (remove CTWC).
-  * [TournamentNavbar.tsx](../src/components/TournamentNavbar.tsx): Rebrand logo to `TOURNAMENT MANAGER` (remove CTWC); update status badge from `DRAFT`/`VERIFIED` to `QUALIFIERS MODE`/`MATCH PLAY MODE`.
-  * [BracketDraftBanner.tsx](../src/features/bracket/components/BracketDraftBanner.tsx): Update banner text to *"QUALIFIERS MODE — Seeding preview active. Click 'Lock Brackets & Begin Match Play' to start matches."*
-  * [BracketVisualizer.tsx](../src/features/bracket/components/BracketVisualizer.tsx): Disable match node `onClick` and set `cursor: default` when in Qualifiers Mode (`!tournament.isVerified` / `!tournament.isLocked`).
-  * [OrganizerSheetMatrix.tsx](../src/features/bracket/components/OrganizerSheetMatrix.tsx) & [MatchCardFeed.tsx](../src/features/bracket/components/MatchCardFeed.tsx): Ensure consistent non-clickable match card styling during Qualifiers Mode.
-  * [MatchScoreDrawer.tsx](../src/features/bracket/components/MatchScoreDrawer.tsx): Remove backdrop click dismissal (`onClick={onClose}` on overlay removed; dismissal requires explicit Cancel, Save, or `X`).
-  * [QualifierEntryModal.tsx](../src/features/qualifiers/components/QualifierEntryModal.tsx): Remove backdrop click dismissal (`onClick={onClose}` on overlay removed).
-
-#### Commit 1.2: Admin Form Dirty Tracking, Navigation Guard & Dynamic Tier Colors [COMPLETE]
-* **Objective:** Add dirty state tracking to `TournamentAdminForm`, guard unsaved changes when navigating away from settings, guard qualifier submission inputs, speedbump confirmation modal for tier deletion (allowing deleting all tiers), and bind tier colors to visual bracket elements.
-* **Changes:**
-  * [TournamentAdminForm.tsx](../src/features/tournament/components/TournamentAdminForm.tsx):
-    * Track initial form state vs current state (`isDirty: boolean`).
-    * Disable "Save Configuration" button when `!isDirty`.
-    * Add unsaved changes confirmation modal ("Stay" vs "Discard & Leave").
-    * Remove `disabled={tiers.length <= 1}` on tier delete; add speedbump confirmation modal for deleting any bracket.
-    * Handle empty tier state cleanly (`tiers.length === 0`).
-    * Provide "Discard Changes" button to revert edits back to saved values.
-  * [TournamentSwitcherPage.tsx](../src/routes/TournamentSwitcherPage.tsx):
-    * Add delete tournament button with safety check (disabled if scores exist) and speedbump confirmation modal.
-  * [TournamentNavbar.tsx](../src/components/TournamentNavbar.tsx): Hook navigation through settings guard if dirty.
-  * [ManageTournamentSettingsPage.tsx](../src/routes/ManageTournamentSettingsPage.tsx): Intercept navigation if settings form is dirty and show unsaved changes confirmation modal.
-  * [QualifierEntryModal.tsx](../src/features/qualifiers/components/QualifierEntryModal.tsx): Guard submit button (`disabled={!isScoreValid}`) until player is selected and score is a non-empty integer `> 0`.
-  * [BracketVisualizer.tsx](../src/features/bracket/components/BracketVisualizer.tsx) & [MatchCardFeed.tsx](../src/features/bracket/components/MatchCardFeed.tsx): Dynamically bind `tier.primaryColor` and `tier.secondaryColor` to round header badges, match card borders, winner slot backgrounds, and trophy icons.
+| Phase | Title | Status | Description |
+| :--- | :--- | :--- | :--- |
+| **Phase 1** | Core Routing Engine | **Complete** | Mathematical Single-Elimination & Flat routing, bye invariants ($N - 1$ matches). |
+| **Phase 2** | Reactive UI & Match Recording | **Complete** | Canvas visualizer, drawer score entry, multi-game tracking, Best-of-X overrides. |
+| **Phase 3** | In-Memory Pipeline & Refinements | **Complete** | Mode unification (`isLocked`), global standings, maxout logic, global player catalog. |
+| **Phase 4** | Tournament Organizations | **Complete** | Organization directory (`/organizations`), org branding & default rules inheritance, raw metric indexing. |
+| **Phase 5** | Double Elimination Bracket Engine | **Complete** | Double elim (Winners, Losers, Grand Finals Reset), Accelerated Hybrid multi-pod layout, player journey search. |
+| **Phase 6** | Direct / Manual Seeding & Bulk Import | **Complete** | Qual-less tournament seeding, multiline paste import, drag/drop reordering, tier dividers, direct bracket generation. |
+| **Phase 7** | Relational Database & API Backend | **Complete (Foundation)** | PostgreSQL (Neon/Docker) + Drizzle ORM, REST API middleware, authentic player pool (1,620 competitors). *(RBAC & R2 avatar uploads deferred).* |
+| **Phase 8** | **Live & Online Qualifiers Engine** | **Next Up (Priority Track C)** | Competitor self-service portal (`/:slug/qualify`), Twitch OAuth 2.0, NES Authwords, countdown timer, online judge review queue, Discord webhooks. |
+| **Phase 9** | Match Data Export & Custom Analytics | **Upcoming (Priority Track E)** | Universal match data export (CSV/TSV/Sheets/JSON) with customizable column selection and reordering. |
+| **Phase 10**| Production Deployment & PIN Security | **Upcoming (Priority Track E)** | Shared Passphrase (PIN) gating all `/manage/*` routes, Vercel edge deployment, custom domains. |
 
 ---
 
-### Priority 2: Tournament Lifecycle & Data Simulation Controls
+## 2. Completed Phases & Historic Execution
 
-#### Commit 2.1: Unify Lifecycle to `isLocked`, Clean Slate Defaults & Purge Legacy Reset Demo [COMPLETE]
-* **Objective:** Replace legacy `isVerified` and `qualsClosed` with single source of truth `isLocked: boolean`, initialize new tournaments with 0 data, and remove the legacy "Reset Demo" button.
-* **Changes:**
-  * [types.ts](../src/features/tournament/types.ts): Update `Tournament` interface: replace `isVerified` and `qualsClosed` with `isLocked: boolean`.
-  * [store.tsx](../src/features/tournament/store.tsx):
-    * Update storage key to `tournament_manager_tournaments_v3` (with migration from `ctwc_tournaments_v3`).
-    * On fresh state with 0 tournaments, start with `[]` (empty list).
-    * `createTournament`: clean slate defaults (`playersPool: []`, `qualifierSubmissions: []`, `tournamentPlayers: {}`, `matchScores: {}`, `isLocked: false`).
-    * Rename `verifyBrackets` to `lockTournament`, update `unlockBrackets`.
-    * Enforce unlock invariant: unlock is blocked if `Object.values(tournament.matchScores)` contains any recorded game scores with error message: *"Cannot unlock: Match play has begun. Clear recorded scores before unlocking."*
-    * Remove `resetTournamentData` legacy demo reset function.
-  * [TournamentSwitcherPage.tsx](../src/routes/TournamentSwitcherPage.tsx):
-    * Clean empty state when 0 tournaments exist, inviting user to click **"+ Create New Tournament"**.
-    * Remove backdrop click dismissal on create modal.
-    * On submit, navigate directly to `/:slug/manage/settings`.
-  * [VerifyBracketModal.tsx](../src/features/tournament/components/VerifyBracketModal.tsx): Update to call `lockTournament`.
-  * [TournamentNavbar.tsx](../src/components/TournamentNavbar.tsx): Remove the legacy "Reset Demo" button, use `isLocked`.
-  * Update [BracketVisualizer.tsx](../src/features/bracket/components/BracketVisualizer.tsx), [MatchCardFeed.tsx](../src/features/bracket/components/MatchCardFeed.tsx), [OrganizerSheetMatrix.tsx](../src/features/bracket/components/OrganizerSheetMatrix.tsx), and [LeaderboardTable.tsx](../src/features/qualifiers/components/LeaderboardTable.tsx) to consume `isLocked`.
-
-#### Commit 2.2: Data Management & Simulation Controls in Settings [COMPLETE]
-* **Objective:** Provide sandbox simulation controls inside tournament settings: "Seed Qualifiers Only", "Simulate Full Tournament", and "Clear All Tournament Data".
-* **Note on Player Simulation & Global Pool:**
-  * To enable seamless testing of brand-new tournaments from scratch, simulation controls will auto-generate realistic competitors (bracket capacity + 4 DNQ) with distinct names, playstyles, and personal bests if the tournament roster lacks competitors.
-  * In addition, the Global Player Directory (`/players`, Priority 5) will feature a **"Generate Fake Players"** action: prompts the user for the number of players to generate with an input, OK, and Cancel button; on OK, it generates random, realistic competitors into the master global pool (`classic_tetris_global_players`).
-* **Changes:**
-  * **[NEW]** [simulation.ts](../src/features/tournament/simulation.ts): Dedicated simulation engine:
-    * `generateRealisticPlayers(count: number): PlayerProfile[]`
-    * `generateSimulatedQualifiers(tournament: Tournament): { players: PlayerProfile[]; submissions: QualifierSubmission[] }`
-    * `simulateTournamentMatches(tournament: Tournament): Record<string, MatchScoreRecord>`
-  * [store.tsx](../src/features/tournament/store.tsx):
-    * Add action `seedQualifiers(tournamentId: string)`: Generates bracket capacity + 4 DNQ realistic competitors with scores tailored to `qualFormat` (`HIGH_SCORE`, `AVERAGE_OF_X`, `POINTS`), leaving in Qualifiers Mode.
-    * Add action `simulateFullTournament(tournamentId: string)`: Seeds qualifiers, locks brackets, and simulates game scores and winners across all rounds up to tier champions.
-    * Add action `clearTournamentData(tournamentId: string)`: Resets `qualifierSubmissions = []`, `matchScores = {}`, `playersPool = []`, `tournamentPlayers = {}`, `isLocked = false`.
-  * [TournamentAdminForm.tsx](../src/features/tournament/components/TournamentAdminForm.tsx):
-    * Add new section **"Data Management & Simulation"**:
-      * "Seed Qualifiers Only" button (disabled if data exists).
-      * "Simulate Full Tournament" button (disabled if data exists).
-      * "Clear All Tournament Data" red button with confirmation speedbump modal.
+### Phase 3: Unified In-Memory Pipeline, Adaptive Qual Board & Operational Polish [COMPLETE]
+* **Priority 1: UI Rebranding, Ergonomics, Modal Guards & Mode Terminology:**
+  * Rebranded UI to "Tournament Manager" (removed all legacy "CTWC" references).
+  * Unified mode terminology: "Qualifiers Mode" (`isLocked === false`) vs "Match Play Mode" (`isLocked === true`).
+  * Locked down match cards in `BracketVisualizer`, `OrganizerSheetMatrix`, and `MatchCardFeed` during Qualifiers Mode.
+  * Disabled backdrop dismissal on `MatchScoreDrawer`, `PlayerDetailDrawer`, and `QualifierEntryModal`.
+  * Added dirty state tracking to `TournamentAdminForm` ("Save Configuration" disabled until dirty) with unsaved changes navigation guard modal.
+  * Bound tier colors dynamically (`primaryColor`, `secondaryColor`) to round badges, borders, winner highlights, and trophy icons.
+* **Priority 2: Tournament Lifecycle & Simulation Controls:**
+  * Replaced legacy `isVerified` and `qualsClosed` with single source of truth `isLocked: boolean`.
+  * Enforced unlock safety invariant: blocking unlock if any match has recorded scores.
+  * Clean-slate defaults on fresh onboarding (0 tournaments on home switcher; modal routes to `/:slug/manage/settings` with 0 data).
+  * Data Management controls in Settings: "Seed Qualifiers Only" (bracket capacity + 4 DNQs), "Simulate Full Tournament" (complete match outcomes to champions), and "Clear All Tournament Data" (guarded by red speedbump confirmation modal). Purged legacy demo pipelines.
+* **Priority 3: Global Tournament Standings & Competitive Exit Tiebreakers:**
+  * Refactored `standings.ts` to output a unified #1 to #N global list across all tiers.
+  * Implemented exact intra-round exit tiebreaker formula (exit game wins $\rightarrow$ loss avg $\rightarrow$ match record $\rightarrow$ game avg $\rightarrow$ seed).
+  * Continuous `FinalStandingsTable.tsx` with overview stat cards, performance analytics columns, and Qual vs. Final rank delta badges.
+* **Priority 4: Qualifiers Table Density & Competitor Detail Drawer:**
+  * Implemented Maxout count ($\ge 999,999$) + kicker score sorting hierarchy in `scoring.ts`.
+  * Format-dense column rendering on `LeaderboardTable.tsx` adapting to `HIGH_SCORE`, `AVERAGE_OF_X`, and `POINTS`.
+  * Slide-out `PlayerDetailDrawer.tsx` displaying competitor profile, chronological qualifier submission audit log, and match breakdown.
+* **Priority 5: Global Player Pool Directory & Tournament Roster:**
+  * Master player directory under LocalStorage key `classic_tetris_global_players` at `/players`.
+  * "Generate Fake Players" prompt modal with presets (`+8`, `+16`, `+32`, `+64`) generating realistic competitors.
+  * Tournament roster registration with "Import from Global Pool" and "Import All Available" actions.
+* **Priority 6: Accelerated Hybrid Layout, Player Journey Highlighting & Operational Polish:**
+  * Accelerated Hybrid multi-pod layout: side-by-side Fit/Split views, scrollbar elimination in Pod 2, Pod 3 match centering, and responsive single-column collapse.
+  * Competitor search input in `BracketTierBar` with auto-complete and zero-lag Player Journey SVG path illumination.
+  * Double Elimination judge feed filtering: resolved stage filter desynchronization, unique round keys, and tier-switching remounting hygiene (`key={tier.id}`).
+  * Established permanent automated regression test mandate in `AGENTS.md`.
 
 ---
 
-### Priority 3: Global Tournament Standings & Competitive Exit Tiebreakers [COMPLETE]
-
-#### Commit 3.1: Competitive Intra-Round Exit Tiebreaker Engine & Global Standings Logic [COMPLETE]
-* **Objective:** Implement the exact mathematical competitive exit tiebreaker formula and sequential #1 to #N global ranking engine.
-* **Status:** Verified with 7 comprehensive unit tests covering all 5 tiebreaker hierarchy levels, forfeit 0-score loss penalties, multi-tier sequential ranking, DNQ/DQ handling, and rank delta.
-* **Changes:**
-  * [standings.ts](../src/features/tournament/standings.ts):
-    * `calculateGlobalStandings(tournament: Tournament)`:
-      * Sequence: Tier 1 (Gold) -> Tier 2 (Silver begins at `Gold Capacity + 1`) -> Tier 3 (Bronze) -> DNQ (ranked by qualifier score) -> DQ (at bottom).
-      * Exact exit tiebreaker hierarchy for competitors eliminated in the same bracket round:
-        1. `exit_game_wins` descending (e.g. 2–3 > 1–3 > 0–3).
-        2. `avg_loss_score` descending (average score across lost games in exit match; unplayed forfeit games count as score 0).
-        3. Overall tournament match record (wins minus losses).
-        4. Overall tournament game score average (across all matches played).
-        5. Initial qualifying seed ascending.
-      * Calculate `qualRank` and `rankDelta = qualRank - finalRank`.
-
-#### Commit 3.2: Unified Global Standings Table & Analytics UI [COMPLETE]
-* **Objective:** Replace tier tab switcher in standings with a single continuous #1 to #N table matching the qualifiers leaderboard styling, complete with performance analytics columns and rank deltas.
-* **Status:** Built and verified with zero type errors, responsive layout, search filter, and quick jump section chips.
-* **Changes:**
-  * [FinalStandingsTable.tsx](../src/features/tournament/components/FinalStandingsTable.tsx):
-    * Continuous global table with dynamic tier divider headers (Gold, Silver, Bronze, DNQ, Disqualified).
-    * Overview stat cards: Tournament Champion, Total Competitors, Completed Matches, Active Tiers.
-    * Performance analytics columns: Rank, Competitor info (with country & playstyle badges), Qual Seed & Delta badge (`↑ +X`, `↓ -X`, `—`), Stage Reached, Exit Match & Loss Avg, Match Record, Game Record, Game Score Average.
-    * Instant search bar and quick filter pills (All, Gold, Silver, DNQ, DQ).
-  * [FinalStandingsPage.tsx](../src/routes/FinalStandingsPage.tsx): Clean layout integrated with global standings.
+### Phase 6: Direct / Manual Seeding & Roster Seeding Engine [COMPLETE]
+* **Objective:** Enable tournament organizers to seed tournaments directly without requiring qualifier submissions, supporting invitationals, pre-ranked community events, and blind-draw tournaments.
+* **Delivered Capabilities:**
+  * **Seeding Mode Toggle:** Introduced `seedingMethod: 'QUALIFIERS' | 'MANUAL'` on `Tournament` with settings toggle in `TournamentAdminForm`. Qual-specific fields cleanly collapse when in manual mode.
+  * **Bulk Seed Import (`BulkSeedImportModal.tsx`):** Large multiline paste modal. Parser strips bullets, numbering (`1. `, `#1 `, `- `), trims whitespace, and automatically resolves names against tournament rosters and the global player catalog.
+  * **Interactive Seeding Manager (`ManualSeedingManager.tsx`):** Dedicated management view with drag-and-drop handles, Move Up/Down/Top/Bottom buttons, direct seed number assignment, reverse order, and Fisher-Yates random shuffle (with confirmation speedbump).
+  * **Dynamic Tier Boundary Dividers:** Visual tier cutoff banners (Gold Tier, Silver Tier, Reserves/Alternate pool) rendered directly across the manual seed list.
+  * **Bracket Generator Hook:** `generateDraftBracketsForTournament` directly bypasses `deriveLeaderboard` when in manual mode and distributes `manualSeeds` across tier capacities.
+  * **Standings & Simulation Integration:** Computes `rankDelta` relative to assigned manual seeds; adapts simulation controls to generate realistic manual seedings.
+  * **Automated Regression Suite:** 10 comprehensive tests in `src/features/tournament/__tests__/manualSeeding.test.ts`.
 
 ---
 
-### Priority 4: Qualifiers Table Density & Competitor Detail Drawer [COMPLETE]
-
-#### Commit 4.1: Maxout Count & Kicker Engine + Format-Dense Leaderboard Columns [COMPLETE]
-* **Objective:** Implement Maxout count (>= 999,999) + kicker score sorting engine for `HIGH_SCORE` mode and declutter leaderboard table columns based on format.
-* **Status:** Verified with 13 comprehensive unit tests covering maxout counting, kicker extraction, and the full sorting hierarchy.
-* **Changes:**
-  * [scoring.ts](../src/features/qualifiers/scoring.ts):
-    * Defined `MAXOUT_THRESHOLD = 999999`.
-    * Implemented `calculateMaxoutAndKicker(submissions: QualifierSubmission[])`.
-    * Updated `LeaderboardRankRow` with `maxoutCount` and `kickerScore`.
-    * Implemented full sorting hierarchy: `maxout_count` descending -> `kicker_score` descending -> peak score -> earlier timestamp -> player ID.
-  * [LeaderboardTable.tsx](../src/features/qualifiers/components/LeaderboardTable.tsx):
-    * Format-dense column layout adapting to `HIGH_SCORE` (Maxout & Kicker badges, High Score, Attempts), `AVERAGE_OF_X` (individual attempt chips, running/final average), and `POINTS` (attempt points breakdown, total points).
-
-#### Commit 4.2: Competitor Detail Slide-Out Drawer (`PlayerDetailDrawer`) [COMPLETE]
-* **Objective:** Provide an in-depth slide-out drawer when clicking any player on the leaderboard, showing attempt audit history and tournament match stats.
-* **Status:** Built and verified with zero type errors, smooth animations, and backdrop dismissal disabled.
-* **Changes:**
-  * **[NEW]** [PlayerDetailDrawer.tsx](../src/features/qualifiers/components/PlayerDetailDrawer.tsx):
-    * Competitor profile overview (PB, Playstyle, Seed/Tier assignment, Country, Notes).
-    * Chronological audit log of all qualifier submissions for this tournament (timestamp, score, maxout/kicker indicators, points earned).
-    * Tournament bracket match play performance and game-by-game logs.
-    * Backdrop click dismissal disabled.
-  * [LeaderboardTable.tsx](../src/features/qualifiers/components/LeaderboardTable.tsx): Connected row click to open drawer.
+### Phase 7: Relational Database & Server API Backend [COMPLETE (FOUNDATION)]
+* **Objective:** Transition `tournament-manager` from ephemeral client-side LocalStorage to a persistent relational database with server API routes.
+* **Delivered Capabilities:**
+  * **PostgreSQL Schema (`src/db/schema.ts`):** Complete relational models with foreign key constraints, cascading deletes, and indexes:
+    * `organizations`: Organization identity, branding, theme colors, tier themes, default rules.
+    * `players`: Competitor identity with `lower(trim(name))` uniqueness index, country, playstyle, PB, notes.
+    * `tournaments`: Tournament identity, organization FK, qual format, points config, `is_locked`, metadata.
+    * `bracket_tiers`: Tier configuration, tournament FK, priority order, bracket type, colors, metadata.
+    * `tournament_players`: Roster assignments, player FK, tier FK, seed, qual completion status.
+    * `qualifier_submissions`: Scores, timestamps, player FK, tournament FK.
+    * `matches` & `games`: Relational match play tracking, game scores, Best-of-X, forfeit flags, winner/loser FKs.
+  * **Database Infrastructure:** Docker compose environment (`docker-compose.yml`) running PostgreSQL 16 on port 5433, with Drizzle Kit push migrations (`npm run db:push`) and Drizzle Studio (`npm run db:studio`).
+  * **Server API Middleware (`src/server/api.ts`):** Vite dev server API middleware supporting:
+    * `/api/organizations`: Org CRUD, detail lookup by ID/slug, default rules sync.
+    * `/api/tournaments`: Full tournament creation, retrieval, updates, and deletion.
+    * `/api/players`: Player CRUD, directory lookups, search.
+    * `/api/tournaments/:id/qualifiers`: Atomic score submission and batch qualifiers ingestion.
+    * `/api/tournaments/:id/matches`: Match score recording and resets.
+    * `/api/simulate/sample`: 1-click sample tournament generation.
 
 ---
 
-### Priority 5: Global Player Pool Directory & Tournament Roster [COMPLETE]
-
-#### Commit 5.1: Global Player Pool Directory (`classic_tetris_global_players` & `/players` Route) [COMPLETE]
-* **Objective:** Provide a master player pool catalog independent of individual tournaments to manage players, manual PBs, playstyles, countries, and notes under LocalStorage key `classic_tetris_global_players`.
-* **"Generate Fake Players" Modal:**
-  * Prominent "Generate Fake Players" button in the global player directory.
-  * Modal prompts for the number of players to generate with a numeric input (default 16, min 1, max 200), quick presets (`+8`, `+16`, `+32`, `+64`), "OK" button, and "Cancel" button.
-  * On "OK", generates realistic fake players with randomized names, playstyles (DAS, Rolling, Hypertap), personal bests (700k–1.35M), countries, and notes, appending them to `classic_tetris_global_players`.
-  * Backdrop click dismissal disabled.
-* **Changes:**
-  * [store.tsx](../src/features/tournament/store.tsx): Introduced `classic_tetris_global_players` state, persistence effect, CRUD actions (`addGlobalPlayer`, `updateGlobalPlayer`, `deleteGlobalPlayer`, `clearAllGlobalPlayers`, `generateFakeGlobalPlayers`), and synced `addPlayerToPool` to master directory.
-  * **[NEW]** [GenerateFakePlayersModal.tsx](../src/features/players/components/GenerateFakePlayersModal.tsx): Numeric prompt modal with presets and OK/Cancel buttons.
-  * **[NEW]** [PlayerEditModal.tsx](../src/features/players/components/PlayerEditModal.tsx): Form for adding and editing competitor metadata (name unique validation, country, PB, playstyle, notes, DQ flag).
-  * **[NEW]** [PlayerDirectory.tsx](../src/features/players/components/PlayerDirectory.tsx): Master player table, stat cards (Total Players, Style breakdown, Top PB, Avg PB), search filter, playstyle filter pills, sort dropdown, and actions.
-  * **[NEW]** [PlayerDirectoryPage.tsx](../src/routes/PlayerDirectoryPage.tsx): Clean route wrapper with global navigation bar.
-  * [App.tsx](../src/App.tsx): Added route `/players`.
-  * [TournamentNavbar.tsx](../src/components/TournamentNavbar.tsx) & [TournamentSwitcherPage.tsx](../src/routes/TournamentSwitcherPage.tsx): Added quick links to `/players`.
-
-#### Commit 5.2: Tournament Roster Management & Registration [COMPLETE]
-* **Objective:** Allow tournaments to import players from the global pool or add new competitors directly into the tournament roster.
-* **Changes:**
-  * **[NEW]** [ImportFromGlobalModal.tsx](../src/features/players/components/ImportFromGlobalModal.tsx): Searchable modal with checkboxes, "Select All", and import action to add global players into tournament roster.
-  * [TournamentAdminForm.tsx](../src/features/tournament/components/TournamentAdminForm.tsx):
-    * Added Section 3: "Tournament Roster" with capacity analytics (Registered, Bracket Capacity, Status), "Import from Global Pool", "Import All Available", and "+ Register Competitor" buttons.
-    * Integrated registered competitor table with search filter and safe competitor removal (blocks removal if competitor has recorded matches).
-  * [CreatablePlayerSelect.tsx](../src/features/qualifiers/components/CreatablePlayerSelect.tsx):
-    * Accepts `globalPlayers` and suggests players from both in-tournament roster and the global catalog.
-    * Auto-imports global player into tournament roster upon selection.
-  * [QualifierEntryModal.tsx](../src/features/qualifiers/components/QualifierEntryModal.tsx): Connected `globalPlayers` and `importPlayersToTournament` to `CreatablePlayerSelect`.
-  * [players.test.ts](../src/features/players/__tests__/players.test.ts): Added 5 unit tests covering player generation, deduplication, fallback naming, import deduplication, and safe removal constraints.
+### Out-of-Scope Capabilities Delivered Along the Way [COMPLETE]
+* **1,620 Authentic Competitor Seed Dataset (`scripts/importPlayers.ts`):**
+  Imported 1,620 real-world competitive Classic Tetris competitors with authentic names, randomized realistic countries, playstyles (Rolling, DAS, Hypertap), and personal bests (750k–1.4M) into PostgreSQL.
+* **Cross-Platform CLI Compatibility:**
+  Hardened database scripts, `drizzle.config.ts`, and Node execution hooks for seamless Windows PowerShell and POSIX execution.
+* **Drizzle Studio Navigation Architecture:**
+  Integrated schema relationships enabling Drizzle Studio's virtual navigation badges between parents and children (`bracket_tier`, `games`, `tournament`).
 
 ---
 
-### Priority 6: Operational Polish, Accelerated Hybrid Bracket Layout & Ergonomics [COMPLETE]
+## 3. Prioritized Implementation Roadmap (Remaining Work)
 
-#### Commit 6.1: Match Drawer Isolation, Theming Consistency & Settings Ergonomics [COMPLETE]
-* **Objective:** Polish `MatchScoreDrawer` aesthetics, header backgrounds, modal cleanliness, and streamline Settings controls and header density.
-* **Changes:**
-  * [MatchScoreDrawer.tsx](../src/features/bracket/components/MatchScoreDrawer.tsx):
-    * Constrained the top gradient accent line strictly to the drawer width, eliminating viewport-wide horizontal overflow.
-    * Replaced drawer header background with solid elevated surface background (`var(--color-bg-surface-elevated)`), matching individual game score cards.
-    * Removed gradient from the drawer footer action bar (Save/Cancel buttons).
-  * [MatchupBanner.tsx](../src/features/bracket/components/drawer/MatchupBanner.tsx):
-    * Separated matchup score section from the drawer title header, preserving the vibrant gradient background exclusively for the match score banner.
-  * [MatchTelemetryModal.tsx](../src/features/bracket/components/MatchTelemetryModal.tsx):
-    * Removed the "first to" label and competitor playstyle chips from the read-only match telemetry view to declutter spectator display.
-  * [OrgBrandPaletteSection.tsx](../src/features/tournament/components/settings/OrgBrandPaletteSection.tsx) & [BracketThemeEditor.tsx](../src/features/bracket/components/BracketThemeEditor.tsx):
-    * Moved the "Apply" button onto the same line as the "Inherit Organizational Theme" checkbox.
-    * Renamed button to "Apply" and checkbox to "Inherit Organizational Theme".
-  * [RoundOverridesEditor.tsx](../src/features/tournament/components/RoundOverridesEditor.tsx):
-    * Removed the empty "No Round Specific Best of overrides" notification banner when no overrides are configured.
-  * [TournamentInfoSection.tsx](../src/features/tournament/components/settings/TournamentInfoSection.tsx):
-    * Right-aligned "Qualifier Attempts" and "Recorded Matches" telemetry badges in the settings header.
-    * Removed redundant header description text to save vertical space.
+```mermaid
+flowchart TD
+    subgraph TrackA["Track A: Mathematical Rules & Logic Bug Fixes (Omen's Loose Notes)"]
+        A1["• Flat Bracket Bye Seed Alternation (1 vs N)<br>• Points Qual 0-Point Tiebreaker (High Score)<br>• Clear Quals vs Matches Speedbump Hierarchy<br>• Settings 'Add Tier' Button Position<br>• Homepage Navigation to Public Views<br>• Player Identity: Twitch vs Name vs Nickname"]
+    end
 
-#### Commit 6.2: Search Bar Unification, Competitor Journey Highlighting & Accelerated Hybrid Layout [COMPLETE]
-* **Objective:** Unify search inputs across screens, implement bracket competitor search with instant journey path highlighting, synchronize highlight transition animations, and overhaul Accelerated Hybrid pod layout (side-by-side Fit/Split views, Pod 2 scrollbar elimination, and Pod 3 match centering).
-* **Changes:**
-  * [FinalStandingsPage.tsx](../src/routes/FinalStandingsPage.tsx) & [PublicLeaderboardPage.tsx](../src/routes/PublicLeaderboardPage.tsx):
-    * Unified search competitor input dimensions, padding, typography, icons, and container alignment across Standings and Qualifiers pages.
-  * [BracketTierBar.tsx](../src/features/bracket/components/BracketTierBar.tsx):
-    * Added interactive Competitor Search input to the desktop bracket toolbar with auto-complete suggestions.
-    * Automatically activates `highlightedPlayerId` (Player Journey Highlight) when a player is selected or search resolves to a single unique competitor.
-    * Clearing search restores standard bracket view.
-    * Enabled the "Split Wings" view mode button for Accelerated Hybrid brackets.
-  * [BracketMatchCard.tsx](../src/features/bracket/components/visualizer/BracketMatchCard.tsx) & [journeyHighlight.ts](../src/features/bracket/journeyHighlight.ts):
-    * Removed legacy competitor name hover color flicker animation.
-    * Synchronized highlight transition timings across SVG connector lines, match card borders, card backgrounds, and dimmed nodes for instant, lag-free state flipping.
-  * [hybridLayout.ts](../src/features/bracket/layout/hybridLayout.ts):
-    * Reduced Pod 3 (Lower Bracket) padding to 12px and round gap to 36px in `calculateAcceleratedHybridLowerBracketLayout`, compacting width to ~1172px.
-    * Pod 1 (Accelerated Round) compacted with 50% breathing room to eliminate internal scrollbars.
-    * Pod 2 (Upper Bracket) fills remaining canvas, allowing scroll only when matches overlap pod margins.
-  * [routingChips.tsx](../src/features/bracket/routingChips.tsx):
-    * Aligned Lower Bracket routing chips and badges with the Lower Bracket palette (`#10B981` / emerald borders and badges) for visual consistency.
-  * [BracketQualifierPodGrid.tsx](../src/features/bracket/components/visualizer/BracketQualifierPodGrid.tsx):
-    * Implemented `isSideBySide` layout (`effectiveObsView === 'fit' || effectiveObsView === 'split'`), placing Pod 1, Pod 2, and Pod 3 side-by-side.
-    * Maintained stacked layout (Top row: Pod 1 & Pod 2; Bottom row: Pod 3) for Standard view (`viewMode === 'standard'`).
-    * Expanded Pod 2 minimum width allocation by 24px and suppressed fit-view scrollbars (`overflowX: effectiveObsView === 'fit' ? 'hidden' : 'auto'`).
-    * Centered matches in Pod 3 with equal left and right margins using `<div style={{ width: 'fit-content', minWidth: 'max-content', margin: '0 auto' }}>`.
-  * [BracketVisualizer.tsx](../src/features/bracket/components/BracketVisualizer.tsx):
-    * Passed `effectiveObsView` to `BracketQualifierPodGrid`.
-    * Updated `combinedBounds` to calculate true side-by-side dimensions (~2760px $\times$ ~895px) for `fitScale` computation, eliminating subpixel clipping.
-  * [index.css](../src/index.css):
-    * Added `.qualifier-side-by-side-pods` to the `@media (max-width: 1024px)` responsive stylesheet to collapse to a single column on smaller viewports.
+    subgraph TrackB["Track B: Architectural Decoupling & Ingestion Pipeline Hardening"]
+        B1["• Decouple Qualifier Ingestion from Full-Blob Tournament Save<br>• Lightweight Ingestion Endpoints (Qualifiers Table Only)<br>• Contract Alignment: playerCount vs numPlayers, TRADITIONAL vs TRADITIONAL_TREE"]
+    end
 
-#### Commit 6.3: Double Elimination Feed Filtering, Tier Switching Hygiene & Regression Testing [COMPLETE]
-* **Objective:** Resolve double elimination judge and mobile feed view filtering breakdowns across stage and round filters, eliminate key collisions from non-sequential round numbering, prevent state leakage across tier switches, and introduce automated regression test suite.
-* **Changes:**
-  * [MatchCardFeed.tsx](../src/features/bracket/components/MatchCardFeed.tsx):
-    * Replaced index-based `selectedRoundIdx` with stable, unique `selectedRoundKey` (`${round.stage || 'R'}_${round.roundIdentifier || round.roundNumber}_${idx}`).
-    * Added `activeRoundKey` calculation that automatically defaults to `'ALL'` if the selected round key does not exist in the active stage filter (preventing out-of-bounds or misaligned round displays).
-    * Added round toggle behavior (clicking the active round pill deselects it and restores "All Rounds").
-    * Added automated reset effect on `tier.id` change (`setSelectedStage('ALL')`, `setSelectedRoundKey('ALL')`, `setSearchTerm('')`, `setActiveMatch(null)`).
-    * Replaced non-unique `round.roundNumber` React keys on buttons and feed sections with guaranteed unique composite keys (`getRoundKey(round, idx)`).
-  * [ManageJudgePage.tsx](../src/routes/ManageJudgePage.tsx) & [PublicTierBracketPage.tsx](../src/routes/PublicTierBracketPage.tsx):
-    * Added `key={tier.id}` to `<MatchCardFeed>` to force clean React remounting and complete state hygiene whenever switching tiers (e.g. Silver $\rightarrow$ Bronze $\rightarrow$ Silver).
-  * [double-elimination.ts](../src/features/bracket/math/double-elimination.ts):
-    * Renumbered `allRounds` in `generateFlatDoubleElim` strictly sequentially (`roundNumber = rIdx + 1`, `matchNumber`), preventing duplicate round numbers between Winners and Losers rounds.
-    * Added guard in `generateFlatDoubleElim` and `generateDoubleEliminationBracket` to safely route player counts $\le 2 \times \text{flatWidth}$ or `flatWidth < 4` to traditional double elimination, preventing undefined match feeder exceptions.
-  * [types.ts](../src/features/bracket/types.ts):
-    * Updated `canonicalizeBracketRounds` to automatically verify and heal sequential round numbering 1..N on all existing and loaded brackets.
-  * [doubleElimFeedFiltering.test.ts](../src/features/bracket/__tests__/doubleElimFeedFiltering.test.ts):
-    * Created comprehensive regression test suite with 9 unit tests verifying sequential round numbers, key collision prevention, small player count / flat width resilience, round key uniqueness across stages, stage filter recovery, and tier-switching hygiene.
-  * [.agents/rules/testing-and-bug-prevention.md](../.agents/rules/testing-and-bug-prevention.md) & [AGENTS.md](../AGENTS.md):
-    * Added permanent workspace rules mandating automated regression tests for all bug fixes and issue resolutions.
+    subgraph TrackC["Track C: Phase 8 — Live & Online Qualifiers Engine"]
+        C1["• Public Self-Service Portal (/:slug/qualify)<br>• Twitch OAuth 2.0 Integration<br>• 6–8 Char NES-Compatible Authword Engine<br>• Countdown Timer & QualTimerLog Telemetry<br>• Online Judge Review Queue & Verification Drawer<br>• Discord Webhook Dispatch"]
+    end
 
+    subgraph TrackD["Track D: Mobile-Responsive Viewport Overhaul (Spec 13.2 / 360×800)"]
+        D1["• Qualifiers Leaderboard Mobile Card View<br>• Final Standings Mobile Card Rows<br>• Tournament Roster & Global Players Handheld Cards<br>• Mobile Navigation Bar & Collapsed Breadcrumbs"]
+    end
 
+    subgraph TrackE["Track E: Phase 9 & Phase 10 — Export, Security & Deployment"]
+        E1["• Universal Match Data Export (CSV, TSV, Sheets, JSON)<br>• Shared Passphrase (PIN) Gating for /manage/*<br>• Production Edge Deployment & Domain Hardening"]
+    end
+
+    TrackA --> TrackB --> TrackC --> TrackD --> TrackE
+```
+
+---
+
+### Track A: Mathematical Rules & Logic Bug Fixes (Omen's Loose Notes)
+* **Goal:** Eliminate all observed tournament rule discrepancies, navigation misdirections, and simulation safety flaws before touching the live ingestion architecture.
+
+#### 1. Flat Bracket Bye Seed Alternation
+* **Problem:** In Flat Single and Double Elimination brackets, byes are currently paired sequentially ($1 \text{ vs } 2, 3 \text{ vs } 4$).
+* **Fix:** Update `flat.ts` and `double-elimination.ts` so byes follow standard competitive tournament bracket alternation: highest seeds receive byes and face the lowest surviving seeds ($1 \text{ vs } N, 2 \text{ vs } N-1$).
+* **Files:** `src/features/bracket/math/flat.ts`, `src/features/bracket/math/double-elimination.ts`.
+
+#### 2. Points Qualifier Tiebreaker for 0-Point Players
+* **Problem:** In `POINTS` qualifier format, players with $0$ points currently float in arbitrary/random order.
+* **Fix:** Update `scoring.ts` to enforce the spec tiebreaker hierarchy: players with $0$ points are deterministically sorted by their highest single game score (`peakScore`).
+* **Files:** `src/features/qualifiers/scoring.ts`.
+
+#### 3. Simulation & Data Management Safety Hierarchy
+* **Problem:** Admins can accidentally clear qualifier data while active matches exist, creating orphaned match records.
+* **Fix:** In `TournamentAdminForm.tsx`, disable "Clear Quals" whenever active match scores exist. Enforce the strict lifecycle hierarchy: "Clear Matches" must be executed before "Clear Quals" becomes enabled. "Clear All" remains available behind its speedbump confirmation modal.
+* **Files:** `src/features/tournament/components/TournamentAdminForm.tsx`, `src/features/tournament/store.tsx`.
+
+#### 4. Settings "Add Tier" Button Placement
+* **Problem:** The "+ Add Tier" button at the top requires organizers to scroll down to find the newly added tier.
+* **Fix:** Position the "+ Add Tier" button at the bottom of the tiers list when 1 or more tiers exist (retaining it prominently in the empty state when 0 tiers exist).
+* **Files:** `src/features/tournament/components/settings/TierManagementSection.tsx`.
+
+#### 5. Homepage Tournament Card Navigation
+* **Problem:** Clicking Bracket, Standings, or Qualifiers on the homepage cards routes users into admin management URLs (`/:slug/manage/*`).
+* **Fix:** Route homepage card links to their clean public/spectator counterparts (`/:slug/bracket`, `/:slug/standings`, `/:slug/leaderboard`).
+* **Files:** `src/routes/TournamentSwitcherPage.tsx`.
+
+#### 6. Global Player Card Identity
+* **Problem:** The competitor model lacks distinct separation between Twitch handle, competitive display name, and personal nickname.
+* **Fix:** Extend `PlayerProfile` and the database `players` table with `twitchUsername`, `nickname`, and `displayName`, updating the player edit modal and detail drawer.
+* **Files:** `src/features/tournament/types.ts`, `src/db/schema.ts`, `src/features/players/components/PlayerEditModal.tsx`.
+
+---
+
+### Track B: Architectural Decoupling & Ingestion Pipeline Hardening
+* **Goal:** Eliminate the monolithic full-object sync anti-pattern in `store.tsx` so live qualifier score submissions can occur at high frequencies without race conditions or database push collisions.
+
+1. **Atomic Qualifier Ingestion:**
+   * Refactor `POST /api/tournaments/:id/qualifiers` to perform a lightweight `INSERT INTO qualifier_submissions` and recalculate live leaderboard rankings without rebuilding or reserializing the entire tournament tree.
+2. **Decouple Store Subscriptions:**
+   * Split `store.tsx` into modular stores or query hooks (`useQualifiers`, `useTournamentDetails`, `useMatches`) so qualifier updates do not trigger full-bracket re-renders.
+3. **Contract Alignment:**
+   * Standardize properties across frontend and backend: eliminate `playerCount` vs `numPlayers` aliasing and unify `TRADITIONAL` / `TRADITIONAL_TREE` in routing types.
+
+---
+
+### Track C: Master Spec Phase 8 — Live & Online Qualifiers Engine
+* **Goal:** Deliver the full online self-service competitor qualification portal per Master Spec Section 10.
+
+1. **Competitor Self-Service Portal (`/:slug/qualify`):**
+   * Public onboarding view for remote competitors.
+   * Twitch OAuth 2.0 integration (retrieves Twitch username, channel ID, and avatar).
+2. **NES-Compatible Authword Engine (Spec Sec 10.2):**
+   * Curated dictionary of ~1,000 family-friendly English words ($\ge 6$ letters).
+   * Strict NES character set enforcement (`A–Z`, `0–9`, `.`, `-`, `!`, `♥`; no spaces).
+   * Support for custom approved words in Tournament Settings.
+3. **Countdown Timer & Telemetry Logging (Spec Sec 10.3):**
+   * Non-blocking countdown timer inheriting `qualWindowMinutes`.
+   * Captures `QualTimerLog` telemetry (`startedAt`, `submittedAt`, `elapsedSeconds`, `pauses`).
+4. **Online Judge Review Queue & Verification Drawer (Spec Sec 10.4):**
+   * Dedicated judge review drawer for incoming submissions.
+   * Embedded Twitch VOD player, 10k topout authword check, timer telemetry log inspection.
+   * Actions: "Verify Qual", "Edit Score", "Mark DNQ", "Disqualify (DQ)".
+5. **Discord Webhooks Integration:**
+   * Automated dispatches on qual start and qual submit with Twitch stream link and score.
+6. **Tournament Mode Toggle:**
+   * Support `IN_PERSON`, `ONLINE`, and `HYBRID` modes.
+
+---
+
+### Track D: Master Spec Section 13.2 — Mobile-Responsive Overhaul (360×800 Viewport)
+* **Goal:** Guarantee all data-dense views are fully readable and operational on smartphone screens without horizontal scroll clipping.
+
+1. **Qualifiers Leaderboard:** Compact mobile card/accordion view displaying Rank, Player, Playstyle, Status, and Attempts/Scores.
+2. **Final Standings:** Mobile card rows preserving Final Rank, Competitor, Seed Delta badge, and Stage Reached.
+3. **Tournament Roster & Global Players Directory:** Mobile card rows for player management.
+4. **Global Navigation & Header:** Hamburger menu / mobile bottom tab bar and collapsed breadcrumbs on viewports $< 768\text{px}$.
+
+---
+
+### Track E: Master Spec Phases 9 & 10 — Export, Security & Production Deployment
+* **Goal:** Finalize export pipelines, access controls, and hosting configuration.
+
+1. **Universal Match Data Export Modal (Phase 9):**
+   * Configurable column toggles (Tournament, Tier, Stage, Round, Players, Seeds, Game Scores, Winner, Forfeit).
+   * Formats: CSV, TSV (direct paste into Google Sheets), and JSON.
+   * Column reordering and export presets ("CTWC Match Sheet", "Detailed Audit").
+2. **Shared PIN Security (Phase 10):**
+   * Passphrase gating for all `/manage/*` routes.
+3. **Production Deployment (Phase 10):**
+   * Vercel edge deployment configuration, environment variable hardening, custom domain setup.
+
+---
+
+## 4. Verification & Testing Standards
+
+Per workspace guidelines in `AGENTS.md`:
+* **Mandatory Regression Tests:** Every bug fix, rule adjustment, and feature must include automated regression tests in `src/api/__tests__/` or `src/features/*/__tests__/`.
+* **Verification Scope:** Tests must verify failure on the buggy state and pass with the fix across all supported bracket types (Single, Double Elimination variants: Traditional, Flat Staged, Accelerated Hybrid), filter interactions, and tier-switching states.
+* **Test Suite Health:** All tests must pass cleanly (`npm test`) with zero TypeScript errors (`npm run typecheck`).
