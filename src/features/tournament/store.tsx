@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   Tournament,
   TournamentTier,
@@ -23,6 +23,10 @@ interface TournamentContextType {
   globalPlayers: PlayerProfile[];
   activeTournamentId: string | null;
   activeTournament?: Tournament;
+  isLoading: boolean;
+  apiError?: string | null;
+  clearApiError?: () => void;
+  simulateSampleTournament: () => Promise<Tournament | undefined>;
   setActiveTournamentId: (id: string | null) => void;
   getTournamentBySlug: (slug: string) => Tournament | undefined;
   getTierBySlug: (
@@ -219,11 +223,87 @@ export function jumpSeedsBunched(
 
 const TournamentContext = createContext<TournamentContextType | null>(null);
 
+async function apiCall(endpoint: string, options: RequestInit = {}) {
+  if (typeof fetch === 'undefined') return null;
+  const res = await fetch(endpoint, options);
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({ error: res.statusText }));
+    const msg = errorData.error || `HTTP ${res.status}`;
+    console.error(`[API Error] ${options.method || 'GET'} ${endpoint} failed:`, msg);
+    throw new Error(msg);
+  }
+  return await res.json();
+}
+
 export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   assertDatabaseConfig();
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [globalPlayers, setGlobalPlayers] = useState<PlayerProfile[]>([]);
   const [activeTournamentId, setActiveTournamentId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const clearApiError = () => setApiError(null);
+
+  const syncTournamentToApi = (tourney: Tournament) => {
+    apiCall(`/api/tournaments/${tourney.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(tourney),
+    }).catch(err => {
+      setApiError(`Database sync error for "${tourney.name}": ${err.message}`);
+    });
+  };
+
+  // Hydrate initial state from PostgreSQL via API
+  useEffect(() => {
+    let isMounted = true;
+    async function hydrate() {
+      setIsLoading(true);
+      try {
+        const [tourneys, players] = await Promise.all([
+          apiCall('/api/tournaments').catch(err => {
+            console.error('Failed to load tournaments from DB:', err);
+            return [];
+          }),
+          apiCall('/api/players').catch(err => {
+            console.error('Failed to load players from DB:', err);
+            return [];
+          }),
+        ]);
+        if (isMounted) {
+          if (Array.isArray(tourneys) && tourneys.length > 0) {
+            setTournaments(tourneys);
+          }
+          if (Array.isArray(players) && players.length > 0) {
+            setGlobalPlayers(players);
+          }
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+    hydrate();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const simulateSampleTournament = async (): Promise<Tournament | undefined> => {
+    setIsLoading(true);
+    try {
+      const res = await apiCall('/api/simulate/sample', { method: 'POST' });
+      if (res && res.id) {
+        setTournaments(prev => [res, ...prev.filter(t => t.id !== res.id && t.slug !== res.slug)]);
+        setActiveTournamentId(res.id);
+        return res;
+      }
+    } finally {
+      setIsLoading(false);
+    }
+    return undefined;
+  };
 
   const activeTournament = tournaments.find(
     t => t.id === activeTournamentId || t.slug === activeTournamentId
@@ -265,7 +345,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       'id' | 'matchScores' | 'playersPool' | 'qualifierSubmissions' | 'tournamentPlayers'
     >
   ): Tournament => {
-    const id = data.slug || `tourney_${Date.now()}`;
+    const id = data.slug || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `tourney_${Date.now()}`);
     const newTourney: Tournament = {
       ...data,
       id,
@@ -288,6 +368,19 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
 
     setTournaments(prev => [newTourney, ...prev]);
+    apiCall('/api/tournaments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newTourney),
+    })
+      .then(saved => {
+        if (saved && saved.id) {
+          setTournaments(prev => prev.map(t => (t.id === newTourney.id ? saved : t)));
+        }
+      })
+      .catch(err => {
+        setApiError(`Failed to save tournament "${newTourney.name}" to database: ${err.message}`);
+      });
     return newTourney;
   };
 
@@ -299,6 +392,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (!updated.isLocked) {
           updated.tiers = generateDraftBracketsForTournament(updated);
         }
+        syncTournamentToApi(updated);
         return updated;
       })
     );
@@ -312,6 +406,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (!updated.isLocked) {
           updated.tiers = generateDraftBracketsForTournament(updated);
         }
+        syncTournamentToApi(updated);
         return updated;
       })
     );
@@ -323,7 +418,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   ): PlayerProfile => {
     const newPlayer: PlayerProfile = {
       ...player,
-      id: `p_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `p_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
     };
 
     // Also sync to global players if not already present
@@ -332,6 +427,12 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         return prev;
       }
       return [...prev, newPlayer];
+    });
+
+    apiCall('/api/players', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newPlayer),
     });
 
     setTournaments(prev =>
@@ -353,6 +454,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (!updated.isLocked) {
           updated.tiers = generateDraftBracketsForTournament(updated);
         }
+        syncTournamentToApi(updated);
         return updated;
       })
     );
@@ -1110,6 +1212,8 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           tiers: t.tiers.map(tier => ({ ...tier, isLocked: false })),
         };
         updated.tiers = generateDraftBracketsForTournament(updated);
+        apiCall(`/api/tournaments/${tournamentId}/matches`, { method: 'DELETE' });
+        syncTournamentToApi(updated);
         return updated;
       })
     );
@@ -1137,6 +1241,8 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (!updated.isLocked) {
           updated.tiers = generateDraftBracketsForTournament(updated);
         }
+        apiCall(`/api/tournaments/${tournamentId}/qualifiers`, { method: 'DELETE' });
+        syncTournamentToApi(updated);
         return updated;
       })
     );
@@ -1158,6 +1264,9 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           tiers: t.tiers.map(tier => ({ ...tier, isLocked: false })),
         };
         updated.tiers = generateDraftBracketsForTournament(updated);
+        apiCall(`/api/tournaments/${tournamentId}/matches`, { method: 'DELETE' });
+        apiCall(`/api/tournaments/${tournamentId}/qualifiers`, { method: 'DELETE' });
+        syncTournamentToApi(updated);
         return updated;
       })
     );
@@ -1179,6 +1288,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           tiers: t.tiers.map(tier => ({ ...tier, isLocked: false })),
         };
         updated.tiers = generateDraftBracketsForTournament(updated);
+        syncTournamentToApi(updated);
         return updated;
       })
     );
@@ -1188,7 +1298,9 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setTournaments(prev =>
       prev.map(t => {
         if (t.id !== tournamentId) return t;
-        return runFullSimulation(t, globalPlayers);
+        const simulated = runFullSimulation(t, globalPlayers);
+        syncTournamentToApi(simulated);
+        return simulated;
       })
     );
   };
@@ -1198,14 +1310,20 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (activeTournamentId === tournamentId || activeTournament?.slug === tournamentId) {
       setActiveTournamentId(null);
     }
+    apiCall(`/api/tournaments/${tournamentId}`, { method: 'DELETE' });
   };
 
   const addGlobalPlayer = (player: Omit<PlayerProfile, 'id'>): PlayerProfile => {
     const newPlayer: PlayerProfile = {
       ...player,
-      id: `p_global_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `p_global_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
     };
     setGlobalPlayers(prev => [newPlayer, ...prev]);
+    apiCall('/api/players', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newPlayer),
+    });
     return newPlayer;
   };
 
@@ -1213,6 +1331,11 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setGlobalPlayers(prev =>
       prev.map(p => (p.id === playerId ? { ...p, ...updates } : p))
     );
+    apiCall(`/api/players/${playerId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
 
     // Propagate updates to any tournament currently containing this player
     setTournaments(prev =>
@@ -1226,6 +1349,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (!updated.isLocked) {
           updated.tiers = generateDraftBracketsForTournament(updated);
         }
+        syncTournamentToApi(updated);
         return updated;
       })
     );
@@ -1233,6 +1357,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const deleteGlobalPlayer = (playerId: string) => {
     setGlobalPlayers(prev => prev.filter(p => p.id !== playerId));
+    apiCall(`/api/players/${playerId}`, { method: 'DELETE' });
   };
 
   const clearAllGlobalPlayers = () => {
@@ -1242,6 +1367,11 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const generateFakeGlobalPlayers = (count: number): PlayerProfile[] => {
     const newPlayers = generateAdditionalFakePlayers(count, globalPlayers);
     setGlobalPlayers(prev => [...prev, ...newPlayers]);
+    apiCall('/api/players/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newPlayers),
+    });
     return newPlayers;
   };
 
@@ -1650,6 +1780,8 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         globalPlayers,
         activeTournamentId,
         activeTournament,
+        isLoading,
+        simulateSampleTournament,
         setActiveTournamentId,
         getTournamentBySlug,
         getTierBySlug,
@@ -1695,8 +1827,49 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         batchJumpManualSeeds,
         batchRemoveManualSeeds,
         batchAddManualSeeds,
+        apiError,
+        clearApiError,
       }}
     >
+      {apiError && (
+        <div
+          role="alert"
+          style={{
+            backgroundColor: '#dc2626',
+            color: '#ffffff',
+            padding: '12px 20px',
+            fontSize: '14px',
+            fontWeight: 600,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            position: 'sticky',
+            top: 0,
+            zIndex: 99999,
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>⚠️</span>
+            <span>{apiError}</span>
+          </div>
+          <button
+            onClick={clearApiError}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#ffffff',
+              fontWeight: 700,
+              fontSize: '16px',
+              cursor: 'pointer',
+              padding: '4px 8px',
+            }}
+            title="Dismiss error"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       {children}
     </TournamentContext.Provider>
   );

@@ -13,7 +13,9 @@
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:import-players": "tsx scripts/importPlayers.ts",
+    "db:simulate": "tsx scripts/simulate.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",

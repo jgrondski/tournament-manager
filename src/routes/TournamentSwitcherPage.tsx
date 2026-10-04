@@ -1,21 +1,31 @@
 import React, { useState } from 'react';
 import { useTournament } from '../features/tournament/store';
 import { TopNavSwitcher } from '../components/TopNavSwitcher';
-import { Layers, Plus, Trophy, AlertTriangle } from 'lucide-react';
+import { Layers, Plus, Trophy, AlertTriangle, Sparkles } from 'lucide-react';
 import { Tournament } from '../features/tournament/types';
 import { TournamentCard } from '../features/tournament/components/TournamentCard';
 import { CreateTournamentModal } from '../features/tournament/components/CreateTournamentModal';
 
 export const TournamentSwitcherPage: React.FC = () => {
-  const { tournaments, deleteTournament } = useTournament();
+  const { tournaments, deleteTournament, isLoading, simulateSampleTournament } = useTournament();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [tournamentToDelete, setTournamentToDelete] = useState<Tournament | null>(null);
+  const [isSimulating, setIsSimulating] = useState(false);
 
   const confirmDeleteTournament = () => {
     if (tournamentToDelete) {
       deleteTournament(tournamentToDelete.id);
       setTournamentToDelete(null);
+    }
+  };
+
+  const handleSimulateSample = async () => {
+    setIsSimulating(true);
+    try {
+      await simulateSampleTournament();
+    } finally {
+      setIsSimulating(false);
     }
   };
 
@@ -50,11 +60,36 @@ export const TournamentSwitcherPage: React.FC = () => {
               <Plus size={18} />
               Create New Tournament
             </button>
+            <button
+              onClick={handleSimulateSample}
+              disabled={isSimulating}
+              className="btn"
+              style={{
+                padding: '0.65rem 1.5rem',
+                fontSize: '0.95rem',
+                background: 'rgba(59, 130, 246, 0.15)',
+                color: '#60a5fa',
+                border: '1px solid rgba(59, 130, 246, 0.35)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                cursor: isSimulating ? 'not-allowed' : 'pointer',
+              }}
+            >
+              <Sparkles size={18} />
+              {isSimulating ? 'Simulating...' : 'Simulate Sample Tournament'}
+            </button>
           </div>
         </header>
 
         {/* Tournament Grid / Empty State */}
-        {tournaments.length === 0 ? (
+        {isLoading ? (
+          <div style={{ textAlign: 'center', padding: '5rem 2rem' }}>
+            <div style={{ width: 44, height: 44, border: '3px solid rgba(255,255,255,0.1)', borderTopColor: 'var(--color-gold-bright)', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 1.25rem' }} />
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '0.5rem' }}>Loading Tournaments</h3>
+            <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.95rem' }}>Hydrating tournaments from PostgreSQL...</p>
+          </div>
+        ) : tournaments.length === 0 ? (
           <div
             style={{
               background: 'var(--color-bg-surface)',
@@ -89,16 +124,37 @@ export const TournamentSwitcherPage: React.FC = () => {
               No Tournaments Created Yet
             </h2>
             <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.95rem', maxWidth: '440px', lineHeight: 1.5 }}>
-              Get started by creating your first competitive tournament. Configure tiers, record qualifier attempts, seed brackets, and run live match play.
+              Get started by creating your first competitive tournament, or launch an instant end-to-end simulation with authentic competitive Tetris players.
             </p>
-            <button
-              onClick={() => setIsCreateModalOpen(true)}
-              className="btn btn-primary"
-              style={{ marginTop: '0.75rem', padding: '0.7rem 1.75rem', fontSize: '0.95rem', boxShadow: 'var(--shadow-gold)' }}
-            >
-              <Plus size={18} />
-              Create New Tournament
-            </button>
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center', marginTop: '0.75rem' }}>
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                className="btn btn-primary"
+                style={{ padding: '0.7rem 1.75rem', fontSize: '0.95rem', boxShadow: 'var(--shadow-gold)' }}
+              >
+                <Plus size={18} />
+                Create New Tournament
+              </button>
+              <button
+                onClick={handleSimulateSample}
+                disabled={isSimulating}
+                className="btn"
+                style={{
+                  padding: '0.7rem 1.75rem',
+                  fontSize: '0.95rem',
+                  background: 'rgba(59, 130, 246, 0.15)',
+                  color: '#60a5fa',
+                  border: '1px solid rgba(59, 130, 246, 0.35)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  cursor: isSimulating ? 'not-allowed' : 'pointer',
+                }}
+              >
+                <Sparkles size={18} />
+                {isSimulating ? 'Simulating...' : 'Simulate Sample Tournament'}
+              </button>
+            </div>
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(480px, 1fr))', gap: '1.5rem' }}>

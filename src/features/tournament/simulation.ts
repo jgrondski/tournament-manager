@@ -8,61 +8,33 @@ import {
 import { advanceMatchWinner } from '../bracket/math';
 import { generateDraftBracketsForTournament } from '../qualifiers/scoring';
 
-export const REALISTIC_PLAYER_NAMES = [
-  'Blue Scuti',
-  'Fractal',
-  'PixelAndy',
-  'DogPlayingTetris',
-  'Alex T',
-  'Tristop',
-  'Huffulufugus',
-  'Sharky',
-  'Cheez',
-  'EricICX',
-  'Sodium',
-  'Brak',
-  'Scallop',
-  'Ben Mullen',
-  'Jonas Neubauer',
-  'Koryan',
-  'Harry Hong',
-  'Svavar',
-  'Matt Martin',
-  'DanV',
-  'RedScuti',
-  'Myles',
-  'Frenzy',
-  'Trey Harrison',
-  'Batfoy',
-  'Meme',
-  'Bo Steil',
-  'Hydrant',
-  'GregBOI',
-  'Richard Wolf',
-  'Tim M',
-  'Marcin K',
-  'Jeff Moore',
-  'Buco',
-  'Eden',
-  'Pikacube',
-  'GreenScuti',
-  'Jake B',
-  'Sam D',
-  'Nate W',
-  'Lucas R',
-  'Thomas P',
-  'Victor L',
-  'Jordan C',
-  'Chris F',
-  'Logan K',
-  'Cody M',
-  'Leo T',
-  'Zack H',
-  'Tyler W',
-];
+import { AUTHENTIC_COMPETITOR_NAMES } from './data/authenticPlayers';
 
-const COUNTRIES = ['US', 'JP', 'CA', 'DE', 'GB', 'FR', 'SE', 'PL', 'AU', 'BR', 'KR', 'FI'];
+export const REALISTIC_PLAYER_NAMES = AUTHENTIC_COMPETITOR_NAMES;
+
+const COUNTRIES = [
+  'US', 'JP', 'CA', 'DE', 'GB', 'FR', 'SE', 'PL', 'AU', 'BR',
+  'KR', 'FI', 'IS', 'NL', 'DK', 'NO', 'ES', 'IT', 'MX', 'NZ'
+];
 const PLAYSTYLES: Array<'DAS' | 'Rolling' | 'Hypertap'> = ['Rolling', 'Rolling', 'Rolling', 'DAS', 'Hypertap'];
+
+const TAG_PREFIXES = ['Hyper', 'Pixel', 'Retro', 'Turbo', 'Shadow', 'Quantum', 'Aero', 'Chrono', 'Zenith', 'Echo', 'Neon', 'Vortex'];
+const TAG_SUFFIXES = ['Roll', 'Tap', 'Stack', 'Drop', 'Dash', 'Shift', 'Spark', 'Master', 'Knight', 'Fox', 'Blader', 'Tetris'];
+
+function generateFallbackTag(existingNames: Set<string>): string {
+  let attempt = 0;
+  while (attempt < 1000) {
+    const pre = TAG_PREFIXES[Math.floor(Math.random() * TAG_PREFIXES.length)];
+    const suf = TAG_SUFFIXES[Math.floor(Math.random() * TAG_SUFFIXES.length)];
+    const num = Math.floor(10 + Math.random() * 89);
+    const candidate = `${pre}${suf}_${num}`;
+    if (!existingNames.has(candidate.toLowerCase())) {
+      return candidate;
+    }
+    attempt++;
+  }
+  return `NeoStack_${Date.now() % 10000}`;
+}
 
 /**
  * Generate a list of realistic competitors with random playstyles, PBs, and countries.
@@ -72,22 +44,19 @@ export function generateRealisticPlayers(count: number, existingPool: PlayerProf
   const players: PlayerProfile[] = [...existingPool];
 
   let nameIdx = 0;
-  let customId = 1;
 
   while (players.length < count) {
     let name = '';
-    if (nameIdx < REALISTIC_PLAYER_NAMES.length) {
+    while (nameIdx < REALISTIC_PLAYER_NAMES.length) {
       const candidate = REALISTIC_PLAYER_NAMES[nameIdx++];
       if (!existingNames.has(candidate.toLowerCase())) {
         name = candidate;
+        break;
       }
     }
 
     if (!name) {
-      name = `Player ${customId++}`;
-      while (existingNames.has(name.toLowerCase())) {
-        name = `Player ${customId++}`;
-      }
+      name = generateFallbackTag(existingNames);
     }
 
     existingNames.add(name.toLowerCase());
@@ -97,8 +66,10 @@ export function generateRealisticPlayers(count: number, existingPool: PlayerProf
     // Personal best between 700,000 and 1,350,000
     const personalBest = Math.floor(700000 + Math.random() * 650000);
 
+    const rawUuid = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}_${players.length + 1}`;
+    const id = `p_sim_${rawUuid}`;
     players.push({
-      id: `p_sim_${Date.now()}_${players.length + 1}_${Math.random().toString(36).substring(2, 6)}`,
+      id,
       name,
       personalBest,
       playstyle,
@@ -121,7 +92,6 @@ export function generateAdditionalFakePlayers(
   const newPlayers: PlayerProfile[] = [];
 
   let nameIdx = 0;
-  let customId = existingPool.length + 1;
 
   while (newPlayers.length < count) {
     let name = '';
@@ -134,10 +104,7 @@ export function generateAdditionalFakePlayers(
     }
 
     if (!name) {
-      name = `Player ${customId++}`;
-      while (existingNames.has(name.toLowerCase())) {
-        name = `Player ${customId++}`;
-      }
+      name = generateFallbackTag(existingNames);
     }
 
     existingNames.add(name.toLowerCase());
@@ -146,8 +113,10 @@ export function generateAdditionalFakePlayers(
     const country = COUNTRIES[Math.floor(Math.random() * COUNTRIES.length)];
     const personalBest = Math.floor(700000 + Math.random() * 650000);
 
+    const rawUuid = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}_${newPlayers.length + 1}`;
+    const id = `p_sim_${rawUuid}`;
     newPlayers.push({
-      id: `p_sim_${Date.now()}_${existingPool.length + newPlayers.length + 1}_${Math.random().toString(36).substring(2, 6)}`,
+      id,
       name,
       personalBest,
       playstyle,

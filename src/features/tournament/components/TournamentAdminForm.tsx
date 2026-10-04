@@ -13,6 +13,7 @@ import { useOrganization } from '../../organizations/store';
 import { generateTraditionalBracket, generateFlatBracket, generateDoubleEliminationBracket, getValidFlatWidths } from '../../bracket/math';
 import { getDefaultTierColors, TierThemeColors } from '../../bracket/colorUtils';
 import { generateDraftBracketsForTournament } from '../../qualifiers/scoring';
+import { AUTHENTIC_COMPETITOR_NAMES } from '../data/authenticPlayers';
 import { pruneInvalidRoundOverrides } from '../roundOverrides';
 import { VerifyBracketModal } from './VerifyBracketModal';
 import { PointsThresholdsDrawer } from './PointsThresholdsDrawer';
@@ -356,7 +357,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
         backgroundColor: '#020203',
         isLocked: false,
         bracket: generateTraditionalBracket(
-          Array.from({ length: 16 }, (_, i) => ({ id: `p${i + 1}`, name: `Player ${i + 1}`, seed: i + 1 })),
+          Array.from({ length: 16 }, (_, i) => ({ id: `p${i + 1}`, name: AUTHENTIC_COMPETITOR_NAMES[i] || `TetrisPlayer_${i + 1}`, seed: i + 1 })),
           { tierId, bestOf: 5 }
         ),
       };
@@ -380,7 +381,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
         backgroundColor: '#0B0E14',
         isLocked: false,
         bracket: generateFlatBracket(
-          Array.from({ length: 9 }, (_, i) => ({ id: `p${i + 1}`, name: `Player ${i + 1}`, seed: i + 1 })),
+          Array.from({ length: 9 }, (_, i) => ({ id: `p${i + 17}`, name: AUTHENTIC_COMPETITOR_NAMES[i + 16] || `TetrisPlayer_${i + 17}`, seed: i + 1 })),
           2,
           { tierId, bestOf: 3, roundBestOfOverrides }
         ),
@@ -409,7 +410,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
         backgroundColor,
         isLocked: false,
         bracket: generateTraditionalBracket(
-          Array.from({ length: 8 }, (_, i) => ({ id: `p${i + 1}`, name: `Player ${i + 1}`, seed: i + 1 })),
+          Array.from({ length: 8 }, (_, i) => ({ id: `p${i + 26}`, name: AUTHENTIC_COMPETITOR_NAMES[i + 25] || `TetrisPlayer_${i + 26}`, seed: i + 1 })),
           { tierId, bestOf: 3 }
         ),
       };

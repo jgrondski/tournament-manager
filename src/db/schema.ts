@@ -21,14 +21,41 @@ export const players = pgTable(
   ]
 );
 
+export const organizations = pgTable(
+  'organizations',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    slug: text('slug').notNull(),
+    shortName: text('short_name'),
+    description: text('description'),
+    website: text('website'),
+    brandColor: text('brand_color'),
+    themeColors: jsonb('theme_colors').$type<Record<string, any>>(),
+    tierThemes: jsonb('tier_themes').$type<Array<Record<string, any>>>(),
+    branding: jsonb('branding').$type<Record<string, any>>(),
+    discordWebhookUrl: text('discord_webhook_url'),
+    defaultRules: jsonb('default_rules').$type<Record<string, any>>(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('organizations_slug_idx').on(table.slug),
+  ]
+);
+
 export const tournaments = pgTable('tournaments', {
   id: uuid('id').defaultRandom().primaryKey(),
+  organizationId: text('organization_id')
+    .references(() => organizations.id, { onDelete: 'restrict' })
+    .notNull(),
   name: text('name').notNull(),
+  slug: text('slug').notNull().default(''),
   qualFormat: text('qual_format', { enum: ['HIGH_SCORE', 'AVERAGE_OF_X', 'POINTS'] }).notNull(),
   qualAverageCount: integer('qual_average_count'),
   pointsConfig: jsonb('points_config').$type<Array<{ minScore: number; points: number }>>(),
   qualsClosed: boolean('quals_closed').notNull().default(false),
   isVerified: boolean('is_verified').notNull().default(false),
+  metadata: jsonb('metadata').$type<Record<string, any>>(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
@@ -37,11 +64,13 @@ export const bracketTiers = pgTable('bracket_tiers', {
   tournamentId: uuid('tournament_id').references(() => tournaments.id, { onDelete: 'cascade' }).notNull(),
   priorityOrder: integer('priority_order').notNull(),
   name: text('name').notNull(),
+  slug: text('slug').notNull().default(''),
   bracketType: text('bracket_type', { enum: ['TRADITIONAL', 'FLAT'] }).notNull(),
   flatWidth: integer('flat_width'),
   numPlayers: integer('num_players').notNull(),
   primaryColor: text('primary_color').notNull().default('#FFD700'),
   secondaryColor: text('secondary_color').notNull().default('#000000'),
+  metadata: jsonb('metadata').$type<Record<string, any>>(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 

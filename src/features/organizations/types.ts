@@ -31,6 +31,7 @@ export interface OrgCompetitorRecord {
 }
 
 export interface CreateOrganizationInput {
+  id?: string;
   name: string;
   slug: string;
   shortName?: string;

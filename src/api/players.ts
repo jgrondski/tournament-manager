@@ -56,6 +56,35 @@ export async function createPlayer(data: {
   return created as PlayerRecord;
 }
 
+export async function createPlayersBatch(records: Array<{
+  name: string;
+  country?: string;
+  avatarType?: 'flag' | 'custom';
+  avatarUrl?: string;
+  avatarThumbnailUrl?: string;
+  personalBest?: number;
+  playstyle?: string;
+  notes?: string;
+}>): Promise<PlayerRecord[]> {
+  const db = getDb();
+  if (records.length === 0) return [];
+  const inserted = await db
+    .insert(players)
+    .values(records.map(r => ({
+      name: r.name.trim(),
+      country: r.country || null,
+      avatarType: r.avatarType || 'flag',
+      avatarUrl: r.avatarUrl || null,
+      avatarThumbnailUrl: r.avatarThumbnailUrl || null,
+      personalBest: r.personalBest ?? 0,
+      playstyle: r.playstyle || null,
+      notes: r.notes || null,
+    })))
+    .onConflictDoNothing()
+    .returning();
+  return inserted as PlayerRecord[];
+}
+
 export async function listPlayers(): Promise<PlayerRecord[]> {
   const db = getDb();
   return (await db.select().from(players)) as PlayerRecord[];

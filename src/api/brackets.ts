@@ -1,5 +1,5 @@
-import { matches, games, tournaments } from '../db/schema';
-import { eq } from 'drizzle-orm';
+import { matches, games, tournaments, bracketTiers } from '../db/schema';
+import { eq, inArray } from 'drizzle-orm';
 import { getDb } from '../db';
 
 export interface MatchRecord {
@@ -100,4 +100,13 @@ export async function recordGameScore(input: {
     .returning();
 
   return createdGame as GameRecord;
+}
+
+export async function clearTournamentMatches(tournamentId: string): Promise<boolean> {
+  const db = getDb();
+  const tiers = await db.select({ id: bracketTiers.id }).from(bracketTiers).where(eq(bracketTiers.tournamentId, tournamentId));
+  if (tiers.length === 0) return false;
+  const tierIds = tiers.map((t: { id: string }) => t.id);
+  const res = await db.delete(matches).where(inArray(matches.tierId, tierIds)).returning();
+  return res.length > 0;
 }

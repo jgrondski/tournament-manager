@@ -56,7 +56,7 @@ describe('Global Player Pool & Simulation', () => {
       });
     });
 
-    it('generates fallback Player X names when predefined names are exhausted', () => {
+    it('generates unique gamer tag fallback names when predefined names are exhausted without generic Player X', () => {
       // Request more players than in REALISTIC_PLAYER_NAMES list
       const largeCount = REALISTIC_PLAYER_NAMES.length + 15;
       const players = generateAdditionalFakePlayers(largeCount);
@@ -66,9 +66,9 @@ describe('Global Player Pool & Simulation', () => {
       const uniqueNames = new Set(players.map(p => p.name.toLowerCase()));
       expect(uniqueNames.size).toBe(largeCount);
 
-      // Verify at least some generated have 'Player ' prefix
-      const fallbackPlayers = players.filter(p => p.name.startsWith('Player '));
-      expect(fallbackPlayers.length).toBeGreaterThanOrEqual(15);
+      // Verify NO generic 'Player ' prefix names are generated
+      const genericPlayers = players.filter(p => /^Player\s+\d+/i.test(p.name));
+      expect(genericPlayers.length).toBe(0);
     });
   });
 

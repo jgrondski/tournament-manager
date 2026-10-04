@@ -41,14 +41,38 @@ export function setupTestDb() {
     );
     CREATE UNIQUE INDEX players_name_lower_idx ON players (lower(trim(name)));
 
+    CREATE TABLE organizations (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL UNIQUE,
+      short_name TEXT,
+      description TEXT,
+      website TEXT,
+      brand_color TEXT,
+      theme_colors JSONB,
+      tier_themes JSONB,
+      branding JSONB,
+      discord_webhook_url TEXT,
+      default_rules JSONB,
+      created_at TIMESTAMP NOT NULL DEFAULT now()
+    );
+
+    INSERT INTO organizations (id, name, slug, short_name, description, brand_color)
+    VALUES 
+      ('org_ctwc', 'Classic Tetris World Championship', 'ctwc', 'CTWC', 'The premier global esports tournament for Classic NES Tetris.', '#ffc905'),
+      ('org_ctm', 'Classic Tetris Monthly', 'ctm', 'CTM', 'The world’s largest online monthly tournament series for Classic Tetris.', '#38bdf8');
+
     CREATE TABLE tournaments (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE RESTRICT,
       name TEXT NOT NULL,
+      slug TEXT NOT NULL DEFAULT '',
       qual_format TEXT NOT NULL,
       qual_average_count INTEGER,
       points_config JSONB,
       quals_closed BOOLEAN NOT NULL DEFAULT false,
       is_verified BOOLEAN NOT NULL DEFAULT false,
+      metadata JSONB,
       created_at TIMESTAMP NOT NULL DEFAULT now()
     );
 
@@ -57,11 +81,13 @@ export function setupTestDb() {
       tournament_id UUID NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
       priority_order INTEGER NOT NULL,
       name TEXT NOT NULL,
+      slug TEXT NOT NULL DEFAULT '',
       bracket_type TEXT NOT NULL,
       flat_width INTEGER,
       num_players INTEGER NOT NULL,
       primary_color TEXT NOT NULL DEFAULT '#FFD700',
       secondary_color TEXT NOT NULL DEFAULT '#000000',
+      metadata JSONB,
       created_at TIMESTAMP NOT NULL DEFAULT now()
     );
 

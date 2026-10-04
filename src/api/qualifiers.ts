@@ -41,6 +41,36 @@ export async function submitQualifierScore(
   return created as QualifierSubmissionRecord;
 }
 
+export async function submitQualifiersBatch(
+  tournamentId: string,
+  submissions: Array<{ playerId: string; score: number }>
+): Promise<QualifierSubmissionRecord[]> {
+  const db = getDb();
+  if (submissions.length === 0) return [];
+  const t = await db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1);
+  if (t.length === 0) throw new Error('Tournament not found');
+  if (t[0].qualsClosed) throw new Error('Qualifiers are closed for this tournament');
+
+  const inserted = await db
+    .insert(qualifierSubmissions)
+    .values(submissions.map(s => ({
+      tournamentId,
+      playerId: s.playerId,
+      score: s.score,
+    })))
+    .returning();
+  return inserted as QualifierSubmissionRecord[];
+}
+
+export async function clearTournamentQualifiers(tournamentId: string): Promise<boolean> {
+  const db = getDb();
+  const res = await db
+    .delete(qualifierSubmissions)
+    .where(eq(qualifierSubmissions.tournamentId, tournamentId))
+    .returning();
+  return res.length > 0;
+}
+
 export async function getQualifierLeaderboard(tournamentId: string): Promise<LeaderboardEntry[]> {
   const db = getDb();
   const t = await db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1);

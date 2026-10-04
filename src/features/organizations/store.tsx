@@ -137,54 +137,29 @@ interface OrganizationContextType {
 const OrganizationContext = createContext<OrganizationContextType | null>(null);
 
 export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [organizations, setOrganizations] = useState<Organization[]>(() => {
-    try {
-      const saved = localStorage.getItem(ORGANIZATIONS_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed
-            .filter((o: any) => o.id !== 'org_lone_star' && o.slug !== 'lone-star')
-            .map((o: any) => ({
-              ...o,
-              shortName: o.shortName || (o.slug ? o.slug.toUpperCase() : o.name),
-              tierThemes: (o.id === 'org_ctwc' && (o.tierThemes?.some((t: any) => t.id === 'theme_ctwc_gold') || !o.tierThemes?.some((t: any) => t.name === 'Bronze')))
-                ? DEFAULT_ORGANIZATIONS[0].tierThemes
-                : (o.tierThemes && o.tierThemes.length > 0 ? o.tierThemes : [
-                    {
-                      id: `theme_${o.id}_primary`,
-                      name: 'Primary Tier',
-                      themeColors: o.themeColors || o.branding?.themeColors || {
-                        primaryColor: o.brandColor || '#ffc905',
-                        secondaryColor: '#705b33',
-                        cardColor: '#1b1c1d',
-                        textColor: '#94A3B8',
-                        backgroundColor: '#020203',
-                      },
-                    },
-                  ]),
-              branding: o.branding || {
-                logoUrl: o.logoUrl,
-                bannerUrl: o.bannerUrl,
-                themeColors: o.themeColors,
-                brandColor: o.brandColor,
-              },
-            }));
-        }
-      }
-    } catch {
-      // fallback to defaults
-    }
-    return DEFAULT_ORGANIZATIONS;
-  });
+  const [organizations, setOrganizations] = useState<Organization[]>(DEFAULT_ORGANIZATIONS);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(ORGANIZATIONS_STORAGE_KEY, JSON.stringify(organizations));
-    } catch {
-      // storage quota fallback
+    let isMounted = true;
+    if (typeof window !== 'undefined' && typeof fetch === 'function') {
+      fetch('/api/organizations')
+        .then(res => {
+          if (!res.ok) throw new Error('Failed to load organizations');
+          return res.json();
+        })
+        .then(data => {
+          if (isMounted && Array.isArray(data) && data.length > 0) {
+            setOrganizations(data);
+          }
+        })
+        .catch(() => {
+          // Gracefully fallback to DEFAULT_ORGANIZATIONS
+        });
     }
-  }, [organizations]);
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const getOrganizationById = (id: string) => {
     return organizations.find(o => o.id === id);
@@ -229,6 +204,25 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
 
     setOrganizations(prev => [newOrg, ...prev]);
+
+    if (typeof window !== 'undefined' && typeof fetch === 'function') {
+      fetch('/api/organizations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newOrg),
+      })
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
+        .then(saved => {
+          if (saved && saved.id) {
+            setOrganizations(prev => prev.map(o => (o.id === newOrg.id ? saved : o)));
+          }
+        })
+        .catch(err => console.error('Failed to persist organization to API:', err));
+    }
+
     return newOrg;
   };
 
@@ -255,6 +249,14 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         };
       })
     );
+
+    if (typeof window !== 'undefined' && typeof fetch === 'function') {
+      fetch(`/api/organizations/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      }).catch(err => console.error('Failed to update organization in API:', err));
+    }
   };
 
   const deleteOrganization = (
@@ -269,6 +271,13 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
 
     setOrganizations(prev => prev.filter(o => o.id !== id));
+
+    if (typeof window !== 'undefined' && typeof fetch === 'function') {
+      fetch(`/api/organizations/${id}`, {
+        method: 'DELETE',
+      }).catch(err => console.error('Failed to delete organization from API:', err));
+    }
+
     return { success: true };
   };
 
