@@ -4,16 +4,22 @@ import { getDb } from '../db';
 
 export interface TierInput {
   name: string;
+  slug?: string;
   bracketType: 'TRADITIONAL' | 'FLAT';
   numPlayers: number;
   priorityOrder: number;
   flatWidth?: number;
   primaryColor?: string;
   secondaryColor?: string;
+  eliminationType?: 'SINGLE' | 'DOUBLE';
+  bracketRouting?: 'TRADITIONAL' | 'FLAT_STAGED' | 'ACCELERATED_HYBRID';
+  bestOf?: number;
+  metadata?: Record<string, any>;
 }
 
 export interface TournamentInput {
   name: string;
+  slug?: string;
   organizationId?: string;
   qualFormat: 'HIGH_SCORE' | 'AVERAGE_OF_X' | 'POINTS';
   qualAverageCount?: number;
@@ -26,6 +32,7 @@ export interface TournamentRecord {
   id: string;
   organizationId: string;
   name: string;
+  slug: string;
   qualFormat: 'HIGH_SCORE' | 'AVERAGE_OF_X' | 'POINTS';
   qualAverageCount: number | null;
   pointsConfig: Array<{ minScore: number; points: number }> | null;
@@ -53,10 +60,12 @@ export async function createTournament(input: TournamentInput): Promise<{
 }> {
   const db = getDb();
   const orgId = input.organizationId || 'org_ctwc';
+  const computedSlug = input.slug || input.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
   const [t] = await db
     .insert(tournaments)
     .values({
       name: input.name,
+      slug: computedSlug,
       organizationId: orgId,
       qualFormat: input.qualFormat,
       qualAverageCount: input.qualAverageCount || null,
@@ -68,17 +77,25 @@ export async function createTournament(input: TournamentInput): Promise<{
   const createdTiers: TierRecord[] = [];
   if (input.tiers && input.tiers.length > 0) {
     for (const tier of input.tiers) {
+      const tierMeta = {
+        eliminationType: tier.eliminationType || 'SINGLE',
+        bracketRouting: tier.bracketRouting,
+        bestOf: tier.bestOf || 3,
+        ...(tier.metadata || {}),
+      };
       const [tr] = await db
         .insert(bracketTiers)
         .values({
           tournamentId: t.id,
           name: tier.name,
+          slug: tier.slug || tier.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
           priorityOrder: tier.priorityOrder,
           bracketType: tier.bracketType,
           flatWidth: tier.flatWidth || null,
           numPlayers: tier.numPlayers,
           primaryColor: tier.primaryColor || '#FFD700',
           secondaryColor: tier.secondaryColor || '#000000',
+          metadata: tierMeta,
         })
         .returning();
       createdTiers.push(tr as TierRecord);
@@ -93,14 +110,22 @@ export async function listTournaments(): Promise<TournamentRecord[]> {
   return (await db.select().from(tournaments)) as TournamentRecord[];
 }
 
+export function isUuid(val: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+}
+
 export async function getTournament(id: string): Promise<{
   tournament: TournamentRecord;
   tiers: TierRecord[];
 } | null> {
   const db = getDb();
-  const t = await db.select().from(tournaments).where(eq(tournaments.id, id)).limit(1);
+  const isIdUuid = isUuid(id);
+  const condition = isIdUuid
+    ? or(eq(tournaments.id, id), eq(tournaments.slug, id))
+    : eq(tournaments.slug, id);
+  const t = await db.select().from(tournaments).where(condition).limit(1);
   if (t.length === 0) return null;
-  const tr = await db.select().from(bracketTiers).where(eq(bracketTiers.tournamentId, id));
+  const tr = await db.select().from(bracketTiers).where(eq(bracketTiers.tournamentId, t[0].id));
   return { tournament: t[0] as TournamentRecord, tiers: tr as TierRecord[] };
 }
 
@@ -115,19 +140,18 @@ export async function deleteTournament(id: string): Promise<boolean> {
   return res.length > 0;
 }
 
-export function isUuid(val: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
-}
 
-import { players, tournamentPlayers, qualifierSubmissions } from '../db/schema';
-import { desc, or } from 'drizzle-orm';
+import { players, tournamentPlayers, qualifierSubmissions, matches, games } from '../db/schema';
+import { desc, or, inArray } from 'drizzle-orm';
 import type {
   Tournament,
   TournamentTier,
   PlayerProfile,
   TournamentPlayer,
   QualifierSubmission,
+  MatchScoreRecord,
 } from '../features/tournament/types';
+import type { BracketMatch } from '../features/bracket/types';
 
 export async function getFullTournament(idOrSlug: string): Promise<Tournament | null> {
   const db = getDb();
@@ -160,6 +184,59 @@ export async function getFullTournament(idOrSlug: string): Promise<Tournament | 
     .from(tournamentPlayers)
     .innerJoin(players, eq(tournamentPlayers.playerId, players.id))
     .where(eq(tournamentPlayers.tournamentId, t.id));
+
+  const tierIds = (tiersList as any[]).map((tr: any) => tr.id);
+  const dbMatches = tierIds.length > 0
+    ? await db.select().from(matches).where(inArray(matches.tierId, tierIds))
+    : [];
+
+  const matchIds = (dbMatches as any[]).map((m: any) => m.id);
+  const dbGames = matchIds.length > 0
+    ? await db.select().from(games).where(inArray(games.matchId, matchIds)).orderBy(games.gameNumber)
+    : [];
+
+  const gamesByMatch = new Map<string, any[]>();
+  for (const g of dbGames as any[]) {
+    if (!gamesByMatch.has(g.matchId)) gamesByMatch.set(g.matchId, []);
+    gamesByMatch.get(g.matchId)!.push(g);
+  }
+
+  const relationalMatchScores: Record<string, MatchScoreRecord> = {};
+  for (const m of dbMatches as any[]) {
+    const mGames = gamesByMatch.get(m.id) || [];
+    let p1Wins = 0;
+    let p2Wins = 0;
+    for (const g of mGames) {
+      if (m.player1Id && g.winnerId === m.player1Id) p1Wins++;
+      else if (m.player2Id && g.winnerId === m.player2Id) p2Wins++;
+    }
+    const bestOf = m.bestOf || 3;
+    const threshold = Math.ceil(bestOf / 2);
+    const isComplete = Boolean(
+      m.isComplete ||
+      (m.winnerId && (p1Wins >= threshold || p2Wins >= threshold || m.isForfeit))
+    );
+
+    relationalMatchScores[m.id] = {
+      matchId: m.id,
+      tierId: m.tierId,
+      organizationId: t.organizationId,
+      bestOf,
+      player1Wins: p1Wins,
+      player2Wins: p2Wins,
+      games: mGames.map((g: any) => ({
+        gameNumber: g.gameNumber,
+        player1Points: g.player1Score,
+        player2Points: g.player2Score,
+        winnerPlayerId: g.winnerId,
+      })),
+      winnerPlayerId: m.winnerId,
+      loserPlayerId: m.loserId,
+      isComplete,
+      notes: m.isForfeit ? 'Forfeit win' : undefined,
+      forfeitWinnerId: m.isForfeit ? (m.winnerId || undefined) : undefined,
+    };
+  }
 
   const meta = (t.metadata as Record<string, any>) || {};
 
@@ -196,6 +273,43 @@ export async function getFullTournament(idOrSlug: string): Promise<Tournament | 
 
   const compositeTiers: TournamentTier[] = (tiersList as any[]).map((tier: any) => {
     const tierMeta = (tier.metadata as Record<string, any>) || {};
+    const bracket = tierMeta.bracket ? { ...tierMeta.bracket } : undefined;
+
+    // Reconcile bracket rounds & matchesById with relational database matches
+    if (bracket) {
+      if (bracket.matchesById) {
+        bracket.matchesById = { ...bracket.matchesById };
+        for (const [mId, m] of Object.entries(bracket.matchesById)) {
+          const score = relationalMatchScores[mId];
+          if (score) {
+            bracket.matchesById[mId] = {
+              ...(m as any),
+              winnerId: score.winnerPlayerId,
+              loserId: score.loserPlayerId,
+              bestOf: score.bestOf,
+            };
+          }
+        }
+      }
+      if (bracket.rounds) {
+        bracket.rounds = bracket.rounds.map((r: any) => ({
+          ...r,
+          matches: (r.matches || []).map((m: any) => {
+            const score = relationalMatchScores[m.id];
+            if (score) {
+              return {
+                ...m,
+                winnerId: score.winnerPlayerId,
+                loserId: score.loserPlayerId,
+                bestOf: score.bestOf,
+              };
+            }
+            return m;
+          }),
+        }));
+      }
+    }
+
     return {
       id: tier.id,
       slug: tier.slug || tier.id,
@@ -217,7 +331,7 @@ export async function getFullTournament(idOrSlug: string): Promise<Tournament | 
       bestOf: tierMeta.bestOf || 3,
       isLocked: Boolean(tierMeta.isLocked || t.qualsClosed),
       roundBestOfOverrides: tierMeta.roundBestOfOverrides || {},
-      bracket: tierMeta.bracket,
+      bracket,
     };
   });
 
@@ -235,7 +349,10 @@ export async function getFullTournament(idOrSlug: string): Promise<Tournament | 
     pointsConfig: (t.pointsConfig as any) || undefined,
     isLocked: Boolean(t.qualsClosed || meta.isLocked),
     tiers: compositeTiers,
-    matchScores: meta.matchScores || {},
+    matchScores: {
+      ...(meta.matchScores || {}),
+      ...relationalMatchScores,
+    },
     playersPool,
     qualifierSubmissions: qualifierSubmissionsList,
     tournamentPlayers: tournamentPlayersMap,
@@ -406,8 +523,138 @@ export async function saveFullTournament(tourney: Tournament): Promise<Tournamen
     }
   }
 
-  // Sync tournament players if present
-  if (tourney.playersPool && tourney.playersPool.length > 0) {
+  // Sync relational matches and games for all active tiers
+  for (let idx = 0; idx < (tourney.tiers || []).length; idx++) {
+    const t = tourney.tiers[idx];
+    const tierUuid = isUuid(t.id)
+      ? t.id
+      : ((existingTiers as any[]).find((et: any) => et.slug === t.slug)?.id || Array.from(currentTierIds)[idx]);
+
+    if (!tierUuid) continue;
+
+    // Delete existing matches for this tier (foreign key cascade deletes existing games)
+    await db.delete(matches).where(eq(matches.tierId, tierUuid));
+
+    const shouldPersistMatches = Boolean(
+      tourney.isLocked ||
+      t.isLocked ||
+      (tourney.matchScores && Object.keys(tourney.matchScores).length > 0)
+    );
+
+    if (t.bracket && shouldPersistMatches) {
+      const matchMap = new Map<string, BracketMatch>();
+      if (t.bracket.matchesById) {
+        for (const [mId, m] of Object.entries(t.bracket.matchesById)) {
+          matchMap.set(mId, m);
+        }
+      }
+      if (t.bracket.rounds) {
+        for (const r of t.bracket.rounds) {
+          for (const m of r.matches || []) {
+            matchMap.set(m.id, m);
+          }
+        }
+      }
+
+      const matchesToInsert: Array<any> = [];
+      const gamesToInsert: Array<any> = [];
+
+      for (const m of matchMap.values()) {
+        const scoreRec = tourney.matchScores?.[m.id];
+        const p1Id = m.player1?.player?.id && isUuid(m.player1.player.id) ? m.player1.player.id : null;
+        const p2Id = m.player2?.player?.id && isUuid(m.player2.player.id) ? m.player2.player.id : null;
+
+        let winId = (scoreRec?.winnerPlayerId && isUuid(scoreRec.winnerPlayerId))
+          ? scoreRec.winnerPlayerId
+          : ((m.winnerId && isUuid(m.winnerId)) ? m.winnerId : null);
+        let losId = (scoreRec?.loserPlayerId && isUuid(scoreRec.loserPlayerId))
+          ? scoreRec.loserPlayerId
+          : ((m.loserId && isUuid(m.loserId)) ? m.loserId : null);
+
+        if (winId && !losId && p1Id && p2Id) {
+          losId = winId === p1Id ? p2Id : p1Id;
+        }
+
+        const bestOf = scoreRec?.bestOf || m.bestOf || t.bestOf || 3;
+        const threshold = Math.ceil(bestOf / 2);
+        const p1Wins = scoreRec?.player1Wins ?? 0;
+        const p2Wins = scoreRec?.player2Wins ?? 0;
+        const isForfeit = Boolean(
+          scoreRec?.forfeitWinnerId || scoreRec?.notes?.toLowerCase().includes('forfeit')
+        );
+        const isComplete = Boolean(
+          scoreRec?.isComplete ||
+          (winId && (p1Wins >= threshold || p2Wins >= threshold || isForfeit))
+        );
+
+        matchesToInsert.push({
+          id: m.id,
+          tierId: tierUuid,
+          roundNumber: m.roundNumber || 1,
+          matchNumber: m.matchNumber || null,
+          stage: m.stage || null,
+          roundIdentifier: m.roundIdentifier || null,
+          player1Id: p1Id,
+          player2Id: p2Id,
+          winnerId: winId,
+          loserId: losId,
+          bestOf,
+          isForfeit,
+          isComplete,
+          metadata: {
+            nextMatchId: m.nextMatchId,
+            nextMatchSlot: m.nextMatchSlot,
+            loserNextMatchId: m.loserNextMatchId,
+            loserNextMatchSlot: m.loserNextMatchSlot,
+            slotA: m.slotA,
+            slotB: m.slotB,
+            player1SourceMatchId: m.player1?.sourceMatchId,
+            player2SourceMatchId: m.player2?.sourceMatchId,
+            isBye: m.isBye,
+          },
+        });
+
+        if (scoreRec?.games && scoreRec.games.length > 0) {
+          for (const g of scoreRec.games) {
+            if (g.player1Points !== null || g.player2Points !== null || g.winnerPlayerId !== null) {
+              const gWinId = g.winnerPlayerId && isUuid(g.winnerPlayerId) ? g.winnerPlayerId : null;
+              let gLosId: string | null = null;
+              if (gWinId && p1Id && p2Id) {
+                gLosId = gWinId === p1Id ? p2Id : p1Id;
+              }
+              gamesToInsert.push({
+                id: crypto.randomUUID(),
+                matchId: m.id,
+                gameNumber: g.gameNumber,
+                player1Score: g.player1Points ?? 0,
+                player2Score: g.player2Points ?? 0,
+                winnerId: gWinId,
+                loserId: gLosId,
+                isIntentionalTopout: false,
+              });
+            }
+          }
+        }
+      }
+
+      if (matchesToInsert.length > 0) {
+        const CHUNK = 50;
+        for (let i = 0; i < matchesToInsert.length; i += CHUNK) {
+          await db.insert(matches).values(matchesToInsert.slice(i, i + CHUNK));
+        }
+      }
+
+      if (gamesToInsert.length > 0) {
+        const CHUNK = 50;
+        for (let i = 0; i < gamesToInsert.length; i += CHUNK) {
+          await db.insert(games).values(gamesToInsert.slice(i, i + CHUNK));
+        }
+      }
+    }
+  }
+
+  // Sync tournament players
+  if (Array.isArray(tourney.playersPool)) {
     // Delete existing tournament players for this tournament
     await db.delete(tournamentPlayers).where(eq(tournamentPlayers.tournamentId, savedTourneyId));
     // Filter to valid UUID players
@@ -432,8 +679,8 @@ export async function saveFullTournament(tourney: Tournament): Promise<Tournamen
     }
   }
 
-  // Sync qualifier submissions if present
-  if (tourney.qualifierSubmissions && tourney.qualifierSubmissions.length > 0) {
+  // Sync qualifier submissions
+  if (Array.isArray(tourney.qualifierSubmissions)) {
     await db.delete(qualifierSubmissions).where(eq(qualifierSubmissions.tournamentId, savedTourneyId));
     const validSubs = tourney.qualifierSubmissions.filter(s => isUuid(s.playerId));
     if (validSubs.length > 0) {

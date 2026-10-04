@@ -95,15 +95,20 @@ export const qualifierSubmissions = pgTable('qualifier_submissions', {
 export const matches = pgTable(
   'matches',
   {
-    id: uuid('id').defaultRandom().primaryKey(),
+    id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
     tierId: uuid('tier_id').references(() => bracketTiers.id, { onDelete: 'cascade' }).notNull(),
     roundNumber: integer('round_number').notNull(),
+    matchNumber: integer('match_number'),
+    stage: text('stage'),
+    roundIdentifier: text('round_identifier'),
     player1Id: uuid('player1_id').references(() => players.id, { onDelete: 'set null' }),
     player2Id: uuid('player2_id').references(() => players.id, { onDelete: 'set null' }),
     winnerId: uuid('winner_id').references(() => players.id, { onDelete: 'set null' }),
     loserId: uuid('loser_id').references(() => players.id, { onDelete: 'set null' }),
     bestOf: integer('best_of').notNull().default(3),
     isForfeit: boolean('is_forfeit').notNull().default(false),
+    isComplete: boolean('is_complete').notNull().default(false),
+    metadata: jsonb('metadata').$type<Record<string, any>>(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   (table) => [
@@ -114,7 +119,7 @@ export const matches = pgTable(
 
 export const games = pgTable('games', {
   id: uuid('id').defaultRandom().primaryKey(),
-  matchId: uuid('match_id').references(() => matches.id, { onDelete: 'cascade' }).notNull(),
+  matchId: text('match_id').references(() => matches.id, { onDelete: 'cascade' }).notNull(),
   gameNumber: integer('game_number').notNull(),
   player1Score: integer('player1_score').notNull().default(0),
   player2Score: integer('player2_score').notNull().default(0),
@@ -123,3 +128,4 @@ export const games = pgTable('games', {
   isIntentionalTopout: boolean('is_intentional_topout').notNull().default(false),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
+

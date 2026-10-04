@@ -1,5 +1,5 @@
 import { matches, games, tournaments, bracketTiers } from '../db/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, or } from 'drizzle-orm';
 import { getDb } from '../db';
 
 export interface MatchRecord {
@@ -28,6 +28,7 @@ export interface GameRecord {
 }
 
 export async function createMatch(input: {
+  id?: string;
   tierId: string;
   roundNumber: number;
   player1Id?: string | null;
@@ -38,6 +39,7 @@ export async function createMatch(input: {
   const [created] = await db
     .insert(matches)
     .values({
+      id: input.id || crypto.randomUUID(),
       tierId: input.tierId,
       roundNumber: input.roundNumber,
       player1Id: input.player1Id || null,
@@ -64,8 +66,13 @@ export async function recordGameScore(input: {
   const db = getDb();
 
   // 1. Verify tournament verification status
-  const t = await db.select().from(tournaments).where(eq(tournaments.id, input.tournamentId)).limit(1);
+  const isIdUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.tournamentId);
+  const condition = isIdUuid
+    ? or(eq(tournaments.id, input.tournamentId), eq(tournaments.slug, input.tournamentId))
+    : eq(tournaments.slug, input.tournamentId);
+  const t = await db.select().from(tournaments).where(condition).limit(1);
   if (t.length === 0) throw new Error('Tournament not found');
+
   if (!t[0].isVerified) {
     throw new Error('Cannot record match scores for an unverified bracket');
   }
@@ -104,7 +111,18 @@ export async function recordGameScore(input: {
 
 export async function clearTournamentMatches(tournamentId: string): Promise<boolean> {
   const db = getDb();
-  const tiers = await db.select({ id: bracketTiers.id }).from(bracketTiers).where(eq(bracketTiers.tournamentId, tournamentId));
+  let resolvedTourneyId = tournamentId;
+  const isIdUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tournamentId);
+  if (!isIdUuid) {
+    const [tourney] = await db
+      .select({ id: tournaments.id })
+      .from(tournaments)
+      .where(eq(tournaments.slug, tournamentId))
+      .limit(1);
+    if (!tourney) return false;
+    resolvedTourneyId = tourney.id;
+  }
+  const tiers = await db.select({ id: bracketTiers.id }).from(bracketTiers).where(eq(bracketTiers.tournamentId, resolvedTourneyId));
   if (tiers.length === 0) return false;
   const tierIds = tiers.map((t: { id: string }) => t.id);
   const res = await db.delete(matches).where(inArray(matches.tierId, tierIds)).returning();

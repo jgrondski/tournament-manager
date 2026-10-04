@@ -18,6 +18,10 @@ export interface LeaderboardEntry {
   topScores: number[];
 }
 
+function isUuid(val: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+}
+
 export async function submitQualifierScore(
   tournamentId: string,
   playerId: string,
@@ -26,14 +30,26 @@ export async function submitQualifierScore(
   if (score < 0) throw new Error('Score must be positive');
 
   const db = getDb();
-  const t = await db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1);
-  if (t.length === 0) throw new Error('Tournament not found');
-  if (t[0].qualsClosed) throw new Error('Qualifiers are closed for this tournament');
+  let resolvedTourneyId = tournamentId;
+  if (!isUuid(tournamentId)) {
+    const [tourney] = await db
+      .select({ id: tournaments.id, qualsClosed: tournaments.qualsClosed })
+      .from(tournaments)
+      .where(eq(tournaments.slug, tournamentId))
+      .limit(1);
+    if (!tourney) throw new Error('Tournament not found');
+    if (tourney.qualsClosed) throw new Error('Qualifiers are closed for this tournament');
+    resolvedTourneyId = tourney.id;
+  } else {
+    const t = await db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1);
+    if (t.length === 0) throw new Error('Tournament not found');
+    if (t[0].qualsClosed) throw new Error('Qualifiers are closed for this tournament');
+  }
 
   const [created] = await db
     .insert(qualifierSubmissions)
     .values({
-      tournamentId,
+      tournamentId: resolvedTourneyId,
       playerId,
       score,
     })
@@ -47,14 +63,26 @@ export async function submitQualifiersBatch(
 ): Promise<QualifierSubmissionRecord[]> {
   const db = getDb();
   if (submissions.length === 0) return [];
-  const t = await db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1);
-  if (t.length === 0) throw new Error('Tournament not found');
-  if (t[0].qualsClosed) throw new Error('Qualifiers are closed for this tournament');
+  let resolvedTourneyId = tournamentId;
+  if (!isUuid(tournamentId)) {
+    const [tourney] = await db
+      .select({ id: tournaments.id, qualsClosed: tournaments.qualsClosed })
+      .from(tournaments)
+      .where(eq(tournaments.slug, tournamentId))
+      .limit(1);
+    if (!tourney) throw new Error('Tournament not found');
+    if (tourney.qualsClosed) throw new Error('Qualifiers are closed for this tournament');
+    resolvedTourneyId = tourney.id;
+  } else {
+    const t = await db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1);
+    if (t.length === 0) throw new Error('Tournament not found');
+    if (t[0].qualsClosed) throw new Error('Qualifiers are closed for this tournament');
+  }
 
   const inserted = await db
     .insert(qualifierSubmissions)
     .values(submissions.map(s => ({
-      tournamentId,
+      tournamentId: resolvedTourneyId,
       playerId: s.playerId,
       score: s.score,
     })))
@@ -64,25 +92,49 @@ export async function submitQualifiersBatch(
 
 export async function clearTournamentQualifiers(tournamentId: string): Promise<boolean> {
   const db = getDb();
+  let resolvedTourneyId = tournamentId;
+  if (!isUuid(tournamentId)) {
+    const [tourney] = await db
+      .select({ id: tournaments.id })
+      .from(tournaments)
+      .where(eq(tournaments.slug, tournamentId))
+      .limit(1);
+    if (!tourney) return false;
+    resolvedTourneyId = tourney.id;
+  }
   const res = await db
     .delete(qualifierSubmissions)
-    .where(eq(qualifierSubmissions.tournamentId, tournamentId))
+    .where(eq(qualifierSubmissions.tournamentId, resolvedTourneyId))
     .returning();
   return res.length > 0;
 }
 
 export async function getQualifierLeaderboard(tournamentId: string): Promise<LeaderboardEntry[]> {
   const db = getDb();
-  const t = await db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1);
-  if (t.length === 0) return [];
-  const tourneyQualFormat = t[0].qualFormat;
-  const qualAvgCount = t[0].qualAverageCount || 2;
-  const pointsConfig = t[0].pointsConfig || [];
+  let resolvedTourneyId = tournamentId;
+  let tRow: any = null;
+  if (!isUuid(tournamentId)) {
+    const [tourney] = await db
+      .select()
+      .from(tournaments)
+      .where(eq(tournaments.slug, tournamentId))
+      .limit(1);
+    if (!tourney) return [];
+    tRow = tourney;
+    resolvedTourneyId = tourney.id;
+  } else {
+    const t = await db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1);
+    if (t.length === 0) return [];
+    tRow = t[0];
+  }
+  const tourneyQualFormat = tRow.qualFormat;
+  const qualAvgCount = tRow.qualAverageCount || 2;
+  const pointsConfig = tRow.pointsConfig || [];
 
   const allSubmissions = (await db
     .select()
     .from(qualifierSubmissions)
-    .where(eq(qualifierSubmissions.tournamentId, tournamentId))
+    .where(eq(qualifierSubmissions.tournamentId, resolvedTourneyId))
     .orderBy(desc(qualifierSubmissions.score))) as QualifierSubmissionRecord[];
 
   // Group by player

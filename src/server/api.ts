@@ -29,8 +29,20 @@ import {
 } from '../api/organizations';
 import { runFullSimulation, generateSimulatedQualifiers } from '../features/tournament/simulation';
 import { AUTHENTIC_COMPETITOR_NAMES } from '../features/tournament/data/authenticPlayers';
-import { generateTraditionalBracket, generateFlatBracket } from '../features/bracket/math';
-import type { Tournament, PlayerProfile } from '../features/tournament/types';
+import {
+  generateTraditionalBracket,
+  generateFlatBracket,
+  advanceMatchWinner,
+  retractMatchWinner,
+  swapMatchSlots,
+} from '../features/bracket/math';
+import { generateDraftBracketsForTournament } from '../features/qualifiers/scoring';
+import type {
+  Tournament,
+  PlayerProfile,
+  MatchScoreRecord,
+  GameScoreEntry,
+} from '../features/tournament/types';
 
 async function parseBody(req: IncomingMessage): Promise<unknown> {
   if (req.method === 'GET' || req.method === 'HEAD') return undefined;
@@ -225,40 +237,79 @@ export function createApiMiddleware() {
         // Subactions
         // POST /api/tournaments/:id/qualifiers
         if (subAction === 'qualifiers' && method === 'POST') {
-          const sub = await submitQualifierScore(tourneyId, body.playerId, body.score);
-          return sendJson(res, 201, sub);
+          await submitQualifierScore(tourneyId, body.playerId, body.score);
+          const t = await getFullTournament(tourneyId);
+          if (t && !t.isLocked) {
+            t.tiers = generateDraftBracketsForTournament(t);
+            const saved = await saveFullTournament(t);
+            return sendJson(res, 201, saved);
+          }
+          return sendJson(res, 201, t);
         }
 
         // POST /api/tournaments/:id/qualifiers/batch
         if (subAction === 'qualifiers/batch' && method === 'POST') {
-          const subs = await submitQualifiersBatch(tourneyId, body.submissions || body);
-          return sendJson(res, 201, subs);
+          await submitQualifiersBatch(tourneyId, body.submissions || body);
+          const t = await getFullTournament(tourneyId);
+          if (t && !t.isLocked) {
+            t.tiers = generateDraftBracketsForTournament(t);
+            const saved = await saveFullTournament(t);
+            return sendJson(res, 201, saved);
+          }
+          return sendJson(res, 201, t);
         }
 
         // DELETE /api/tournaments/:id/qualifiers
         if (subAction === 'qualifiers' && method === 'DELETE') {
-          await clearTournamentQualifiers(tourneyId);
           const t = await getFullTournament(tourneyId);
-          if (t) {
-            t.qualifierSubmissions = [];
-            t.qualifiers = [];
-            t.manualSeeds = [];
-            await saveFullTournament(t);
+          if (!t) return sendError(res, 404, 'Tournament not found');
+
+          await clearTournamentQualifiers(t.id);
+          t.qualifierSubmissions = [];
+          t.qualifiers = [];
+          t.manualSeeds = [];
+          if (!t.isLocked) {
+            t.tiers = generateDraftBracketsForTournament(t);
           }
-          return sendJson(res, 200, { success: true });
+          const saved = await saveFullTournament(t);
+          return sendJson(res, 200, saved);
         }
 
         // DELETE /api/tournaments/:id/matches
         if (subAction === 'matches' && method === 'DELETE') {
-          await clearTournamentMatches(tourneyId);
           const t = await getFullTournament(tourneyId);
-          if (t) {
-            t.matchScores = {};
-            t.isLocked = false;
-            t.tiers = t.tiers.map(tier => ({ ...tier, isLocked: false }));
-            await saveFullTournament(t);
-          }
-          return sendJson(res, 200, { success: true });
+          if (!t) return sendError(res, 404, 'Tournament not found');
+
+          await clearTournamentMatches(t.id);
+          t.matchScores = {};
+          t.isLocked = false;
+          t.tiers = t.tiers.map(tier => ({ ...tier, isLocked: false }));
+          t.tiers = generateDraftBracketsForTournament(t);
+          const saved = await saveFullTournament(t);
+          return sendJson(res, 200, saved);
+        }
+
+        // POST /api/tournaments/:id/clear-all
+        if (subAction === 'clear-all' && method === 'POST') {
+          const t = await getFullTournament(tourneyId);
+          if (!t) return sendError(res, 404, 'Tournament not found');
+
+          await clearTournamentMatches(t.id);
+          await clearTournamentQualifiers(t.id);
+          t.playersPool = [];
+          t.qualifierSubmissions = [];
+          t.qualifiers = [];
+          t.manualSeeds = [];
+          t.matchScores = {};
+          t.tournamentPlayers = {};
+          t.isLocked = false;
+          t.tiers = t.tiers.map(tier => ({
+            ...tier,
+            isLocked: false,
+            bracket: { rounds: [], totalMatches: 0, matchesById: {} } as any,
+          }));
+          const saved = await saveFullTournament(t);
+          return sendJson(res, 200, saved);
         }
 
         // POST /api/tournaments/:id/simulate/seed-quals
@@ -284,6 +335,7 @@ export function createApiMiddleware() {
           t.matchScores = {};
           t.isLocked = false;
           t.tiers = t.tiers.map(tier => ({ ...tier, isLocked: false }));
+          t.tiers = generateDraftBracketsForTournament(t);
 
           const saved = await saveFullTournament(t);
           return sendJson(res, 200, saved);
@@ -308,6 +360,329 @@ export function createApiMiddleware() {
 
           const simulated = runFullSimulation(t, profiles);
           const saved = await saveFullTournament(simulated);
+          return sendJson(res, 200, saved);
+        }
+
+        // DELETE /api/tournaments/:id/qualifiers/:subId
+        const qualDelMatch = subAction.match(/^qualifiers\/([^/]+)$/);
+        if (qualDelMatch && method === 'DELETE') {
+          const subId = qualDelMatch[1];
+          const t = await getFullTournament(tourneyId);
+          if (!t) return sendError(res, 404, 'Tournament not found');
+
+          t.qualifierSubmissions = (t.qualifierSubmissions || []).filter(s => s.id !== subId);
+          if (!t.isLocked) {
+            t.tiers = generateDraftBracketsForTournament(t);
+          }
+          const saved = await saveFullTournament(t);
+          return sendJson(res, 200, saved);
+        }
+
+        // POST /api/tournaments/:id/lock
+        if (subAction === 'lock' && method === 'POST') {
+          const t = await getFullTournament(tourneyId);
+          if (!t) return sendError(res, 404, 'Tournament not found');
+
+          t.isLocked = true;
+          t.tiers = t.tiers.map(tr => ({ ...tr, isLocked: true }));
+          const saved = await saveFullTournament(t);
+          return sendJson(res, 200, saved);
+        }
+
+        // POST /api/tournaments/:id/unlock
+        if (subAction === 'unlock' && method === 'POST') {
+          const t = await getFullTournament(tourneyId);
+          if (!t) return sendError(res, 404, 'Tournament not found');
+
+          const hasRecordedScores = Object.values(t.matchScores || {}).some(
+            record =>
+              record.isComplete ||
+              record.games.some(
+                g => g.player1Points !== null || g.player2Points !== null || g.winnerPlayerId !== null
+              ) ||
+              record.player1Wins > 0 ||
+              record.player2Wins > 0 ||
+              Boolean(record.winnerPlayerId)
+          );
+
+          if (hasRecordedScores) {
+            return sendError(
+              res,
+              400,
+              'Cannot unlock: Match play has begun. Clear recorded scores before unlocking.'
+            );
+          }
+
+          t.isLocked = false;
+          t.tiers = t.tiers.map(tr => ({ ...tr, isLocked: false }));
+          t.tiers = generateDraftBracketsForTournament(t);
+          const saved = await saveFullTournament(t);
+          return sendJson(res, 200, saved);
+        }
+
+        // POST /api/tournaments/:id/matches/swap-slots
+        if (subAction === 'matches/swap-slots' && method === 'POST') {
+          const t = await getFullTournament(tourneyId);
+          if (!t) return sendError(res, 404, 'Tournament not found');
+
+          const { tierId, sourceMatchId, sourceSlot, targetMatchId, targetSlot } = body;
+          const tier = t.tiers.find(tr => tr.id === tierId);
+          if (!tier || !tier.bracket) return sendError(res, 404, 'Tier or bracket not found');
+
+          const srcRecord = t.matchScores?.[sourceMatchId];
+          const tgtRecord = t.matchScores?.[targetMatchId];
+          const hasSrcScore =
+            srcRecord &&
+            (srcRecord.games?.length > 0 || srcRecord.isComplete || Boolean(srcRecord.winnerPlayerId));
+          const hasTgtScore =
+            tgtRecord &&
+            (tgtRecord.games?.length > 0 || tgtRecord.isComplete || Boolean(tgtRecord.winnerPlayerId));
+
+          if (hasSrcScore || hasTgtScore) {
+            return sendError(
+              res,
+              400,
+              'Cannot swap slots: Match play or scores have already begun in one of the matches.'
+            );
+          }
+
+          const updatedBracket = swapMatchSlots(tier.bracket, {
+            sourceMatchId,
+            sourceSlot,
+            targetMatchId,
+            targetSlot,
+          });
+          t.tiers = t.tiers.map(tr => (tr.id === tierId ? { ...tr, bracket: updatedBracket } : tr));
+          const saved = await saveFullTournament(t);
+          return sendJson(res, 200, saved);
+        }
+
+        // PUT /api/tournaments/:id/matches/:matchId/score
+        const matchScoreSub = subAction.match(/^matches\/([^/]+)\/score$/);
+        if (matchScoreSub && method === 'PUT') {
+          const matchId = matchScoreSub[1];
+          const t = await getFullTournament(tourneyId);
+          if (!t) return sendError(res, 404, 'Tournament not found');
+
+          const tierId = body.tierId;
+          const tier = t.tiers.find(tr => tr.id === tierId);
+          if (!tier || !tier.bracket) return sendError(res, 404, 'Tier or bracket not found');
+
+          const targetMatch = tier.bracket.matchesById?.[matchId];
+          if (!targetMatch) return sendError(res, 404, 'Match not found in tier bracket');
+
+          const p1 = targetMatch.player1.player;
+          const p2 = targetMatch.player2.player;
+          const currentRecord = t.matchScores[matchId] || {
+            matchId,
+            tierId,
+            organizationId: t.organizationId,
+            bestOf: targetMatch.bestOf || tier.bestOf || 5,
+            player1Wins: 0,
+            player2Wins: 0,
+            games: [],
+            winnerPlayerId: null,
+            loserPlayerId: null,
+            isComplete: false,
+          };
+
+          const scoredGames: GameScoreEntry[] = body.scoredGames || body.games || [];
+          const cleanedGames: GameScoreEntry[] = scoredGames
+            .map(g => {
+              const isZeroZero = g.player1Points === 0 && g.player2Points === 0 && !g.winnerPlayerId;
+              const isEmpty = g.player1Points === null && g.player2Points === null && !g.winnerPlayerId;
+              if (isEmpty || isZeroZero) {
+                return {
+                  gameNumber: g.gameNumber,
+                  player1Points: null,
+                  player2Points: null,
+                  winnerPlayerId: null,
+                };
+              }
+              return {
+                gameNumber: g.gameNumber,
+                player1Points: g.player1Points,
+                player2Points: g.player2Points,
+                winnerPlayerId: g.winnerPlayerId,
+              };
+            })
+            .sort((a, b) => a.gameNumber - b.gameNumber);
+
+          let p1Wins = 0;
+          let p2Wins = 0;
+          for (const g of cleanedGames) {
+            if (p1 && g.winnerPlayerId === p1.id) p1Wins++;
+            else if (p2 && g.winnerPlayerId === p2.id) p2Wins++;
+          }
+
+          const matchBestOf = body.bestOf || currentRecord.bestOf || targetMatch.bestOf || tier.bestOf || 5;
+          const threshold = Math.ceil(matchBestOf / 2);
+          let matchWinnerId: string | null = null;
+          let matchLoserId: string | null = null;
+          let isComplete = false;
+
+          if (p1 && p1Wins >= threshold) {
+            matchWinnerId = p1.id;
+            matchLoserId = p2 ? p2.id : null;
+            isComplete = true;
+          } else if (p2 && p2Wins >= threshold) {
+            matchWinnerId = p2.id;
+            matchLoserId = p1 ? p1.id : null;
+            isComplete = true;
+          }
+
+          const updatedRecord: MatchScoreRecord = {
+            ...currentRecord,
+            bestOf: matchBestOf,
+            player1Wins: p1Wins,
+            player2Wins: p2Wins,
+            games: cleanedGames,
+            winnerPlayerId: matchWinnerId,
+            loserPlayerId: matchLoserId,
+            isComplete,
+            hasTiebreaker: Boolean(body.hasTiebreaker),
+          };
+
+          let updatedBracket = tier.bracket;
+          if (matchWinnerId && isComplete) {
+            try {
+              updatedBracket = advanceMatchWinner(tier.bracket, matchId, matchWinnerId);
+            } catch {}
+          } else {
+            try {
+              updatedBracket = retractMatchWinner(tier.bracket, matchId);
+            } catch {}
+          }
+
+          t.tiers = t.tiers.map(tr => (tr.id === tierId ? { ...tr, bracket: updatedBracket } : tr));
+          t.matchScores[matchId] = updatedRecord;
+
+          const saved = await saveFullTournament(t);
+          return sendJson(res, 200, saved);
+        }
+
+        // POST /api/tournaments/:id/matches/:matchId/forfeit
+        const matchForfeitSub = subAction.match(/^matches\/([^/]+)\/forfeit$/);
+        if (matchForfeitSub && method === 'POST') {
+          const matchId = matchForfeitSub[1];
+          const t = await getFullTournament(tourneyId);
+          if (!t) return sendError(res, 404, 'Tournament not found');
+
+          const tierId = body.tierId;
+          const tier = t.tiers.find(tr => tr.id === tierId);
+          if (!tier || !tier.bracket) return sendError(res, 404, 'Tier or bracket not found');
+
+          const targetMatch = tier.bracket.matchesById?.[matchId];
+          if (!targetMatch) return sendError(res, 404, 'Match not found in tier bracket');
+
+          const p1 = targetMatch.player1.player;
+          const p2 = targetMatch.player2.player;
+          const winnerPlayerId = body.winnerPlayerId;
+          const loserId = p1?.id === winnerPlayerId ? p2?.id ?? null : p1?.id ?? null;
+
+          const currentRecord = t.matchScores[matchId] || {
+            matchId,
+            tierId,
+            organizationId: t.organizationId,
+            bestOf: targetMatch.bestOf || tier.bestOf,
+            player1Wins: 0,
+            player2Wins: 0,
+            games: [],
+            winnerPlayerId: null,
+            loserPlayerId: null,
+            isComplete: false,
+          };
+
+          const updatedRecord: MatchScoreRecord = {
+            ...currentRecord,
+            winnerPlayerId,
+            loserPlayerId: loserId,
+            isComplete: true,
+            notes: 'Forfeit win',
+            forfeitWinnerId: winnerPlayerId,
+          };
+
+          let updatedBracket = tier.bracket;
+          try {
+            updatedBracket = advanceMatchWinner(tier.bracket, matchId, winnerPlayerId);
+          } catch {}
+
+          t.tiers = t.tiers.map(tr => (tr.id === tierId ? { ...tr, bracket: updatedBracket } : tr));
+          t.matchScores[matchId] = updatedRecord;
+
+          const saved = await saveFullTournament(t);
+          return sendJson(res, 200, saved);
+        }
+
+        // PUT /api/tournaments/:id/matches/:matchId/best-of
+        const matchBestOfSub = subAction.match(/^matches\/([^/]+)\/best-of$/);
+        if (matchBestOfSub && method === 'PUT') {
+          const matchId = matchBestOfSub[1];
+          const t = await getFullTournament(tourneyId);
+          if (!t) return sendError(res, 404, 'Tournament not found');
+
+          const tierId = body.tierId;
+          const tier = t.tiers.find(tr => tr.id === tierId);
+          if (!tier || !tier.bracket) return sendError(res, 404, 'Tier or bracket not found');
+
+          const targetMatch = tier.bracket.matchesById?.[matchId];
+          if (!targetMatch) return sendError(res, 404, 'Match not found in tier bracket');
+
+          const bestOf = body.bestOf || 3;
+          const currentRecord = t.matchScores[matchId] || {
+            matchId,
+            tierId,
+            organizationId: t.organizationId,
+            bestOf,
+            player1Wins: 0,
+            player2Wins: 0,
+            games: [],
+            winnerPlayerId: null,
+            loserPlayerId: null,
+            isComplete: false,
+          };
+
+          const threshold = Math.ceil(bestOf / 2);
+          const p1Wins = currentRecord.player1Wins;
+          const p2Wins = currentRecord.player2Wins;
+          const p1 = targetMatch.player1.player;
+          const p2 = targetMatch.player2.player;
+          let isComplete = false;
+          let winnerPlayerId: string | null = null;
+          let loserPlayerId: string | null = null;
+          if (p1 && p1Wins >= threshold) {
+            winnerPlayerId = p1.id;
+            loserPlayerId = p2 ? p2.id : null;
+            isComplete = true;
+          } else if (p2 && p2Wins >= threshold) {
+            winnerPlayerId = p2.id;
+            loserPlayerId = p1 ? p1.id : null;
+            isComplete = true;
+          }
+
+          let updatedBracket = tier.bracket;
+          if (isComplete && winnerPlayerId) {
+            try {
+              updatedBracket = advanceMatchWinner(tier.bracket, matchId, winnerPlayerId);
+            } catch {}
+          } else {
+            try {
+              updatedBracket = retractMatchWinner(tier.bracket, matchId);
+            } catch {}
+          }
+
+          const updatedRecord: MatchScoreRecord = {
+            ...currentRecord,
+            bestOf,
+            isComplete,
+            winnerPlayerId,
+            loserPlayerId,
+          };
+
+          t.tiers = t.tiers.map(tr => (tr.id === tierId ? { ...tr, bracket: updatedBracket } : tr));
+          t.matchScores[matchId] = updatedRecord;
+
+          const saved = await saveFullTournament(t);
           return sendJson(res, 200, saved);
         }
       }

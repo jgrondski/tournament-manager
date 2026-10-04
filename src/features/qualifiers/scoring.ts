@@ -415,6 +415,18 @@ export function generateDraftBracketsForTournament(tournament: Tournament): Tour
       };
     }
 
+    // If insufficient players and tournament has no qualifiers/seeds/players, reset bracket
+    if (
+      (tournament.playersPool || []).length === 0 &&
+      (tournament.qualifierSubmissions || []).length === 0 &&
+      (tournament.manualSeeds || []).length === 0
+    ) {
+      return {
+        ...tier,
+        bracket: { rounds: [], totalMatches: 0, matchesById: {} } as any,
+      };
+    }
+
     // Keep existing structure if insufficient players
     return tier;
   });

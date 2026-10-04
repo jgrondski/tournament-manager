@@ -110,21 +110,26 @@ export function setupTestDb() {
     );
 
     CREATE TABLE matches (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      id TEXT PRIMARY KEY DEFAULT gen_random_uuid(),
       tier_id UUID NOT NULL REFERENCES bracket_tiers(id) ON DELETE CASCADE,
       round_number INTEGER NOT NULL,
+      match_number INTEGER,
+      stage TEXT,
+      round_identifier TEXT,
       player1_id UUID REFERENCES players(id) ON DELETE SET NULL,
       player2_id UUID REFERENCES players(id) ON DELETE SET NULL,
       winner_id UUID REFERENCES players(id) ON DELETE SET NULL,
       loser_id UUID REFERENCES players(id) ON DELETE SET NULL,
       best_of INTEGER NOT NULL DEFAULT 3,
       is_forfeit BOOLEAN NOT NULL DEFAULT false,
+      is_complete BOOLEAN NOT NULL DEFAULT false,
+      metadata JSONB,
       created_at TIMESTAMP NOT NULL DEFAULT now()
     );
 
     CREATE TABLE games (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      match_id UUID NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+      match_id TEXT NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
       game_number INTEGER NOT NULL,
       player1_score INTEGER NOT NULL DEFAULT 0,
       player2_score INTEGER NOT NULL DEFAULT 0,

@@ -132,12 +132,16 @@ interface OrganizationContextType {
   createOrganization: (input: CreateOrganizationInput) => Organization;
   updateOrganization: (id: string, updates: Partial<Organization>) => void;
   deleteOrganization: (id: string, hasAssociatedTournaments?: boolean) => { success: boolean; error?: string };
+  orgError: string | null;
+  clearOrgError: () => void;
 }
 
 const OrganizationContext = createContext<OrganizationContextType | null>(null);
 
 export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [organizations, setOrganizations] = useState<Organization[]>(DEFAULT_ORGANIZATIONS);
+  const [orgError, setOrgError] = useState<string | null>(null);
+  const clearOrgError = () => setOrgError(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -203,8 +207,6 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       createdAt: Date.now(),
     };
 
-    setOrganizations(prev => [newOrg, ...prev]);
-
     if (typeof window !== 'undefined' && typeof fetch === 'function') {
       fetch('/api/organizations', {
         method: 'POST',
@@ -217,45 +219,36 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         })
         .then(saved => {
           if (saved && saved.id) {
-            setOrganizations(prev => prev.map(o => (o.id === newOrg.id ? saved : o)));
+            setOrganizations(prev => [saved, ...prev.filter(o => o.id !== saved.id)]);
           }
         })
-        .catch(err => console.error('Failed to persist organization to API:', err));
+        .catch(err => {
+          setOrgError(`Failed to create organization: ${err.message}`);
+        });
     }
 
     return newOrg;
   };
 
   const updateOrganization = (id: string, updates: Partial<Organization>) => {
-    setOrganizations(prev =>
-      prev.map(o => {
-        if (o.id !== id) return o;
-        const updatedTheme = updates.themeColors || updates.branding?.themeColors || o.themeColors;
-        return {
-          ...o,
-          ...updates,
-          themeColors: updatedTheme,
-          tierThemes: updates.tierThemes || o.tierThemes,
-          branding: {
-            ...o.branding,
-            ...updates.branding,
-            logoUrl: updates.logoUrl !== undefined ? updates.logoUrl : (updates.branding?.logoUrl !== undefined ? updates.branding.logoUrl : o.logoUrl),
-            bannerUrl: updates.bannerUrl !== undefined ? updates.bannerUrl : (updates.branding?.bannerUrl !== undefined ? updates.branding.bannerUrl : o.bannerUrl),
-            themeColors: updatedTheme,
-            brandColor: updates.brandColor || updatedTheme?.primaryColor || o.brandColor,
-          },
-          // If slug is updated, normalize
-          slug: updates.slug ? updates.slug.trim().toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-') : o.slug,
-        };
-      })
-    );
-
     if (typeof window !== 'undefined' && typeof fetch === 'function') {
       fetch(`/api/organizations/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
-      }).catch(err => console.error('Failed to update organization in API:', err));
+      })
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
+        .then(saved => {
+          if (saved && saved.id) {
+            setOrganizations(prev => prev.map(o => (o.id === id ? saved : o)));
+          }
+        })
+        .catch(err => {
+          setOrgError(`Failed to update organization: ${err.message}`);
+        });
     }
   };
 
@@ -270,12 +263,17 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       };
     }
 
-    setOrganizations(prev => prev.filter(o => o.id !== id));
-
     if (typeof window !== 'undefined' && typeof fetch === 'function') {
       fetch(`/api/organizations/${id}`, {
         method: 'DELETE',
-      }).catch(err => console.error('Failed to delete organization from API:', err));
+      })
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          setOrganizations(prev => prev.filter(o => o.id !== id));
+        })
+        .catch(err => {
+          setOrgError(`Failed to delete organization: ${err.message}`);
+        });
     }
 
     return { success: true };
@@ -290,8 +288,49 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         createOrganization,
         updateOrganization,
         deleteOrganization,
+        orgError,
+        clearOrgError,
       }}
     >
+      {orgError && (
+        <div
+          role="alert"
+          style={{
+            backgroundColor: '#dc2626',
+            color: '#ffffff',
+            padding: '12px 20px',
+            fontSize: '14px',
+            fontWeight: 600,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            position: 'sticky',
+            top: 0,
+            zIndex: 99999,
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>⚠️</span>
+            <span>{orgError}</span>
+          </div>
+          <button
+            onClick={clearOrgError}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#ffffff',
+              fontWeight: 700,
+              fontSize: '16px',
+              cursor: 'pointer',
+              padding: '4px 8px',
+            }}
+            title="Dismiss error"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       {children}
     </OrganizationContext.Provider>
   );

@@ -78,6 +78,12 @@ export const ManageTournamentSettingsPage: React.FC = () => {
         <TournamentAdminForm
           tournament={tournament}
           onDirtyChange={setIsDirty}
+          onSaved={(saved) => {
+            setIsDirty(false);
+            if (saved?.slug && saved.slug !== slug) {
+              navigate(`/${saved.slug}/manage/settings`, { replace: true });
+            }
+          }}
         />
       </main>
 
