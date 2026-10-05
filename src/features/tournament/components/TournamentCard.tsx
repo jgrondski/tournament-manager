@@ -100,7 +100,13 @@ export const TournamentCard: React.FC<TournamentCardProps> = ({
             )}
 
             <span className="badge badge-muted">
-              {tournament.qualFormat?.replace(/_/g, ' ') || 'Average'}
+              {tournament.qualFormat === 'HIGH_SCORE'
+                ? '# of Maxes'
+                : tournament.qualFormat === 'AVERAGE_OF_X'
+                ? (tournament.qualAverageCount ? `Avg of ${tournament.qualAverageCount}` : 'Average of X')
+                : tournament.qualFormat === 'POINTS'
+                ? 'Points'
+                : 'Average'}
             </span>
           </div>
 

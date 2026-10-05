@@ -259,7 +259,8 @@ export async function getFullTournament(idOrSlug: string): Promise<Tournament | 
       tournamentId: t.id,
       playerId: row.player.id,
       seed: row.tp.seed || undefined,
-      qualsCompleted: row.tp.qualsCompleted,
+      qualsCompleted: Boolean(row.tp.qualsCompleted),
+      isVerified: Boolean(row.tp.qualsCompleted),
     };
   }
 
@@ -400,8 +401,10 @@ export async function saveFullTournament(tourney: Tournament): Promise<Tournamen
     }
   }
 
-  const condition = or(eq(tournaments.id, tourneyUuid), eq(tournaments.slug, slug));
-  const existing = await db.select().from(tournaments).where(condition).limit(1);
+  let existing = await db.select().from(tournaments).where(eq(tournaments.id, tourneyUuid)).limit(1);
+  if (existing.length === 0 && slug) {
+    existing = await db.select().from(tournaments).where(eq(tournaments.slug, slug)).limit(1);
+  }
 
   const metadata = {
     organizationId: orgId,
@@ -667,11 +670,12 @@ export async function saveFullTournament(tourney: Tournament): Promise<Tournamen
         await db.insert(tournamentPlayers).values(
           chunk.map(p => {
             const tp = tourney.tournamentPlayers?.[p.id];
+            const isCompleted = Boolean(tp?.qualsCompleted ?? tp?.isVerified);
             return {
               tournamentId: savedTourneyId,
               playerId: p.id,
               seed: tp?.seed || null,
-              qualsCompleted: tp?.qualsCompleted || false,
+              qualsCompleted: isCompleted,
             };
           })
         );
@@ -688,13 +692,16 @@ export async function saveFullTournament(tourney: Tournament): Promise<Tournamen
       for (let i = 0; i < validSubs.length; i += CHUNK) {
         const chunk = validSubs.slice(i, i + CHUNK);
         await db.insert(qualifierSubmissions).values(
-          chunk.map(s => ({
-            id: isUuid(s.id) ? s.id : crypto.randomUUID(),
-            tournamentId: savedTourneyId,
-            playerId: s.playerId,
-            score: s.score,
-            createdAt: new Date(s.submittedAt || Date.now()),
-          }))
+          chunk.map(s => {
+            const isOurUuid = isUuid(s.id) && s.tournamentId === savedTourneyId;
+            return {
+              id: isOurUuid ? s.id : crypto.randomUUID(),
+              tournamentId: savedTourneyId,
+              playerId: s.playerId,
+              score: s.score,
+              createdAt: new Date(s.submittedAt || Date.now()),
+            };
+          })
         );
       }
     }

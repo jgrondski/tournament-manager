@@ -41,9 +41,17 @@ export type SidebarNavView =
   | 'tournaments';
 
 export function filterTournamentsByQuery(tournaments: Tournament[], query: string): Tournament[] {
-  if (!query.trim()) return tournaments;
+  const seenIds = new Set<string>();
+  const uniqueTournaments: Tournament[] = [];
+  for (const t of tournaments) {
+    if (t?.id && !seenIds.has(t.id)) {
+      seenIds.add(t.id);
+      uniqueTournaments.push(t);
+    }
+  }
+  if (!query.trim()) return uniqueTournaments;
   const q = query.toLowerCase().trim();
-  return tournaments.filter(t => t.name.toLowerCase().includes(q) || t.slug.toLowerCase().includes(q));
+  return uniqueTournaments.filter(t => t.name.toLowerCase().includes(q) || t.slug.toLowerCase().includes(q));
 }
 
 export function getTournamentTargetUrl(targetTourney: Tournament, view?: SidebarNavView, isManage: boolean = true): string {
@@ -159,6 +167,19 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
         e.preventDefault();
       }
     }
+  };
+
+  const handleDropdownNavigate = (url: string) => {
+    if (onNavigate) {
+      const allowed = onNavigate(url);
+      if (allowed === false) {
+        setIsTournamentMenuOpen(false);
+        return;
+      }
+    }
+    setIsTournamentMenuOpen(false);
+    setTournamentSearchQuery('');
+    navigate(url);
   };
 
   const handleUnlockClick = (e: React.MouseEvent) => {
@@ -281,6 +302,7 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
         >
           <Link
             to="/"
+            onClick={e => handleLinkClick(e, '/')}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -346,6 +368,7 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
               >
                 <Link
                   to={`/org/${currentOrg.slug}`}
+                  onClick={e => handleLinkClick(e, `/org/${currentOrg.slug}`)}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -373,6 +396,7 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
                 </Link>
                 <Link
                   to={`/org/${currentOrg.slug}`}
+                  onClick={e => handleLinkClick(e, `/org/${currentOrg.slug}`)}
                   style={{
                     fontSize: '0.65rem',
                     color: 'var(--color-text-muted, #64748b)',
@@ -474,7 +498,10 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
                     </div>
                     <Link
                       to={`/org/${currentOrg.slug}`}
-                      onClick={() => setIsTournamentMenuOpen(false)}
+                      onClick={e => {
+                        setIsTournamentMenuOpen(false);
+                        handleLinkClick(e, `/org/${currentOrg.slug}`);
+                      }}
                       style={{
                         fontSize: '0.68rem',
                         color: 'var(--color-gold-bright, #ffc905)',
@@ -567,16 +594,16 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
                     </div>
                   ) : (
                     filteredTournaments.map(t => {
-                      const isSelected = t.id === activeTourney.id;
+                      const isSelected = Boolean(activeTourney?.id && t.id === activeTourney.id);
+                      const nameCount = filteredTournaments.filter(other => other.name.toLowerCase() === t.name.toLowerCase()).length;
+                      const displayName = nameCount > 1 ? `${t.name} (${t.slug})` : t.name;
                       return (
                         <button
                           key={t.id}
                           type="button"
                           onClick={() => {
-                            setIsTournamentMenuOpen(false);
-                            setTournamentSearchQuery('');
                             const targetUrl = getTournamentTargetUrl(t, activeView);
-                            navigate(targetUrl);
+                            handleDropdownNavigate(targetUrl);
                           }}
                           style={{
                             width: '100%',
@@ -595,7 +622,7 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
                           }}
                         >
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {t.name}
+                            {displayName}
                           </span>
                           {isSelected && <Check size={13} color="var(--color-gold-bright, #ffc905)" style={{ flexShrink: 0 }} />}
                         </button>
@@ -629,7 +656,10 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
                   </div>
                   <Link
                     to="/"
-                    onClick={() => setIsTournamentMenuOpen(false)}
+                    onClick={e => {
+                      setIsTournamentMenuOpen(false);
+                      handleLinkClick(e, '/');
+                    }}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -647,7 +677,10 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
                   </Link>
                   <Link
                     to="/organizations"
-                    onClick={() => setIsTournamentMenuOpen(false)}
+                    onClick={e => {
+                      setIsTournamentMenuOpen(false);
+                      handleLinkClick(e, '/organizations');
+                    }}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -665,7 +698,10 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
                   </Link>
                   <Link
                     to="/players"
-                    onClick={() => setIsTournamentMenuOpen(false)}
+                    onClick={e => {
+                      setIsTournamentMenuOpen(false);
+                      handleLinkClick(e, '/players');
+                    }}
                     style={{
                       display: 'flex',
                       alignItems: 'center',

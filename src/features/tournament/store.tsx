@@ -272,9 +272,9 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           if (matchIndex >= 0) {
             const next = [...prev];
             next[matchIndex] = saved;
-            return next;
+            return next.filter((t, i) => i === matchIndex || t.id !== saved.id);
           }
-          return [saved, ...prev];
+          return [saved, ...prev.filter(t => t.id !== saved.id)];
         });
         console.log(`[Store] Tournament "${saved.name}" synced to database successfully.`);
         return saved;
@@ -645,10 +645,15 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       tournamentId: tournament.id,
       organizationId: tournament.organizationId,
     };
-    const newVerified = isVerified !== undefined ? isVerified : !existing.isVerified;
+    const currentVal = Boolean(existing.isVerified || existing.qualsCompleted);
+    const newVerified = isVerified !== undefined ? isVerified : !currentVal;
     const updatedPlayers = {
       ...currentPlayers,
-      [playerId]: { ...existing, isVerified: newVerified },
+      [playerId]: {
+        ...existing,
+        isVerified: newVerified,
+        qualsCompleted: newVerified,
+      },
     };
     syncTournamentToApi({ ...tournament, tournamentPlayers: updatedPlayers });
   };

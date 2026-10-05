@@ -20,7 +20,6 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
     addPlayerToPool,
     submitQualifierScore,
     deleteQualifierScore,
-    togglePlayerQualifierVerified,
     globalPlayers,
     importPlayersToTournament,
   } = useTournament();
@@ -39,8 +38,6 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
     if (!selectedPlayer) return 'not started';
     return getPlayerQualifierStatus(tournament, selectedPlayer.id);
   }, [tournament, selectedPlayer]);
-
-  const isVerified = qualStatus === 'verified';
 
   if (!isOpen) return null;
 
@@ -145,7 +142,7 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
                 Submit Qualifier Score
               </h3>
               <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                {tournament.name} • {tournament.qualFormat.replace(/_/g, ' ')}
+                {tournament.name} • {tournament.qualFormat === 'HIGH_SCORE' ? '# of Maxes' : tournament.qualFormat.replace(/_/g, ' ')}
               </p>
             </div>
           </div>
@@ -240,23 +237,6 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
                     </span>
                   )}
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => togglePlayerQualifierVerified(tournament.id, selectedPlayer.id)}
-                  className={`btn ${isVerified ? 'btn-secondary' : 'btn-primary'}`}
-                  style={{
-                    padding: '0.25rem 0.65rem',
-                    fontSize: '0.75rem',
-                    gap: '0.3rem',
-                    borderColor: isVerified ? 'rgba(34, 197, 94, 0.5)' : undefined,
-                    color: isVerified ? '#4ade80' : undefined,
-                  }}
-                  title={isVerified ? 'Click to unverify qualifier' : 'Click to verify qualifier as judge'}
-                >
-                  <Check size={12} />
-                  {isVerified ? 'Verified' : 'Verify'}
-                </button>
               </div>
 
               {/* 2. Score Submission Form */}

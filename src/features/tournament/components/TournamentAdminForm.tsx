@@ -344,11 +344,11 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
     const tierId = generateUUID();
 
     if (tiers.length === 0) {
-      // 1st Tier: Gold Championship, 16 players, Traditional, Bo5, #ffd200 / #5e512b
+      // 1st Tier: Gold, 16 players, Traditional, Bo5, #ffd200 / #5e512b
       newTier = {
         id: tierId,
         slug: 'gold',
-        name: 'Gold Championship',
+        name: 'Gold',
         priority: 1,
         bracketType: 'TRADITIONAL',
         playerCount: 16,
@@ -365,12 +365,12 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
         ),
       };
     } else if (tiers.length === 1) {
-      // 2nd Tier: Silver Bracket, 9 players, Flat bracket, 2 wide, Bo3 with semis & finals Bo5 overrides, #CBD5E1 / #3d4652
+      // 2nd Tier: Silver, 9 players, Flat bracket, 2 wide, Bo3 with semis & finals Bo5 overrides, #CBD5E1 / #3d4652
       const roundBestOfOverrides = { 4: 5, 5: 5 };
       newTier = {
         id: tierId,
         slug: 'silver',
-        name: 'Silver Bracket',
+        name: 'Silver',
         priority: 2,
         bracketType: 'FLAT',
         playerCount: 9,
@@ -391,7 +391,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
       };
     } else {
       const nextPriority = tiers.length + 1;
-      const tierName = nextPriority === 3 ? 'Bronze Bracket' : `Tier ${nextPriority}`;
+      const tierName = nextPriority === 3 ? 'Bronze' : `Tier ${nextPriority}`;
       const tierSlug = nextPriority === 3 ? 'bronze' : `tier-${nextPriority}`;
       const primaryColor = nextPriority === 3 ? '#db5f00' : '#3b82f6';
       const secondaryColor = nextPriority === 3 ? '#4e310e' : '#60a5fa';

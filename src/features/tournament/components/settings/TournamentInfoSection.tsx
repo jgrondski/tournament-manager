@@ -203,7 +203,7 @@ export const TournamentInfoSection: React.FC<TournamentInfoSectionProps> = ({
             {/* Conditional format inline settings on the exact same row */}
             {qualFormat === 'HIGH_SCORE' && (
               <div style={{ flex: 1, minWidth: 0, marginTop: '1.45rem', display: 'flex', alignItems: 'center', height: '38px', color: 'var(--color-text-muted)', fontSize: '0.8rem', background: 'var(--color-bg-surface-elevated)', padding: '0 0.85rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)' }}>
-                <span>Ranked by highest game score; ties broken by total maxout count.</span>
+                <span>Ranked by number of maxouts; kickers act as the tiebreaker.</span>
               </div>
             )}
 

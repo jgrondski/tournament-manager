@@ -50,7 +50,7 @@ export function getPlayerQualifierStatus(
   }
 
   const tPlayer = tournament.tournamentPlayers?.[playerId];
-  if (tPlayer?.isVerified) {
+  if (tPlayer?.isVerified || tPlayer?.qualsCompleted) {
     return 'verified';
   }
 

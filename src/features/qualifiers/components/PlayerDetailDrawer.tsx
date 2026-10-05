@@ -12,6 +12,7 @@ import {
   Plus,
   Trash2,
   Check,
+  ShieldCheck,
   AlertTriangle,
 } from 'lucide-react';
 import { LeaderboardRankRow, MAXOUT_THRESHOLD, deriveLeaderboard, getPlayerQualifierStatus } from '../scoring';
@@ -600,7 +601,7 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
             scrollbarColor: `${colorWithAlpha(primaryColor, 0.35)} transparent`,
           }}
         >
-          {/* Section 0: Quick Qual Submission & Judge Verification */}
+          {/* Section 0: Quick Qual Submission & Judge Verification (Either/Or) */}
           {!tournament.isLocked && (
             <div
               style={{
@@ -609,12 +610,15 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
                 borderRadius: 'var(--radius-md)',
                 padding: '1.1rem',
                 boxShadow: `0 4px 18px ${colorWithAlpha(primaryColor, 0.1)}`,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.85rem',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Trophy size={16} color={primaryColor} />
-                  <h3 style={{ ...sectionTitleStyle, color: '#ffffff' }}>Submit Qualifier Score</h3>
+                  <h3 style={{ ...sectionTitleStyle, color: '#ffffff' }}>Qualifier Stage Actions</h3>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -624,7 +628,7 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
                       style={{
                         fontSize: '0.72rem',
                         fontWeight: 700,
-                        padding: '0.15rem 0.55rem',
+                        padding: '0.2rem 0.6rem',
                         borderRadius: 'var(--radius-sm)',
                         background: 'rgba(34, 197, 94, 0.2)',
                         color: '#4ade80',
@@ -632,7 +636,7 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
                         boxShadow: '0 0 8px rgba(34, 197, 94, 0.25)',
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '0.25rem',
+                        gap: '0.3rem',
                       }}
                     >
                       <Check size={12} strokeWidth={3} /> Verified
@@ -643,7 +647,7 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
                       style={{
                         fontSize: '0.72rem',
                         fontWeight: 700,
-                        padding: '0.15rem 0.55rem',
+                        padding: '0.2rem 0.6rem',
                         borderRadius: 'var(--radius-sm)',
                         background: colorWithAlpha(primaryColor, 0.2),
                         color: primaryColor,
@@ -658,7 +662,7 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
                       style={{
                         fontSize: '0.72rem',
                         fontWeight: 500,
-                        padding: '0.15rem 0.55rem',
+                        padding: '0.2rem 0.6rem',
                         borderRadius: 'var(--radius-sm)',
                         background: 'rgba(255, 255, 255, 0.08)',
                         color: 'var(--color-text-muted)',
@@ -668,91 +672,139 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
                       Not Started
                     </span>
                   )}
-
-                  {/* Judge Verification Trigger */}
-                  <button
-                    type="button"
-                    onClick={() => togglePlayerQualifierVerified(tournament.id, player.id)}
-                    className="btn"
-                    style={{
-                      padding: '0.3rem 0.75rem',
-                      fontSize: '0.75rem',
-                      gap: '0.35rem',
-                      borderRadius: 'var(--radius-sm)',
-                      background: isVerified ? 'rgba(34, 197, 94, 0.15)' : colorWithAlpha(primaryColor, 0.12),
-                      borderColor: isVerified ? 'rgba(34, 197, 94, 0.5)' : colorWithAlpha(primaryColor, 0.4),
-                      color: isVerified ? '#4ade80' : primaryColor,
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}
-                    title={isVerified ? 'Click to unverify qualifier' : 'Click to verify qualifier as judge'}
-                  >
-                    <Check size={13} strokeWidth={3} />
-                    {isVerified ? 'Verified' : 'Verify'}
-                  </button>
                 </div>
               </div>
 
-              {/* Inline Score Entry Form */}
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const num = parseInt(scoreInput.replace(/\D/g, ''), 10);
-                  if (num > 0) {
-                    submitQualifierScore(tournament.id, player.id, num);
-                    setScoreInput('');
-                  }
-                }}
-                style={{
-                  display: 'flex',
-                  gap: '0.5rem',
-                  padding: '0.55rem',
-                  borderRadius: 'var(--radius-sm)',
-                  background: getAlternateShade(cardColor, 6),
-                  border: `1px solid ${colorWithAlpha(primaryColor, 0.25, 'var(--color-border-subtle)')}`,
-                }}
-              >
-                <input
-                  type="text"
-                  value={scoreInput ? parseInt(scoreInput.replace(/\D/g, ''), 10).toLocaleString() : ''}
-                  onChange={(e) => setScoreInput(e.target.value.replace(/\D/g, ''))}
-                  placeholder="Enter score (e.g. 1,050,000)..."
-                  style={{
-                    flex: 1,
-                    padding: '0.5rem 0.75rem',
-                    borderRadius: 'var(--radius-sm)',
-                    border: `1px solid ${colorWithAlpha(primaryColor, 0.35, 'var(--color-border)')}`,
-                    background: backgroundColor,
-                    color: '#ffffff',
-                    fontSize: '0.88rem',
-                    fontWeight: 700,
+              {/* Action 1: Score Entry */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Option A: Record Attempt Score
+                </span>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const num = parseInt(scoreInput.replace(/\D/g, ''), 10);
+                    if (num > 0) {
+                      submitQualifierScore(tournament.id, player.id, num);
+                      setScoreInput('');
+                    }
                   }}
-                />
-                <button
-                  type="submit"
-                  disabled={!scoreInput || parseInt(scoreInput.replace(/\D/g, ''), 10) <= 0}
                   style={{
-                    padding: '0.5rem 1rem',
-                    fontSize: '0.82rem',
-                    fontWeight: 700,
-                    gap: '0.35rem',
-                    whiteSpace: 'nowrap',
+                    display: 'flex',
+                    gap: '0.5rem',
+                    padding: '0.45rem',
                     borderRadius: 'var(--radius-sm)',
-                    background: primaryColor,
-                    color: primaryContrast,
-                    border: 'none',
-                    cursor: (!scoreInput || parseInt(scoreInput.replace(/\D/g, ''), 10) <= 0) ? 'not-allowed' : 'pointer',
-                    opacity: (!scoreInput || parseInt(scoreInput.replace(/\D/g, ''), 10) <= 0) ? 0.6 : 1,
-                    boxShadow: `0 2px 10px ${colorWithAlpha(primaryColor, 0.35)}`,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    transition: 'all 0.15s ease',
+                    background: getAlternateShade(cardColor, 6),
+                    border: `1px solid ${colorWithAlpha(primaryColor, 0.25, 'var(--color-border-subtle)')}`,
                   }}
                 >
-                  <Plus size={15} /> Log Score
+                  <input
+                    type="text"
+                    value={scoreInput ? parseInt(scoreInput.replace(/\D/g, ''), 10).toLocaleString() : ''}
+                    onChange={(e) => setScoreInput(e.target.value.replace(/\D/g, ''))}
+                    placeholder="Enter score (e.g. 1,050,000)..."
+                    style={{
+                      flex: 1,
+                      padding: '0.45rem 0.7rem',
+                      borderRadius: 'var(--radius-sm)',
+                      border: `1px solid ${colorWithAlpha(primaryColor, 0.35, 'var(--color-border)')}`,
+                      background: backgroundColor,
+                      color: '#ffffff',
+                      fontSize: '0.88rem',
+                      fontWeight: 700,
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={!scoreInput || parseInt(scoreInput.replace(/\D/g, ''), 10) <= 0}
+                    style={{
+                      padding: '0.45rem 0.9rem',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      gap: '0.35rem',
+                      whiteSpace: 'nowrap',
+                      borderRadius: 'var(--radius-sm)',
+                      background: primaryColor,
+                      color: primaryContrast,
+                      border: 'none',
+                      cursor: (!scoreInput || parseInt(scoreInput.replace(/\D/g, ''), 10) <= 0) ? 'not-allowed' : 'pointer',
+                      opacity: (!scoreInput || parseInt(scoreInput.replace(/\D/g, ''), 10) <= 0) ? 0.6 : 1,
+                      boxShadow: `0 2px 10px ${colorWithAlpha(primaryColor, 0.35)}`,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <Plus size={15} /> Log Score
+                  </button>
+                </form>
+              </div>
+
+              {/* Action Divider */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', margin: '0.1rem 0' }}>
+                <div style={{ flex: 1, height: '1px', background: 'var(--color-border-subtle)' }} />
+                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  — OR —
+                </span>
+                <div style={{ flex: 1, height: '1px', background: 'var(--color-border-subtle)' }} />
+              </div>
+
+              {/* Action 2: Judge Verification */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '0.65rem 0.85rem',
+                  borderRadius: 'var(--radius-sm)',
+                  background: isVerified ? 'rgba(34, 197, 94, 0.08)' : getAlternateShade(cardColor, 6),
+                  border: isVerified ? '1px solid rgba(34, 197, 94, 0.35)' : `1px solid ${colorWithAlpha(primaryColor, 0.25, 'var(--color-border-subtle)')}`,
+                  gap: '0.75rem',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: isVerified ? '#4ade80' : '#ffffff', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <ShieldCheck size={14} color={isVerified ? '#4ade80' : primaryColor} />
+                    {isVerified ? 'Qualification Complete & Verified' : 'Verify Entire Qualification'}
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginTop: '0.15rem' }}>
+                    {isVerified
+                      ? "Official judge sign-off active. Click to revoke if further attempts are required."
+                      : "Official judge sign-off for this competitor's entire qualification run."}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => togglePlayerQualifierVerified(tournament.id, player.id)}
+                  style={{
+                    padding: '0.45rem 0.9rem',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    borderRadius: 'var(--radius-sm)',
+                    background: isVerified ? 'rgba(239, 68, 68, 0.12)' : 'rgba(34, 197, 94, 0.15)',
+                    border: isVerified ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(34, 197, 94, 0.5)',
+                    color: isVerified ? '#f87171' : '#4ade80',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.15s ease',
+                  }}
+                  title={isVerified ? 'Click to unverify qualifier' : "Click to officially verify this competitor's qualification"}
+                >
+                  {isVerified ? (
+                    <>
+                      <X size={13} strokeWidth={2.5} /> Unverify Qual
+                    </>
+                  ) : (
+                    <>
+                      <Check size={13} strokeWidth={3} /> Verify Entire Qual
+                    </>
+                  )}
                 </button>
-              </form>
+              </div>
             </div>
           )}
 

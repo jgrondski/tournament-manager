@@ -187,23 +187,30 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
 
             {isTournamentMenuOpen && (
               <div style={dropdownStyle} onClick={() => setIsTournamentMenuOpen(false)}>
-                {tournaments.map(t => (
-                  <button
-                    key={t.id}
-                    onClick={() => handleDropdownNavigate(t.tiers[0] ? `/${t.slug}/${t.tiers[0].slug}` : `/${t.slug}/leaderboard`)}
-                    style={{
-                      ...dropdownItemStyle,
-                      background: t.id === tournament.id ? 'var(--color-gold-bg)' : 'transparent',
-                      color: t.id === tournament.id ? 'var(--color-gold-bright)' : 'var(--color-text-primary)',
-                      fontWeight: t.id === tournament.id ? 700 : 400,
-                    }}
-                  >
-                    <div>
-                      <div>{t.name}</div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>{t.date} • {t.location}</div>
-                    </div>
-                  </button>
-                ))}
+                {tournaments
+                  .filter((t, i, arr) => arr.findIndex(other => other.id === t.id) === i)
+                  .map(t => {
+                    const isSelected = Boolean(tournament?.id && t.id === tournament.id);
+                    const nameCount = tournaments.filter(other => other.name.toLowerCase() === t.name.toLowerCase()).length;
+                    const displayName = nameCount > 1 ? `${t.name} (${t.slug})` : t.name;
+                    return (
+                      <button
+                        key={t.id}
+                        onClick={() => handleDropdownNavigate(t.tiers[0] ? `/${t.slug}/${t.tiers[0].slug}` : `/${t.slug}/leaderboard`)}
+                        style={{
+                          ...dropdownItemStyle,
+                          background: isSelected ? 'var(--color-gold-bg)' : 'transparent',
+                          color: isSelected ? 'var(--color-gold-bright)' : 'var(--color-text-primary)',
+                          fontWeight: isSelected ? 700 : 400,
+                        }}
+                      >
+                        <div>
+                          <div>{displayName}</div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>{t.date} • {t.location}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
               </div>
             )}
           </div>
@@ -212,6 +219,7 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
           {hostOrg && (
             <Link
               to={`/org/${hostOrg.slug}`}
+              onClick={e => handleLinkClick(e, `/org/${hostOrg.slug}`)}
               className="badge"
               style={{
                 textDecoration: 'none',

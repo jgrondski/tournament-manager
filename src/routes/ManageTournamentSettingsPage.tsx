@@ -48,6 +48,11 @@ export const ManageTournamentSettingsPage: React.FC = () => {
     }
   };
 
+  React.useEffect(() => {
+    setIsDirty(false);
+    setPendingNavigation(null);
+  }, [tournament?.id]);
+
   return (
     <TournamentLayout
       tournament={tournament}
@@ -76,6 +81,7 @@ export const ManageTournamentSettingsPage: React.FC = () => {
         </div>
 
         <TournamentAdminForm
+          key={tournament.id}
           tournament={tournament}
           onDirtyChange={setIsDirty}
           onSaved={(saved) => {
