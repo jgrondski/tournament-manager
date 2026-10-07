@@ -128,7 +128,7 @@ describe('API Server & Full Simulation Engine against PostgreSQL Schema', () => 
   });
 
   describe('3. Connect/Vite API Middleware HTTP Handling', () => {
-    it('responds to /api/health with status ok', async () => {
+    it('responds to /api/health with status ok and db connected', async () => {
       const middleware = createApiMiddleware();
 
       let statusCode = 0;
@@ -154,6 +154,45 @@ describe('API Server & Full Simulation Engine against PostgreSQL Schema', () => 
       expect(statusCode).toBe(200);
       const parsed = JSON.parse(responseBody);
       expect(parsed.status).toBe('ok');
+      expect(parsed.db).toBe('connected');
+    });
+
+    it('responds to /api/health with 503 error when database is unreachable', async () => {
+      const middleware = createApiMiddleware();
+
+      // Temporarily mock db to simulate unreachable PostgreSQL container
+      setDb({
+        execute: () => Promise.reject(new Error('Connection refused: 127.0.0.1:5433')),
+      } as any);
+
+      let statusCode = 0;
+      let responseBody = '';
+      const req: any = {
+        url: '/api/health',
+        method: 'GET',
+      };
+      const res: any = {
+        setHeader: () => {},
+        end: (body: string) => {
+          responseBody = body;
+        },
+        set statusCode(val: number) {
+          statusCode = val;
+        },
+        get statusCode() {
+          return statusCode;
+        },
+      };
+
+      await middleware(req, res, () => {});
+      expect(statusCode).toBe(503);
+      const parsed = JSON.parse(responseBody);
+      expect(parsed.status).toBe('error');
+      expect(parsed.db).toBe('disconnected');
+      expect(parsed.error).toContain('Connection refused');
+
+      // Restore testDb
+      setDb(testDb);
     });
 
     it('responds to /api/simulate/sample and returns simulated tournament', async () => {

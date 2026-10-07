@@ -167,7 +167,7 @@ export type SeedingMethod = 'QUALIFIERS' | 'MANUAL';
 
 export interface Tournament {
   id: string;
-  organizationId: string; // required association to parent Organization
+  organizationId?: string; // parent Organization ID if associated
   slug: string; // e.g. 'kc-2026-open'
   name: string; // e.g. 'KC Regional 2026 Open'
   date: string;

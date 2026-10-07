@@ -163,6 +163,11 @@ flowchart TD
 * **Fix:** Extend `PlayerProfile` and the database `players` table with `twitchUsername`, `nickname`, and `displayName`, updating the player edit modal and detail drawer.
 * **Files:** `src/features/tournament/types.ts`, `src/db/schema.ts`, `src/features/players/components/PlayerEditModal.tsx`.
 
+#### 7. Pre-Lock Bracket Visibility in OBS & Public Overlays (Note 1)
+* **Problem:** When match play hasn't been finalized but bracket tiers have been specified in settings, brackets are visible to admins and in the public view, but OBS overlays do not display or preview them.
+* **Fix:** Update OBS overlay components (`ObsBracketView.tsx`, `ObsMatchCardView.tsx`, and associated routes) to support draft bracket preview mode when `tournament.isLocked === false`, rendering the projected bracket matches rather than an empty state.
+* **Files:** `src/features/obs/components/ObsBracketView.tsx`, `src/features/obs/components/ObsMatchCardView.tsx`, `src/routes/ObsOverlayPage.tsx`.
+
 ---
 
 ### Track B: Architectural Decoupling & Ingestion Pipeline Hardening
@@ -231,3 +236,24 @@ Per workspace guidelines in `AGENTS.md`:
 * **Mandatory Regression Tests:** Every bug fix, rule adjustment, and feature must include automated regression tests in `src/api/__tests__/` or `src/features/*/__tests__/`.
 * **Verification Scope:** Tests must verify failure on the buggy state and pass with the fix across all supported bracket types (Single, Double Elimination variants: Traditional, Flat Staged, Accelerated Hybrid), filter interactions, and tier-switching states.
 * **Test Suite Health:** All tests must pass cleanly (`npm test`) with zero TypeScript errors (`npm run typecheck`).
+
+## 5. Omen's bug notes & Resolution Status
+
+- **Note 1:** *When match play hasn't been finalized but the brackets have been specified in settings, you can see the brackets as an admin or in public view but not in overlays.*
+  * **Status:** Scheduled under **Track A, Item 7**. Will be addressed directly as part of Track A fixes.
+
+- **Note 2:** *When the db is down, there doesn't seem to be any indicators in the main global UI that it's down. If the DB goes down and you were admining a tournament, it also doesn't mention that it's down.*
+  * **Status:** **RESOLVED.**
+    * Active `/api/health` database ping endpoint implemented (`SELECT 1` returns 200 `{ db: 'connected' }` or 503 `{ db: 'disconnected' }`).
+    * Real-time DB offline detection wired into `TournamentProvider` store hydration and mutations (`isDbConnected`, `dbError`, `checkDbHealth`, `retryConnection`).
+    * Sticky top-level offline alert banner rendered with "Retry Connection" action.
+    * Prominent PostgreSQL Offline card rendered on `TournamentSwitcherPage` with `npm run db:up` guidance.
+    * `🔴 DB OFFLINE` indicator badges added to `TournamentNavbar` and `TournamentSidebar`.
+    * Unit & regression tests added in `src/server/__tests__/apiSimulation.test.ts`.
+
+- **Note 3:** *Sample orgs for "CTWC" and "CTM" don't seem to be connected to any database at all. Let's just drop both for now; later we're going to want to seed the data so no reason to preserve the samples for now.*
+  * **Status:** **RESOLVED.**
+    * Hardcoded mock objects in `DEFAULT_ORGANIZATIONS` purged.
+    * Made `tournaments.organizationId` nullable in `schema.ts`, `testDb.ts`, and `types.ts` to cleanly support independent tournaments without requiring foreign key references to mock organizations.
+    * Removed all fallback references to `'org_ctwc'` across `store.tsx`, `TournamentAdminForm.tsx`, `tournaments.ts`, and `CreateTournamentModal.tsx`.
+    * Cleaned up dropdown and organization views to gracefully handle empty organization catalogs.

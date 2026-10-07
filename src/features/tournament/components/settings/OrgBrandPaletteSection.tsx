@@ -89,11 +89,15 @@ export const OrgBrandPaletteSection: React.FC<OrgBrandPaletteSectionProps> = ({
               onChange={e => onOrganizationIdChange(e.target.value)}
               style={inputStyle}
             >
-              {organizations.map(org => (
-                <option key={org.id} value={org.id}>
-                  {org.name} ({org.shortName})
-                </option>
-              ))}
+              {organizations.length === 0 ? (
+                <option value="">None (Independent Tournament)</option>
+              ) : (
+                organizations.map(org => (
+                  <option key={org.id} value={org.id}>
+                    {org.name} ({org.shortName || org.slug})
+                  </option>
+                ))
+              )}
             </select>
             <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '0.25rem', display: 'block' }}>
               All match scores, career metrics, and qualifying leaderboards roll up to this organization.

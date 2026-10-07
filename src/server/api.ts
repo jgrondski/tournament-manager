@@ -1,3 +1,5 @@
+import { getDb } from '../db';
+import { sql } from 'drizzle-orm';
 import type { IncomingMessage, ServerResponse } from 'http';
 import {
   createPlayer,
@@ -101,7 +103,18 @@ export function createApiMiddleware() {
 
       // GET /api/health
       if (pathname === '/api/health' && method === 'GET') {
-        return sendJson(res, 200, { status: 'ok', timestamp: Date.now() });
+        try {
+          const db = getDb();
+          await db.execute(sql`SELECT 1`);
+          return sendJson(res, 200, { status: 'ok', db: 'connected', timestamp: Date.now() });
+        } catch (err: any) {
+          return sendJson(res, 503, {
+            status: 'error',
+            db: 'disconnected',
+            error: err.message || 'Database connection failed',
+            timestamp: Date.now(),
+          });
+        }
       }
 
       // --- PLAYERS ENDPOINTS ---

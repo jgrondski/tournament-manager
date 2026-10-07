@@ -64,7 +64,7 @@ export function setupTestDb() {
 
     CREATE TABLE tournaments (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE RESTRICT,
+      organization_id TEXT REFERENCES organizations(id) ON DELETE RESTRICT,
       name TEXT NOT NULL,
       slug TEXT NOT NULL DEFAULT '',
       qual_format TEXT NOT NULL,

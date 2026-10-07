@@ -46,8 +46,7 @@ export const organizations = pgTable(
 export const tournaments = pgTable('tournaments', {
   id: uuid('id').defaultRandom().primaryKey(),
   organizationId: text('organization_id')
-    .references(() => organizations.id, { onDelete: 'restrict' })
-    .notNull(),
+    .references(() => organizations.id, { onDelete: 'restrict' }),
   name: text('name').notNull(),
   slug: text('slug').notNull().default(''),
   qualFormat: text('qual_format', { enum: ['HIGH_SCORE', 'AVERAGE_OF_X', 'POINTS'] }).notNull(),

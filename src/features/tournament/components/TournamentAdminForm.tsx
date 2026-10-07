@@ -51,7 +51,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
   const [name, setName] = useState(tournament.name);
   const [slug, setSlug] = useState(tournament.slug);
   const [organizationId, setOrganizationId] = useState<string>(
-    tournament.organizationId || organizations[0]?.id || 'org_ctwc'
+    tournament.organizationId || organizations[0]?.id || ''
   );
   const [useOrgBranding, setUseOrgBranding] = useState<boolean>(
     tournament.useOrgBranding ?? true
@@ -163,7 +163,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
   const isDirty = useMemo(() => {
     if (name.trim() !== (tournament.name || '').trim()) return true;
     if (slug.trim() !== (tournament.slug || '').trim()) return true;
-    if (organizationId !== (tournament.organizationId || 'org_ctwc')) return true;
+    if ((organizationId || '') !== (tournament.organizationId || '')) return true;
     if (useOrgBranding !== (tournament.useOrgBranding ?? true)) return true;
     if ((discordWebhookUrl || '').trim() !== (tournament.discordWebhookUrl || '').trim()) return true;
     if ((logoUrl || '').trim() !== (tournament.logoUrl || '').trim()) return true;
@@ -259,7 +259,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
     if (!isDirty) {
       setName(tournament.name || '');
       setSlug(tournament.slug || '');
-      setOrganizationId(tournament.organizationId || 'org_ctwc');
+      setOrganizationId(tournament.organizationId || '');
       setUseOrgBranding(tournament.useOrgBranding ?? true);
       setDiscordWebhookUrl(tournament.discordWebhookUrl || '');
       setLogoUrl(tournament.logoUrl || '');
@@ -282,7 +282,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
   const handleDiscardChanges = () => {
     setName(tournament.name || '');
     setSlug(tournament.slug || '');
-    setOrganizationId(tournament.organizationId || 'org_ctwc');
+    setOrganizationId(tournament.organizationId || '');
     setUseOrgBranding(tournament.useOrgBranding ?? true);
     setDiscordWebhookUrl(tournament.discordWebhookUrl || '');
     setLogoUrl(tournament.logoUrl || '');
@@ -586,7 +586,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
         // Immediately sync local form state with saved tournament returned from database
         setName(saved.name || '');
         setSlug(saved.slug || '');
-        setOrganizationId(saved.organizationId || 'org_ctwc');
+        setOrganizationId(saved.organizationId || '');
         setUseOrgBranding(saved.useOrgBranding ?? true);
         setDiscordWebhookUrl(saved.discordWebhookUrl || '');
         setLogoUrl(saved.logoUrl || '');

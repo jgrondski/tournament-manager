@@ -7,7 +7,15 @@ import { TournamentCard } from '../features/tournament/components/TournamentCard
 import { CreateTournamentModal } from '../features/tournament/components/CreateTournamentModal';
 
 export const TournamentSwitcherPage: React.FC = () => {
-  const { tournaments, deleteTournament, isLoading, simulateSampleTournament } = useTournament();
+  const {
+    tournaments,
+    deleteTournament,
+    isLoading,
+    simulateSampleTournament,
+    isDbConnected,
+    dbError,
+    retryConnection,
+  } = useTournament();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [tournamentToDelete, setTournamentToDelete] = useState<Tournament | null>(null);
@@ -88,6 +96,66 @@ export const TournamentSwitcherPage: React.FC = () => {
             <div style={{ width: 44, height: 44, border: '3px solid rgba(255,255,255,0.1)', borderTopColor: 'var(--color-gold-bright)', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 1.25rem' }} />
             <h3 style={{ fontSize: '1.2rem', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '0.5rem' }}>Loading Tournaments</h3>
             <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.95rem' }}>Hydrating tournaments from PostgreSQL...</p>
+          </div>
+        ) : !isDbConnected ? (
+          <div
+            style={{
+              background: 'linear-gradient(180deg, rgba(239, 68, 68, 0.08) 0%, rgba(185, 28, 28, 0.04) 100%)',
+              border: '1px solid rgba(239, 68, 68, 0.35)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '3.5rem 2rem',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '1rem',
+              maxWidth: '620px',
+              margin: '1rem auto 3rem',
+            }}
+          >
+            <div
+              style={{
+                width: '60px',
+                height: '60px',
+                borderRadius: '50%',
+                background: 'rgba(239, 68, 68, 0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ef4444',
+                marginBottom: '0.5rem',
+              }}
+            >
+              <AlertTriangle size={32} />
+            </div>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+              PostgreSQL Database Offline
+            </h2>
+            <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.95rem', maxWidth: '460px', lineHeight: 1.5 }}>
+              Unable to connect to the database on port 5433 ({dbError || 'Connection refused'}). Tournaments cannot be loaded or modified while PostgreSQL is disconnected.
+            </p>
+            <div
+              style={{
+                background: 'rgba(0, 0, 0, 0.4)',
+                padding: '0.5rem 1rem',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '0.85rem',
+                color: '#fca5a5',
+                fontFamily: 'monospace',
+                marginTop: '0.25rem',
+              }}
+            >
+              npm run db:up
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center', marginTop: '0.75rem' }}>
+              <button
+                onClick={() => retryConnection()}
+                className="btn btn-primary"
+                style={{ padding: '0.7rem 1.75rem', fontSize: '0.95rem' }}
+              >
+                Retry Connection
+              </button>
+            </div>
           </div>
         ) : tournaments.length === 0 ? (
           <div

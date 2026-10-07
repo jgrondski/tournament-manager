@@ -25,7 +25,7 @@ export const CreateTournamentModal: React.FC<CreateTournamentModalProps> = ({
   const { organizations, getOrganizationById } = useOrganization();
   const navigate = useNavigate();
 
-  const initialOrgId = fixedOrgId || defaultOrgId || organizations[0]?.id || 'org_ctwc';
+  const initialOrgId = fixedOrgId || defaultOrgId || organizations[0]?.id || '';
   const [newTourneyOrgId, setNewTourneyOrgId] = useState<string>(initialOrgId);
   const [newTourneyName, setNewTourneyName] = useState('');
   const [newTourneySlug, setNewTourneySlug] = useState('');
@@ -37,7 +37,7 @@ export const CreateTournamentModal: React.FC<CreateTournamentModalProps> = ({
 
   // Sync with fixedOrgId or organizations loading
   useEffect(() => {
-    const targetId = fixedOrgId || defaultOrgId || organizations[0]?.id || 'org_ctwc';
+    const targetId = fixedOrgId || defaultOrgId || organizations[0]?.id || '';
     setNewTourneyOrgId(targetId);
 
     const org = getOrganizationById(targetId);

@@ -118,7 +118,7 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
   isCollapsed: controlledIsCollapsed,
   onToggleCollapse,
 }) => {
-  const { tournaments, unlockBrackets, setActiveTournamentId } = useTournament();
+  const { tournaments, unlockBrackets, setActiveTournamentId, isDbConnected, retryConnection } = useTournament();
   const { getOrganizationById } = useOrganization();
   const navigate = useNavigate();
 
@@ -343,6 +343,30 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
             )}
           </Link>
         </div>
+
+        {/* DB Offline Indicator */}
+        {!isDbConnected && (
+          <div
+            onClick={() => retryConnection()}
+            style={{
+              padding: isCollapsed ? '0.4rem 0.2rem' : '0.4rem 0.75rem',
+              background: 'rgba(239, 68, 68, 0.18)',
+              borderBottom: '1px solid rgba(239, 68, 68, 0.4)',
+              color: '#f87171',
+              fontSize: '0.68rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: isCollapsed ? 'center' : 'flex-start',
+              gap: '0.4rem',
+            }}
+            title="PostgreSQL Offline! Click to retry connection."
+          >
+            <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#ef4444', flexShrink: 0 }} />
+            {!isCollapsed && <span>DB OFFLINE (RETRY)</span>}
+          </div>
+        )}
 
         {/* Tournament Switcher & Mode Pill */}
         {activeTourney && (

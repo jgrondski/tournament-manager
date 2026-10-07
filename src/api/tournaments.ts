@@ -59,7 +59,7 @@ export async function createTournament(input: TournamentInput): Promise<{
   tiers: TierRecord[];
 }> {
   const db = getDb();
-  const orgId = input.organizationId || 'org_ctwc';
+  const orgId = input.organizationId || null;
   const computedSlug = input.slug || input.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
   const [t] = await db
     .insert(tournaments)
@@ -338,7 +338,7 @@ export async function getFullTournament(idOrSlug: string): Promise<Tournament | 
 
   const fullTourney: Tournament = {
     id: t.id,
-    organizationId: t.organizationId || meta.organizationId || 'org_ctwc',
+    organizationId: t.organizationId || meta.organizationId || undefined,
     slug: t.slug,
     name: t.name,
     date: meta.date || '',
@@ -383,21 +383,16 @@ export async function saveFullTournament(tourney: Tournament): Promise<Tournamen
   const tourneyUuid = isUuid(tourney.id) ? tourney.id : crypto.randomUUID();
   const slug = tourney.slug || `tournament-${Date.now()}`;
   
-  let orgId = tourney.organizationId || 'org_ctwc';
-  const [matchingOrg] = await db
-    .select({ id: organizations.id })
-    .from(organizations)
-    .where(or(eq(organizations.id, orgId), eq(organizations.slug, orgId)))
-    .limit(1);
+  let orgId: string | null = null;
+  if (tourney.organizationId) {
+    const [matchingOrg] = await db
+      .select({ id: organizations.id })
+      .from(organizations)
+      .where(or(eq(organizations.id, tourney.organizationId), eq(organizations.slug, tourney.organizationId)))
+      .limit(1);
 
-  if (matchingOrg) {
-    orgId = matchingOrg.id;
-  } else {
-    const allOrgs = await db.select({ id: organizations.id }).from(organizations).limit(1);
-    if (allOrgs.length > 0) {
-      orgId = allOrgs[0].id;
-    } else {
-      orgId = 'org_ctwc';
+    if (matchingOrg) {
+      orgId = matchingOrg.id;
     }
   }
 

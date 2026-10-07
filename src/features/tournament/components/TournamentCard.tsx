@@ -30,7 +30,7 @@ export const TournamentCard: React.FC<TournamentCardProps> = ({
   showOrgBadge = true,
 }) => {
   const { getOrganizationById } = useOrganization();
-  const org = getOrganizationById(tournament.organizationId);
+  const org = tournament.organizationId ? getOrganizationById(tournament.organizationId) : undefined;
 
   const hasTiers = tournament.tiers && tournament.tiers.length > 0;
   const defaultTier = hasTiers ? tournament.tiers[0] : undefined;

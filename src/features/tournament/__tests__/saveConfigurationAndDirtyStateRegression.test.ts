@@ -22,7 +22,7 @@ describe('Save Configuration & Dirty State Regression (All Bracket Types)', () =
     return (current: {
       name: string;
       slug: string;
-      organizationId: string;
+      organizationId?: string;
       useOrgBranding: boolean;
       discordWebhookUrl: string;
       logoUrl: string;
@@ -37,7 +37,7 @@ describe('Save Configuration & Dirty State Regression (All Bracket Types)', () =
     }): boolean => {
       if (current.name.trim() !== (baseline.name || '').trim()) return true;
       if (current.slug.trim() !== (baseline.slug || '').trim()) return true;
-      if (current.organizationId !== (baseline.organizationId || 'org_ctwc')) return true;
+      if ((current.organizationId || '') !== (baseline.organizationId || '')) return true;
       if (current.useOrgBranding !== (baseline.useOrgBranding ?? true)) return true;
       if ((current.discordWebhookUrl || '').trim() !== (baseline.discordWebhookUrl || '').trim()) return true;
       if ((current.logoUrl || '').trim() !== (baseline.logoUrl || '').trim()) return true;

@@ -36,9 +36,9 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
   activeView,
   onNavigate,
 }) => {
-  const { tournaments, unlockBrackets } = useTournament();
+  const { tournaments, unlockBrackets, isDbConnected, retryConnection } = useTournament();
   const { getOrganizationById } = useOrganization();
-  const hostOrg = getOrganizationById(tournament.organizationId);
+  const hostOrg = tournament.organizationId ? getOrganizationById(tournament.organizationId) : undefined;
   const navigate = useNavigate();
   const [isTournamentMenuOpen, setIsTournamentMenuOpen] = useState(false);
   const [isObsMenuOpen, setIsObsMenuOpen] = useState(false);
@@ -256,6 +256,32 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
 
         {/* Right Side: Mode Pill Chip, Bracket Views Group, and All OBS Overlays */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+          {/* DB Offline Indicator Pill */}
+          {!isDbConnected && (
+            <button
+              type="button"
+              onClick={() => retryConnection()}
+              style={{
+                background: 'rgba(239, 68, 68, 0.2)',
+                border: '1px solid rgba(239, 68, 68, 0.6)',
+                borderRadius: 'var(--radius-full)',
+                padding: '0.2rem 0.65rem',
+                color: '#f87171',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                transition: 'all 0.15s ease',
+              }}
+              title="PostgreSQL Database Offline! Click to retry connection."
+            >
+              <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#ef4444', display: 'inline-block' }} />
+              <span>DB OFFLINE</span>
+            </button>
+          )}
+
           {/* Interactive Mode Pill Button (Placed to the left of the Sheet button) */}
           {!tournament.isLocked ? (
             <button

@@ -1,31 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { DEFAULT_ORGANIZATIONS } from '../store';
 import { computeOrganizationMetrics, computeOrgCompetitorLeaderboard } from '../metrics';
-import { Tournament, PlayerProfile } from '../../tournament/types';
+import { Tournament, PlayerProfile, Organization } from '../../tournament/types';
 import { generateTraditionalBracket } from '../../bracket/math';
 
 describe('Organizations Core Engine & Metrics', () => {
-  it('initializes default organizations with 5-color bracket theme palettes and default rules', () => {
-    expect(DEFAULT_ORGANIZATIONS.length).toBe(2);
-
-    const ctwc = DEFAULT_ORGANIZATIONS.find(o => o.slug === 'ctwc');
-    expect(ctwc).toBeDefined();
-    expect(ctwc?.name).toBe('Classic Tetris World Championship');
-    expect(ctwc?.themeColors).toBeDefined();
-    expect(ctwc?.themeColors?.primaryColor).toBe('#ffc905');
-    expect(ctwc?.themeColors?.secondaryColor).toBe('#705b33');
-    expect(ctwc?.themeColors?.cardColor).toBe('#1b1c1d');
-    expect(ctwc?.themeColors?.textColor).toBe('#94A3B8');
-    expect(ctwc?.themeColors?.backgroundColor).toBe('#020203');
-    expect(ctwc?.defaultRules?.qualFormat).toBe('AVERAGE_OF_X');
-    expect(ctwc?.defaultRules?.bestOf).toBe(5);
-
-    // Verify CTWC default tier themes
-    expect(ctwc?.tierThemes).toHaveLength(2);
-    expect(ctwc?.tierThemes?.[0].name).toBe('Silver');
-    expect(ctwc?.tierThemes?.[0].themeColors.primaryColor).toBe('#CBD5E1');
-    expect(ctwc?.tierThemes?.[1].name).toBe('Bronze');
-    expect(ctwc?.tierThemes?.[1].themeColors.primaryColor).toBe('#db5f00');
+  it('initializes default organizations as empty array (no unbacked mock orgs)', () => {
+    expect(DEFAULT_ORGANIZATIONS).toEqual([]);
   });
 
   it('computes accurate organization metrics from hosted tournaments', () => {
@@ -210,8 +191,10 @@ describe('Organizations Core Engine & Metrics', () => {
   });
 
   it('correctly resolves discord webhook URL fallback hierarchy', () => {
-    const orgWithWebhook = {
-      ...DEFAULT_ORGANIZATIONS[0],
+    const orgWithWebhook: Partial<Organization> = {
+      id: 'org_test',
+      slug: 'test',
+      name: 'Test Org',
       discordWebhookUrl: 'https://discord.com/api/webhooks/org-default',
     };
 
@@ -230,17 +213,33 @@ describe('Organizations Core Engine & Metrics', () => {
     expect(resolvedFallback).toBe('https://discord.com/api/webhooks/org-default');
 
     // Case 3: Neither has webhook configured
-    const orgWithoutWebhook = { ...DEFAULT_ORGANIZATIONS[0], discordWebhookUrl: undefined };
+    const orgWithoutWebhook: Partial<Organization> = {
+      id: 'org_test',
+      slug: 'test',
+      name: 'Test Org',
+      discordWebhookUrl: undefined,
+    };
     const resolvedNone = tourneyWithoutWebhook.discordWebhookUrl?.trim() || orgWithoutWebhook.discordWebhookUrl;
     expect(resolvedNone).toBeUndefined();
   });
 
   it('verifies 5-color bracket theme palette inheritance and override capability', () => {
-    const ctwc = DEFAULT_ORGANIZATIONS.find(o => o.slug === 'ctwc')!;
-    expect(ctwc.themeColors).toBeDefined();
+    const sampleOrg: Partial<Organization> = {
+      id: 'org_ctwc',
+      slug: 'ctwc',
+      name: 'Classic Tetris World Championship',
+      themeColors: {
+        primaryColor: '#ffc905',
+        secondaryColor: '#705b33',
+        cardColor: '#1b1c1d',
+        textColor: '#94A3B8',
+        backgroundColor: '#020203',
+      },
+    };
+    expect(sampleOrg.themeColors).toBeDefined();
 
     // 5 colors defined on organization:
-    const { primaryColor, secondaryColor, cardColor, textColor, backgroundColor } = ctwc.themeColors!;
+    const { primaryColor, secondaryColor, cardColor, textColor, backgroundColor } = sampleOrg.themeColors!;
     expect(primaryColor).toBe('#ffc905');
     expect(secondaryColor).toBe('#705b33');
     expect(cardColor).toBe('#1b1c1d');
@@ -250,7 +249,7 @@ describe('Organizations Core Engine & Metrics', () => {
     // Inherited regional tournament
     const inheritedTourney: Partial<Tournament> = {
       useOrgBranding: true,
-      themeColors: ctwc.themeColors,
+      themeColors: sampleOrg.themeColors,
     };
     expect(inheritedTourney.useOrgBranding).toBe(true);
     expect(inheritedTourney.themeColors?.primaryColor).toBe('#ffc905');

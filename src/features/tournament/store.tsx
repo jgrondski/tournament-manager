@@ -19,6 +19,10 @@ interface TournamentContextType {
   activeTournamentId: string | null;
   activeTournament?: Tournament;
   isLoading: boolean;
+  isDbConnected: boolean;
+  dbError: string | null;
+  checkDbHealth: () => Promise<boolean>;
+  retryConnection: () => Promise<void>;
   apiError?: string | null;
   clearApiError?: () => void;
   simulateSampleTournament: () => Promise<Tournament | undefined>;
@@ -250,8 +254,47 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [globalPlayers, setGlobalPlayers] = useState<PlayerProfile[]>([]);
   const [activeTournamentId, setActiveTournamentId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isDbConnected, setIsDbConnected] = useState<boolean>(true);
+  const [dbError, setDbError] = useState<string | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
   const clearApiError = () => setApiError(null);
+
+  const checkDbHealth = async (): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/health');
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.status === 'ok') {
+        setIsDbConnected(true);
+        setDbError(null);
+        return true;
+      } else {
+        setIsDbConnected(false);
+        setDbError(data.error || 'PostgreSQL database is currently disconnected.');
+        return false;
+      }
+    } catch (err: any) {
+      setIsDbConnected(false);
+      setDbError(err.message || 'Cannot reach API server');
+      return false;
+    }
+  };
+
+  const retryConnection = async (): Promise<void> => {
+    const ok = await checkDbHealth();
+    if (ok) {
+      setIsLoading(true);
+      try {
+        const [tourneys, players] = await Promise.all([
+          apiCall('/api/tournaments').catch(() => []),
+          apiCall('/api/players').catch(() => []),
+        ]);
+        if (Array.isArray(tourneys)) setTournaments(tourneys);
+        if (Array.isArray(players)) setGlobalPlayers(players);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
 
   const syncTournamentToApi = async (tourney: Tournament): Promise<Tournament | null> => {
     try {
@@ -261,6 +304,8 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         body: JSON.stringify(tourney),
       });
       if (saved && saved.id) {
+        setIsDbConnected(true);
+        setDbError(null);
         setTournaments(prev => {
           const matchIndex = prev.findIndex(
             t =>
@@ -283,6 +328,8 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } catch (err: any) {
       console.error(`[Store] Database sync error for "${tourney.name}":`, err);
       setApiError(`Database sync error for "${tourney.name}": ${err.message}`);
+      setIsDbConnected(false);
+      setDbError(err.message);
       return null;
     }
   };
@@ -293,9 +340,16 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     async function hydrate() {
       setIsLoading(true);
       try {
+        const isHealthy = await checkDbHealth();
+        if (!isHealthy) {
+          console.warn('[Store] Database health check failed. PostgreSQL is offline.');
+          return;
+        }
         const [tourneys, players] = await Promise.all([
           apiCall('/api/tournaments').catch(err => {
             console.error('Failed to load tournaments from DB:', err);
+            setIsDbConnected(false);
+            setDbError(err.message);
             return [];
           }),
           apiCall('/api/players').catch(err => {
@@ -304,10 +358,10 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           }),
         ]);
         if (isMounted) {
-          if (Array.isArray(tourneys) && tourneys.length > 0) {
+          if (Array.isArray(tourneys)) {
             setTournaments(tourneys);
           }
-          if (Array.isArray(players) && players.length > 0) {
+          if (Array.isArray(players)) {
             setGlobalPlayers(players);
           }
         }
@@ -382,7 +436,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const newTourney: Tournament = {
       ...data,
       id,
-      organizationId: data.organizationId || 'org_ctwc',
+      organizationId: data.organizationId || undefined,
       slug: data.slug || id,
       matchScores: {},
       playersPool: [],
@@ -410,6 +464,8 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     })
       .then(saved => {
         if (saved && saved.id) {
+          setIsDbConnected(true);
+          setDbError(null);
           setTournaments(prev => [
             saved,
             ...prev.filter(t => t.id !== saved.id && t.id !== newTourney.id && t.slug !== saved.slug)
@@ -421,6 +477,8 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       .catch(err => {
         console.error(`[Store] Failed to save tournament "${newTourney.name}" to database:`, err);
         setApiError(`Failed to save tournament "${newTourney.name}" to database: ${err.message}`);
+        setIsDbConnected(false);
+        setDbError(err.message);
       });
     return newTourney;
   };
@@ -1655,10 +1713,59 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         batchJumpManualSeeds,
         batchRemoveManualSeeds,
         batchAddManualSeeds,
+        isDbConnected,
+        dbError,
+        checkDbHealth,
+        retryConnection,
         apiError,
         clearApiError,
       }}
     >
+      {!isDbConnected && (
+        <div
+          role="alert"
+          style={{
+            backgroundColor: '#991b1b',
+            backgroundImage: 'linear-gradient(90deg, #991b1b 0%, #7f1d1d 100%)',
+            color: '#ffffff',
+            padding: '10px 16px',
+            fontSize: '13px',
+            fontWeight: 600,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            position: 'sticky',
+            top: 0,
+            zIndex: 99999,
+            boxShadow: '0 4px 14px rgba(0, 0, 0, 0.5)',
+            borderBottom: '1px solid rgba(239, 68, 68, 0.4)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '15px' }}>🔴</span>
+            <span>
+              <strong>PostgreSQL Database Offline:</strong> Unable to connect on port 5433 ({dbError || 'Connection refused'}). Tournaments cannot be loaded or saved. Please ensure the Docker container is running (<code>npm run db:up</code>).
+            </span>
+          </div>
+          <button
+            onClick={() => retryConnection()}
+            style={{
+              background: '#ffffff',
+              color: '#991b1b',
+              border: 'none',
+              borderRadius: '4px',
+              padding: '4px 12px',
+              fontWeight: 700,
+              fontSize: '12px',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              marginLeft: '12px',
+            }}
+          >
+            Retry Connection
+          </button>
+        </div>
+      )}
       {apiError && (
         <div
           role="alert"
