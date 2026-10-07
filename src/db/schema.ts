@@ -1,5 +1,14 @@
 import { pgTable, uuid, text, integer, boolean, jsonb, timestamp, uniqueIndex, index } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
+import type {
+  TierThemeColors,
+  OrgTierTheme,
+  OrganizationBranding,
+  OrganizationDefaultRules,
+  TournamentMetadata,
+  TierMetadata,
+  MatchMetadata,
+} from '../features/tournament/types';
 
 export const players = pgTable(
   'players',
@@ -31,11 +40,11 @@ export const organizations = pgTable(
     description: text('description'),
     website: text('website'),
     brandColor: text('brand_color'),
-    themeColors: jsonb('theme_colors').$type<Record<string, any>>(),
-    tierThemes: jsonb('tier_themes').$type<Array<Record<string, any>>>(),
-    branding: jsonb('branding').$type<Record<string, any>>(),
+    themeColors: jsonb('theme_colors').$type<TierThemeColors>(),
+    tierThemes: jsonb('tier_themes').$type<OrgTierTheme[]>(),
+    branding: jsonb('branding').$type<OrganizationBranding>(),
     discordWebhookUrl: text('discord_webhook_url'),
-    defaultRules: jsonb('default_rules').$type<Record<string, any>>(),
+    defaultRules: jsonb('default_rules').$type<OrganizationDefaultRules>(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   (table) => [
@@ -54,7 +63,7 @@ export const tournaments = pgTable('tournaments', {
   pointsConfig: jsonb('points_config').$type<Array<{ minScore: number; points: number }>>(),
   qualsClosed: boolean('quals_closed').notNull().default(false),
   isVerified: boolean('is_verified').notNull().default(false),
-  metadata: jsonb('metadata').$type<Record<string, any>>(),
+  metadata: jsonb('metadata').$type<TournamentMetadata>(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
@@ -69,7 +78,7 @@ export const bracketTiers = pgTable('bracket_tiers', {
   numPlayers: integer('num_players').notNull(),
   primaryColor: text('primary_color').notNull().default('#FFD700'),
   secondaryColor: text('secondary_color').notNull().default('#000000'),
-  metadata: jsonb('metadata').$type<Record<string, any>>(),
+  metadata: jsonb('metadata').$type<TierMetadata>(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
@@ -107,7 +116,7 @@ export const matches = pgTable(
     bestOf: integer('best_of').notNull().default(3),
     isForfeit: boolean('is_forfeit').notNull().default(false),
     isComplete: boolean('is_complete').notNull().default(false),
-    metadata: jsonb('metadata').$type<Record<string, any>>(),
+    metadata: jsonb('metadata').$type<MatchMetadata>(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   (table) => [

@@ -105,12 +105,12 @@ This document is the consolidated, single source of truth for the implementation
 
 ```mermaid
 flowchart TD
-    subgraph TrackA["Track A: Mathematical Rules & Logic Bug Fixes (Omen's Loose Notes)"]
-        A1["• Flat Bracket Bye Seed Alternation (1 vs N)<br>• Points Qual 0-Point Tiebreaker (High Score)<br>• Clear Quals vs Matches Speedbump Hierarchy<br>• Settings 'Add Tier' Button Position<br>• Homepage Navigation to Public Views<br>• Player Identity: Twitch vs Name vs Nickname"]
+    subgraph TrackA["Track A: Architectural Decoupling, Factory Centralization & Developer Ergonomics"]
+        A1["• Decouple Monolithic Store (1,770 lines) into Domain Hooks<br>• Centralized Factory & Defaults (defaults.ts)<br>• Standalone CLI Database Seeder (npm run db:seed)<br>• Contract Alignment & Strict Type Invariants<br>• Targeted Fast-Feedback NPM Test Scripts (test:brackets, test:api)<br>• Agent Architecture Cheatsheet in AGENTS.md"]
     end
 
-    subgraph TrackB["Track B: Architectural Decoupling & Ingestion Pipeline Hardening"]
-        B1["• Decouple Qualifier Ingestion from Full-Blob Tournament Save<br>• Lightweight Ingestion Endpoints (Qualifiers Table Only)<br>• Contract Alignment: playerCount vs numPlayers, TRADITIONAL vs TRADITIONAL_TREE"]
+    subgraph TrackB["Track B: Mathematical Rules & Logic Bug Fixes (Omen's Loose Notes)"]
+        B1["• Flat Bracket Bye Seed Alternation (1 vs N)<br>• Points Qual 0-Point Tiebreaker (High Score)<br>• Clear Quals vs Matches Speedbump Hierarchy<br>• Settings 'Add Tier' Button Position<br>• Homepage Navigation to Public Views<br>• Player Identity: Twitch vs Name vs Nickname<br>• Pre-Lock Bracket Visibility in OBS Overlays (Note 1)"]
     end
 
     subgraph TrackC["Track C: Phase 8 — Live & Online Qualifiers Engine"]
@@ -130,8 +130,21 @@ flowchart TD
 
 ---
 
-### Track A: Mathematical Rules & Logic Bug Fixes (Omen's Loose Notes)
-* **Goal:** Eliminate all observed tournament rule discrepancies, navigation misdirections, and simulation safety flaws before touching the live ingestion architecture.
+### Track A: Architectural Decoupling, Factory Centralization & Developer Ergonomics [COMPLETE]
+* **Goal:** Eliminate monolithic state/form bottlenecks, eliminate defensive mock fallbacks, centralize entity defaults, and introduce fast domain test commands so all subsequent development runs with minimal agent scanning tokens and near-zero credit overhead.
+* **Delivered Capabilities:**
+  * **Domain Hooks Decoupling:** Created independent domain hooks in `src/features/tournament/hooks/` (`useTournamentSettings`, `useQualifiers`, `useMatches`, `useGlobalPlayers`) with index re-exports and backward-compatible bindings in `store.tsx`.
+  * **Single Entity Factory & Defaults (`src/features/tournament/defaults.ts`):** Canonical factories `createEmptyTournament()`, `createDefaultTier(priority)`, and `createEmptyPlayer()` implemented and adopted in `TournamentAdminForm.tsx` and `CreateTournamentModal.tsx`.
+  * **Dedicated CLI Database Seed Script (`npm run db:seed`):** Standalone cross-platform script `scripts/seed.ts` seeding default organizations, 1,620 authentic competitors, and sample tournaments directly via Drizzle into PostgreSQL.
+  * **Contract Alignment & Strict Type Invariants:** Eliminates loose `Record<string, any>` types with strict `TournamentMetadata`, `TierMetadata`, `OrganizationBranding`, and `OrganizationDefaultRules` in `types.ts` and `schema.ts`. Hardens `TierInput` and `TierRecord` to defensively support both `playerCount` and `numPlayers` and align `BracketRouting` with `TRADITIONAL_TREE`.
+  * **Targeted Fast-Feedback NPM Test Scripts:** Added `npm run test:brackets` (~2.6s), `npm run test:api` (~5.5s), and `npm run test:ui` (~3.1s) to `package.json`.
+  * **Agent Architecture Index:** Added Domain File Map and updated verification commands in `AGENTS.md`.
+  * **Automated Regression Suite:** 12 tests in `src/features/tournament/__tests__/domainHooksAndDefaults.test.ts`.
+
+---
+
+### Track B: Mathematical Rules & Logic Bug Fixes (Omen's Loose Notes)
+* **Goal:** Eliminate all observed tournament rule discrepancies, navigation misdirections, and simulation safety flaws built on top of the clean decoupled architecture.
 
 #### 1. Flat Bracket Bye Seed Alternation
 * **Problem:** In Flat Single and Double Elimination brackets, byes are currently paired sequentially ($1 \text{ vs } 2, 3 \text{ vs } 4$).
@@ -146,7 +159,7 @@ flowchart TD
 #### 3. Simulation & Data Management Safety Hierarchy
 * **Problem:** Admins can accidentally clear qualifier data while active matches exist, creating orphaned match records.
 * **Fix:** In `TournamentAdminForm.tsx`, disable "Clear Quals" whenever active match scores exist. Enforce the strict lifecycle hierarchy: "Clear Matches" must be executed before "Clear Quals" becomes enabled. "Clear All" remains available behind its speedbump confirmation modal.
-* **Files:** `src/features/tournament/components/TournamentAdminForm.tsx`, `src/features/tournament/store.tsx`.
+* **Files:** `src/features/tournament/components/TournamentAdminForm.tsx`.
 
 #### 4. Settings "Add Tier" Button Placement
 * **Problem:** The "+ Add Tier" button at the top requires organizers to scroll down to find the newly added tier.
@@ -167,18 +180,6 @@ flowchart TD
 * **Problem:** When match play hasn't been finalized but bracket tiers have been specified in settings, brackets are visible to admins and in the public view, but OBS overlays do not display or preview them.
 * **Fix:** Update OBS overlay components (`ObsBracketView.tsx`, `ObsMatchCardView.tsx`, and associated routes) to support draft bracket preview mode when `tournament.isLocked === false`, rendering the projected bracket matches rather than an empty state.
 * **Files:** `src/features/obs/components/ObsBracketView.tsx`, `src/features/obs/components/ObsMatchCardView.tsx`, `src/routes/ObsOverlayPage.tsx`.
-
----
-
-### Track B: Architectural Decoupling & Ingestion Pipeline Hardening
-* **Goal:** Eliminate the monolithic full-object sync anti-pattern in `store.tsx` so live qualifier score submissions can occur at high frequencies without race conditions or database push collisions.
-
-1. **Atomic Qualifier Ingestion:**
-   * Refactor `POST /api/tournaments/:id/qualifiers` to perform a lightweight `INSERT INTO qualifier_submissions` and recalculate live leaderboard rankings without rebuilding or reserializing the entire tournament tree.
-2. **Decouple Store Subscriptions:**
-   * Split `store.tsx` into modular stores or query hooks (`useQualifiers`, `useTournamentDetails`, `useMatches`) so qualifier updates do not trigger full-bracket re-renders.
-3. **Contract Alignment:**
-   * Standardize properties across frontend and backend: eliminate `playerCount` vs `numPlayers` aliasing and unify `TRADITIONAL` / `TRADITIONAL_TREE` in routing types.
 
 ---
 
@@ -240,7 +241,7 @@ Per workspace guidelines in `AGENTS.md`:
 ## 5. Omen's bug notes & Resolution Status
 
 - **Note 1:** *When match play hasn't been finalized but the brackets have been specified in settings, you can see the brackets as an admin or in public view but not in overlays.*
-  * **Status:** Scheduled under **Track A, Item 7**. Will be addressed directly as part of Track A fixes.
+  * **Status:** Scheduled under **Track B, Item 7**. Will be addressed directly as part of Track B fixes.
 
 - **Note 2:** *When the db is down, there doesn't seem to be any indicators in the main global UI that it's down. If the DB goes down and you were admining a tournament, it also doesn't mention that it's down.*
   * **Status:** **RESOLVED.**

@@ -1,20 +1,23 @@
 import { tournaments, bracketTiers, organizations } from '../db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, or } from 'drizzle-orm';
 import { getDb } from '../db';
+import type { BracketType, BracketRouting, EliminationType } from '../features/bracket/types';
+import type { TournamentMetadata, TierMetadata } from '../features/tournament/types';
 
 export interface TierInput {
   name: string;
   slug?: string;
-  bracketType: 'TRADITIONAL' | 'FLAT';
-  numPlayers: number;
+  bracketType: BracketType;
+  numPlayers?: number;
+  playerCount?: number;
   priorityOrder: number;
   flatWidth?: number;
   primaryColor?: string;
   secondaryColor?: string;
-  eliminationType?: 'SINGLE' | 'DOUBLE';
-  bracketRouting?: 'TRADITIONAL' | 'FLAT_STAGED' | 'ACCELERATED_HYBRID';
+  eliminationType?: EliminationType;
+  bracketRouting?: BracketRouting;
   bestOf?: number;
-  metadata?: Record<string, any>;
+  metadata?: TierMetadata;
 }
 
 export interface TournamentInput {
@@ -25,6 +28,7 @@ export interface TournamentInput {
   qualAverageCount?: number;
   pointsConfig?: Array<{ minScore: number; points: number }>;
   isVerified?: boolean;
+  metadata?: TournamentMetadata;
   tiers?: TierInput[];
 }
 
@@ -46,9 +50,10 @@ export interface TierRecord {
   tournamentId: string;
   priorityOrder: number;
   name: string;
-  bracketType: 'TRADITIONAL' | 'FLAT';
+  bracketType: BracketType;
   flatWidth: number | null;
   numPlayers: number;
+  playerCount: number;
   primaryColor: string;
   secondaryColor: string;
   createdAt: Date;
@@ -71,18 +76,20 @@ export async function createTournament(input: TournamentInput): Promise<{
       qualAverageCount: input.qualAverageCount || null,
       pointsConfig: input.pointsConfig || null,
       isVerified: input.isVerified || false,
+      metadata: input.metadata,
     })
     .returning();
 
   const createdTiers: TierRecord[] = [];
   if (input.tiers && input.tiers.length > 0) {
     for (const tier of input.tiers) {
-      const tierMeta = {
+      const tierMeta: TierMetadata = {
         eliminationType: tier.eliminationType || 'SINGLE',
         bracketRouting: tier.bracketRouting,
         bestOf: tier.bestOf || 3,
         ...(tier.metadata || {}),
       };
+      const resolvedNumPlayers = tier.numPlayers ?? tier.playerCount ?? 16;
       const [tr] = await db
         .insert(bracketTiers)
         .values({
@@ -92,13 +99,16 @@ export async function createTournament(input: TournamentInput): Promise<{
           priorityOrder: tier.priorityOrder,
           bracketType: tier.bracketType,
           flatWidth: tier.flatWidth || null,
-          numPlayers: tier.numPlayers,
+          numPlayers: resolvedNumPlayers,
           primaryColor: tier.primaryColor || '#FFD700',
           secondaryColor: tier.secondaryColor || '#000000',
           metadata: tierMeta,
         })
         .returning();
-      createdTiers.push(tr as TierRecord);
+      createdTiers.push({
+        ...tr,
+        playerCount: tr.numPlayers,
+      } as TierRecord);
     }
   }
 
@@ -126,7 +136,11 @@ export async function getTournament(id: string): Promise<{
   const t = await db.select().from(tournaments).where(condition).limit(1);
   if (t.length === 0) return null;
   const tr = await db.select().from(bracketTiers).where(eq(bracketTiers.tournamentId, t[0].id));
-  return { tournament: t[0] as TournamentRecord, tiers: tr as TierRecord[] };
+  const mappedTiers: TierRecord[] = (tr as any[]).map(r => ({
+    ...r,
+    playerCount: r.numPlayers,
+  }));
+  return { tournament: t[0] as TournamentRecord, tiers: mappedTiers };
 }
 
 export async function deleteTournament(id: string): Promise<boolean> {
@@ -142,7 +156,7 @@ export async function deleteTournament(id: string): Promise<boolean> {
 
 
 import { players, tournamentPlayers, qualifierSubmissions, matches, games } from '../db/schema';
-import { desc, or, inArray } from 'drizzle-orm';
+import { desc, inArray } from 'drizzle-orm';
 import type {
   Tournament,
   TournamentTier,

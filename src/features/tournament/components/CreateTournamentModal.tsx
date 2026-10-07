@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTournament } from '../store';
 import { useOrganization } from '../../organizations/store';
 import { QualFormat, Tournament, DEFAULT_POINTS_THRESHOLDS } from '../types';
+import { createEmptyTournament } from '../defaults';
 import { ClearableNumberInput } from '../../../components/ClearableNumberInput';
 import { X, Building2 } from 'lucide-react';
 
@@ -78,21 +79,20 @@ export const CreateTournamentModal: React.FC<CreateTournamentModalProps> = ({
 
     const org = getOrganizationById(newTourneyOrgId);
 
-    const created = createTournament({
-      name: newTourneyName.trim(),
-      slug: newTourneySlug.trim(),
-      organizationId: newTourneyOrgId,
-      date: newTourneyDate.trim() || 'Upcoming',
-      location: newTourneyLocation.trim() || 'TBD',
-      qualFormat: newTourneyFormat,
-      qualAverageCount: parsedAvgCount,
-      pointsConfig: newTourneyFormat === 'POINTS'
-        ? (org?.defaultRules?.pointsConfig || DEFAULT_POINTS_THRESHOLDS)
-        : undefined,
-      isLocked: false,
-      tiers: [],
-      useOrgBranding: true,
-    });
+    const created = createTournament(
+      createEmptyTournament({
+        name: newTourneyName.trim(),
+        slug: newTourneySlug.trim(),
+        organizationId: newTourneyOrgId,
+        date: newTourneyDate.trim() || 'Upcoming',
+        location: newTourneyLocation.trim() || 'TBD',
+        qualFormat: newTourneyFormat,
+        qualAverageCount: parsedAvgCount,
+        pointsConfig: newTourneyFormat === 'POINTS'
+          ? (org?.defaultRules?.pointsConfig || DEFAULT_POINTS_THRESHOLDS)
+          : undefined,
+      })
+    );
 
     onClose();
     if (onCreated) {

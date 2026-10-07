@@ -1,7 +1,7 @@
 import { BracketStructure, BracketType, EliminationType, BracketStage, BracketRouting } from '../bracket/types';
 import { TierThemeColors } from '../bracket/colorUtils';
 
-export type { EliminationType, BracketStage, BracketRouting };
+export type { EliminationType, BracketStage, BracketRouting, TierThemeColors };
 
 export type QualFormat = 'HIGH_SCORE' | 'AVERAGE_OF_X' | 'POINTS';
 
@@ -31,6 +31,57 @@ export interface OrgTierTheme {
   textSize?: 'compact' | 'normal' | 'large';
 }
 
+export interface OrganizationBranding {
+  logoUrl?: string;
+  bannerUrl?: string;
+  themeColors?: TierThemeColors;
+  brandColor?: string;
+}
+
+export interface OrganizationDefaultRules {
+  qualFormat?: QualFormat;
+  qualAverageCount?: number;
+  qualWindowMinutes?: number;
+  bestOf?: number;
+  primaryColor?: string;
+  secondaryColor?: string;
+  pointsConfig?: PointsThreshold[];
+}
+
+export interface TournamentMetadata {
+  date?: string;
+  location?: string;
+  organizationId?: string;
+  useOrgBranding?: boolean;
+  logoUrl?: string;
+  bannerUrl?: string;
+  discordWebhookUrl?: string;
+  themeColors?: TierThemeColors;
+  seedingMethod?: SeedingMethod;
+  manualSeeds?: string[];
+  [key: string]: unknown;
+}
+
+export interface TierMetadata {
+  cardColor?: string;
+  textColor?: string;
+  backgroundColor?: string;
+  lowerBracketColor?: string;
+  textSize?: 'compact' | 'normal' | 'large' | 'small' | 'medium' | 'xlarge' | number;
+  eliminationType?: EliminationType;
+  bracketRouting?: BracketRouting;
+  finalsCutoff?: number;
+  bestOf?: number;
+  isLocked?: boolean;
+  roundBestOfOverrides?: Record<string | number, number>;
+  bracket?: BracketStructure;
+  [key: string]: unknown;
+}
+
+export interface MatchMetadata {
+  [key: string]: unknown;
+}
+
 export interface Organization {
   id: string;
   slug: string; // unique URL slug, e.g. 'ctwc', 'ctm'
@@ -43,22 +94,9 @@ export interface Organization {
   brandColor?: string; // primary accent color
   themeColors?: TierThemeColors; // 5-color bracket theme palette
   tierThemes?: OrgTierTheme[]; // multi-tier default themes (primary, secondary, etc.)
-  branding?: {
-    logoUrl?: string;
-    bannerUrl?: string;
-    themeColors?: TierThemeColors;
-    brandColor?: string;
-  };
+  branding?: OrganizationBranding;
   discordWebhookUrl?: string; // inherited by tournaments if not overridden
-  defaultRules?: {
-    qualFormat?: QualFormat;
-    qualAverageCount?: number;
-    qualWindowMinutes?: number;
-    bestOf?: number;
-    primaryColor?: string;
-    secondaryColor?: string;
-    pointsConfig?: PointsThreshold[];
-  };
+  defaultRules?: OrganizationDefaultRules;
   createdAt: number;
 }
 

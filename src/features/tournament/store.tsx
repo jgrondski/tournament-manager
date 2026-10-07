@@ -1819,3 +1819,10 @@ export const useTournament = () => {
   return context;
 };
 
+export {
+  useTournamentSettings,
+  useQualifiers,
+  useMatches,
+  useGlobalPlayers,
+} from './hooks';
+

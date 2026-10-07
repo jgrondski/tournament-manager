@@ -41,7 +41,31 @@
 - **Competitor Name Trimming**: Database enforces `lower(trim(name))` uniqueness. Always trim names before queries/inserts.
 
 ## 7. Primary Verification Commands
-- `npx vitest run <file>` — Fast, targeted unit test during development.
+- `npm run test:brackets` — Fast, targeted bracket math & visualizer tests (~1-2s).
+- `npm run test:api` — Relational database & backend API middleware tests (~3-5s).
+- `npm run test:ui` — Component, form, drawer, and navigation tests (~2-3s).
+- `npx vitest run <file>` — Single file unit test during development.
 - `npm run typecheck` — TypeScript check (`tsc --noEmit`).
 - `npm test` — Full regression test suite (run at milestone completion).
 - `npm run db:push` — Validate schema against real PostgreSQL.
+- `npm run db:seed` — Standalone CLI seeder for orgs, authentic competitors, and sample tournaments.
+
+## 8. Domain File Map & Architecture Index
+- **Bracket Engine & Math**:
+  - `src/features/bracket/math/` — Bracket generation math (`traditional.ts`, `flat.ts`, `double-elimination.ts`, `advance.ts`, `overrides.ts`).
+  - `src/features/bracket/components/` — Visualizers (`BracketVisualizer.tsx`, `OrganizerSheetMatrix.tsx`, `MatchCardFeed.tsx`, `MatchScoreDrawer.tsx`).
+  - `src/features/bracket/colorUtils.ts` — 5-color bracket themer and contrast algorithms.
+- **Tournament State & Domain Hooks**:
+  - `src/features/tournament/store.tsx` — Root React Context provider (`TournamentProvider`, `useTournament`).
+  - `src/features/tournament/hooks/` — Focused domain hooks (`useTournamentSettings`, `useQualifiers`, `useMatches`, `useGlobalPlayers`).
+  - `src/features/tournament/defaults.ts` — Canonical entity factories (`createEmptyTournament`, `createDefaultTier`, `createEmptyPlayer`).
+  - `src/features/tournament/types.ts` — Canonical domain models & strict interfaces.
+- **Qualifiers & Standings**:
+  - `src/features/qualifiers/scoring.ts` — Scoring hierarchy, tiebreakers, rank derivation, bracket draft distribution.
+  - `src/features/qualifiers/components/` — Leaderboard & drawers (`LeaderboardTable.tsx`, `PlayerDetailDrawer.tsx`, `QualifierEntryModal.tsx`).
+  - `src/features/tournament/standings.ts` — Intra-round exit tiebreakers and final standings table.
+- **Relational Database & Backend API**:
+  - `src/db/schema.ts` — Drizzle PostgreSQL relational schemas & cascading foreign keys.
+  - `src/server/api.ts` — Vite dev server REST middleware (`/api/health`, `/api/tournaments`, `/api/players`, `/api/simulate/sample`).
+  - `src/api/` — Typed DB query operations (`tournaments.ts`, `players.ts`, `qualifiers.ts`, `brackets.ts`, `organizations.ts`).
+  - `scripts/seed.ts` — Standalone database CLI seeder (`npm run db:seed`).

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Tournament, TournamentTier, QualFormat, PointsThreshold, DEFAULT_POINTS_THRESHOLDS, SeedingMethod } from '../types';
-import { useTournament, generateUUID } from '../store';
+import { useTournament } from '../store';
+import { createDefaultTier } from '../defaults';
 import {
   Save,
   CheckCircle2,
@@ -13,7 +14,6 @@ import { useOrganization } from '../../organizations/store';
 import { generateTraditionalBracket, generateFlatBracket, generateDoubleEliminationBracket, getValidFlatWidths } from '../../bracket/math';
 import { getDefaultTierColors, TierThemeColors } from '../../bracket/colorUtils';
 import { generateDraftBracketsForTournament } from '../../qualifiers/scoring';
-import { AUTHENTIC_COMPETITOR_NAMES } from '../data/authenticPlayers';
 import { pruneInvalidRoundOverrides } from '../roundOverrides';
 import { VerifyBracketModal } from './VerifyBracketModal';
 import { PointsThresholdsDrawer } from './PointsThresholdsDrawer';
@@ -340,91 +340,14 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
   };
 
   const addTier = () => {
-    let newTier: TournamentTier;
-    const tierId = generateUUID();
-
-    if (tiers.length === 0) {
-      // 1st Tier: Gold, 16 players, Traditional, Bo5, #ffd200 / #5e512b
-      newTier = {
-        id: tierId,
-        slug: 'gold',
-        name: 'Gold',
-        priority: 1,
-        bracketType: 'TRADITIONAL',
-        playerCount: 16,
-        bestOf: 5,
-        primaryColor: '#ffc905',
-        secondaryColor: '#705b33',
-        cardColor: '#1b1c1d',
-        textColor: '#94A3B8',
-        backgroundColor: '#020203',
-        isLocked: false,
-        bracket: generateTraditionalBracket(
-          Array.from({ length: 16 }, (_, i) => ({ id: `p${i + 1}`, name: AUTHENTIC_COMPETITOR_NAMES[i] || `TetrisPlayer_${i + 1}`, seed: i + 1 })),
-          { tierId, bestOf: 5 }
-        ),
-      };
-    } else if (tiers.length === 1) {
-      // 2nd Tier: Silver, 9 players, Flat bracket, 2 wide, Bo3 with semis & finals Bo5 overrides, #CBD5E1 / #3d4652
-      const roundBestOfOverrides = { 4: 5, 5: 5 };
-      newTier = {
-        id: tierId,
-        slug: 'silver',
-        name: 'Silver',
-        priority: 2,
-        bracketType: 'FLAT',
-        playerCount: 9,
-        flatWidth: 2,
-        bestOf: 3,
-        roundBestOfOverrides,
-        primaryColor: '#CBD5E1',
-        secondaryColor: '#3d4652',
-        cardColor: '#0E1420',
-        textColor: '#4f5c6d',
-        backgroundColor: '#0B0E14',
-        isLocked: false,
-        bracket: generateFlatBracket(
-          Array.from({ length: 9 }, (_, i) => ({ id: `p${i + 17}`, name: AUTHENTIC_COMPETITOR_NAMES[i + 16] || `TetrisPlayer_${i + 17}`, seed: i + 1 })),
-          2,
-          { tierId, bestOf: 3, roundBestOfOverrides }
-        ),
-      };
-    } else {
-      const nextPriority = tiers.length + 1;
-      const tierName = nextPriority === 3 ? 'Bronze' : `Tier ${nextPriority}`;
-      const tierSlug = nextPriority === 3 ? 'bronze' : `tier-${nextPriority}`;
-      const primaryColor = nextPriority === 3 ? '#db5f00' : '#3b82f6';
-      const secondaryColor = nextPriority === 3 ? '#4e310e' : '#60a5fa';
-      const cardColor = nextPriority === 3 ? '#181410' : '#0E1420';
-      const textColor = nextPriority === 3 ? '#5e6f87' : '#94A3B8';
-      const backgroundColor = '#0B0E14';
-      newTier = {
-        id: tierId,
-        slug: tierSlug,
-        name: tierName,
-        priority: nextPriority,
-        bracketType: 'TRADITIONAL',
-        playerCount: 8,
-        bestOf: 3,
-        primaryColor,
-        secondaryColor,
-        cardColor,
-        textColor,
-        backgroundColor,
-        isLocked: false,
-        bracket: generateTraditionalBracket(
-          Array.from({ length: 8 }, (_, i) => ({ id: `p${i + 26}`, name: AUTHENTIC_COMPETITOR_NAMES[i + 25] || `TetrisPlayer_${i + 26}`, seed: i + 1 })),
-          { tierId, bestOf: 3 }
-        ),
-      };
-    }
-
+    const nextPriority = tiers.length + 1;
+    const newTier = createDefaultTier(nextPriority);
     const nextTiers = [...tiers, newTier];
     const draftTiers = generateDraftBracketsForTournament({ ...tournament, tiers: nextTiers });
     setTiers(draftTiers);
     setOpenThemes(prev => ({
       ...prev,
-      [tierId]: true,
+      [newTier.id]: true,
     }));
   };
 
