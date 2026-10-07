@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { useTournament } from '../features/tournament/store';
+import { Tournament } from '../features/tournament/types';
 import { getStoredTierSlug, setStoredTierSlug } from '../features/tournament/tierStorage';
 import { TournamentLayout } from '../components/TournamentLayout';
 import { OrganizerSheetMatrix } from '../features/bracket/components/OrganizerSheetMatrix';
@@ -8,9 +9,14 @@ import { getContrastingTextColor } from '../features/bracket/colorUtils';
 import { GitBranch } from 'lucide-react';
 import { LoadingScreen } from '../components/LoadingScreen';
 
+/**
+ * Tier 1: Route Gate (Hydration & Data Boundary)
+ * - Zero local form state
+ * - Zero useEffects
+ * - Unconditional hook execution
+ */
 export const ManageSheetPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
-  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { getTournamentBySlug, isLoading, isHydrated } = useTournament();
 
@@ -30,19 +36,26 @@ export const ManageSheetPage: React.FC = () => {
     );
   }
 
+  return <ManageSheetView key={tournament.id} tournament={tournament} />;
+};
+
+/**
+ * Tier 2: Keyed Feature View
+ * - key={tournament.id} guarantees clean state reset on tournament switch
+ * - Purely derives active tier from URL search params without useEffect sync loops
+ */
+interface ManageSheetViewProps {
+  tournament: Tournament;
+}
+
+const ManageSheetView: React.FC<ManageSheetViewProps> = ({ tournament }) => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+
   const sortedTiers = [...tournament.tiers].sort((a, b) => a.priority - b.priority);
-  const storedTier = getStoredTierSlug(slug);
+  const storedTier = getStoredTierSlug(tournament.slug);
   const requestedTierSlug = searchParams.get('tier') || storedTier || sortedTiers[0]?.slug;
   const tier = sortedTiers.find(t => t.slug === requestedTierSlug || t.id === requestedTierSlug) || sortedTiers[0];
-
-  useEffect(() => {
-    if (tier && slug) {
-      setStoredTierSlug(slug, tier.slug);
-      if (searchParams.get('tier') !== tier.slug) {
-        setSearchParams({ tier: tier.slug }, { replace: true });
-      }
-    }
-  }, [tier?.slug, slug]);
 
   if (!tier) {
     return (
@@ -64,6 +77,11 @@ export const ManageSheetPage: React.FC = () => {
       </TournamentLayout>
     );
   }
+
+  const handleSelectTier = (tSlug: string) => {
+    setStoredTierSlug(tournament.slug, tSlug);
+    setSearchParams({ tier: tSlug });
+  };
 
   return (
     <TournamentLayout
@@ -109,10 +127,7 @@ export const ManageSheetPage: React.FC = () => {
               <button
                 key={t.id}
                 type="button"
-                onClick={() => {
-                  setStoredTierSlug(slug, t.slug);
-                  setSearchParams({ tier: t.slug });
-                }}
+                onClick={() => handleSelectTier(t.slug)}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -167,6 +182,7 @@ export const ManageSheetPage: React.FC = () => {
 
       <main style={{ flex: 1, padding: '1.25rem 2rem', maxWidth: '100%', width: '100%', margin: '0 auto', overflowX: 'auto' }}>
         <OrganizerSheetMatrix
+          key={tier.id}
           tournament={tournament}
           tier={tier}
         />

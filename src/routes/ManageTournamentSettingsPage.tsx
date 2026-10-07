@@ -1,17 +1,22 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTournament } from '../features/tournament/store';
+import { Tournament } from '../features/tournament/types';
 import { TournamentLayout } from '../components/TournamentLayout';
 import { TournamentAdminForm } from '../features/tournament/components/TournamentAdminForm';
 import { AlertTriangle, X, Settings } from 'lucide-react';
 import { LoadingScreen } from '../components/LoadingScreen';
 
+/**
+ * Tier 1: Route Gate (Hydration & Data Boundary)
+ * - Zero local form state
+ * - Zero useEffects
+ * - Unconditional hook execution
+ */
 export const ManageTournamentSettingsPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { getTournamentBySlug, isLoading, isHydrated } = useTournament();
-  const [isDirty, setIsDirty] = useState(false);
-  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
 
   if (isLoading || !isHydrated) {
     return <LoadingScreen message="Loading tournament settings..." />;
@@ -28,6 +33,23 @@ export const ManageTournamentSettingsPage: React.FC = () => {
       </div>
     );
   }
+
+  return <TournamentSettingsView key={tournament.id} tournament={tournament} />;
+};
+
+/**
+ * Tier 2: Keyed Feature View
+ * - key={tournament.id} guarantees clean state reset on tournament switch without useEffect
+ * - Manages unsaved changes navigation guard and layout
+ */
+interface TournamentSettingsViewProps {
+  tournament: Tournament;
+}
+
+const TournamentSettingsView: React.FC<TournamentSettingsViewProps> = ({ tournament }) => {
+  const navigate = useNavigate();
+  const [isDirty, setIsDirty] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
 
   const handleNavigateAttempt = (url: string) => {
     if (url.includes(`/${tournament.slug}/manage/settings`)) {
@@ -52,11 +74,6 @@ export const ManageTournamentSettingsPage: React.FC = () => {
       navigate(dest);
     }
   };
-
-  React.useEffect(() => {
-    setIsDirty(false);
-    setPendingNavigation(null);
-  }, [tournament?.id]);
 
   return (
     <TournamentLayout
@@ -91,7 +108,7 @@ export const ManageTournamentSettingsPage: React.FC = () => {
           onDirtyChange={setIsDirty}
           onSaved={(saved) => {
             setIsDirty(false);
-            if (saved?.slug && saved.slug !== slug) {
+            if (saved?.slug && saved.slug !== tournament.slug) {
               navigate(`/${saved.slug}/manage/settings`, { replace: true });
             }
           }}
@@ -189,4 +206,3 @@ export const ManageTournamentSettingsPage: React.FC = () => {
     </TournamentLayout>
   );
 };
-

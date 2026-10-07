@@ -35,9 +35,14 @@
   - Clearing qualifiers is forbidden if match scores exist (require "Clear Matches" first).
 
 ## 6. UI & State Hygiene
+- **3-Tier Component Pattern**: Follow `docs/UI_ARCHITECTURE.md`:
+  - Tier 1: Route Gate (Container). Only reads params/store, renders LoadingScreen/NotFound. ZERO form state, ZERO `useEffect`s. Passes resolved entities with `key={entity.id}`.
+  - Tier 2: Keyed Feature View (`key={entity.id}`). Owns ephemeral layout/modal/dirty state. Automatically resets state on remount. ZERO `useEffect`s for resetting state.
+  - Tier 3: Pure Presentational Leaf Components. Driven purely by props & callbacks.
+- **Anti-`useEffect` Mandate**: Never use `useEffect` to reset state when an ID changes (use `key={id}`), to sync URL params, or to compute derived values. `useEffect` is only for external browser API sync.
 - **Modals & Drawers**: Backdrop/scrim clicks MUST NEVER dismiss dialogs or score drawers (`onClick={onClose}` on backdrops is prohibited). Dismissal requires explicit Cancel/Save/X.
 - **Country Flags**: Country codes MUST be 2-letter uppercase ISO 3166-1 alpha-2 strings. Always provide a safe fallback icon for null or unknown countries.
-- **Tier Switching**: Multi-tier feeds (`MatchCardFeed`) must use `key={tier.id}` to guarantee clean remounting without stale state.
+- **Tier Switching & Navigation**: Tab/tier selection must be driven by URL params (`?tier=slug`), never `sessionStorage`. Multi-tier feeds (`MatchCardFeed`) must use `key={tier.id}` to guarantee clean remounting without stale state.
 - **Competitor Name Trimming**: Database enforces `lower(trim(name))` uniqueness. Always trim names before queries/inserts.
 
 ## 7. Primary Verification Commands

@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useSearchParams, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useTournament } from '../features/tournament/store';
-import { getStoredTierSlug, setStoredTierSlug } from '../features/tournament/tierStorage';
+import { Tournament, TournamentTier } from '../features/tournament/types';
+import { BracketMatch } from '../features/bracket/types';
 import { TournamentLayout } from '../components/TournamentLayout';
 import { SpectatorLayout } from '../components/SpectatorLayout';
 import { BracketVisualizer } from '../features/bracket/components/BracketVisualizer';
@@ -13,6 +14,12 @@ import { useBracketTier } from '../features/bracket/hooks/useBracketTier';
 import { ObsBracketView } from '../features/obs/components/ObsBracketView';
 import { LoadingScreen } from '../components/LoadingScreen';
 
+/**
+ * Tier 1: Route Gate (Hydration & Data Boundary)
+ * - Zero local search or modal state
+ * - Zero state-tracking useEffects
+ * - Handles loading, aliases, redirects, and missing data boundaries
+ */
 export const PublicTierBracketPage: React.FC = () => {
   const { slug, tierSlug } = useParams<{ slug: string; tierSlug: string }>();
   const [searchParams] = useSearchParams();
@@ -21,58 +28,19 @@ export const PublicTierBracketPage: React.FC = () => {
   const { getTournamentBySlug, isLoading: isStoreLoading, isHydrated } = useTournament();
 
   const isManageRoute = location.pathname.includes('/manage/');
-  const canManage = isManageRoute;
-
   const isObsMode = searchParams.get('obs') === 'true';
   const urlView = searchParams.get('view') as BracketViewMode | null;
-  const chroma = searchParams.get('chroma');
 
-  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-
-  // Initialize view mode: URL param > OBS fit > Mobile feed (< 768px) > Standard
-  const [localViewMode, setLocalViewMode] = useState<BracketViewMode>(() => {
-    if (urlView) return urlView;
-    if (isObsMode) return 'fit';
-    if (typeof window !== 'undefined' && window.innerWidth < 768) {
-      return 'feed';
-    }
-    return 'standard';
-  });
-
-  // Update view mode if query param changes
-  useEffect(() => {
-    if (urlView) {
-      setLocalViewMode(urlView);
-    }
-  }, [urlView]);
+  const initialViewMode: BracketViewMode = urlView || (isObsMode ? 'fit' : 'standard');
 
   const {
     tournament,
     tier,
     isLoading: isBracketLoading,
-  } = useBracketTier(slug, tierSlug, { initialViewMode: localViewMode });
+  } = useBracketTier(slug, tierSlug, { initialViewMode });
 
   const tournamentFallback = slug ? getTournamentBySlug(slug) : undefined;
   const tierData = tournament && tier ? { tournament, tier } : undefined;
-
-  // If in OBS mode, ensure background is transparent or chroma
-  useEffect(() => {
-    if (isObsMode) {
-      document.body.classList.add('obs-overlay-mode');
-    } else {
-      document.body.classList.remove('obs-overlay-mode');
-    }
-    return () => {
-      document.body.classList.remove('obs-overlay-mode');
-    };
-  }, [isObsMode]);
-
-  // Persist current explored tier to sessionStorage
-  useEffect(() => {
-    if (tierData && slug) {
-      setStoredTierSlug(slug, tierData.tier.slug);
-    }
-  }, [tierData?.tier?.slug, slug]);
 
   // Loading state gate: prevent false "Bracket Not Found" flash while database initializes
   if (isStoreLoading || isBracketLoading || !isHydrated) {
@@ -82,10 +50,8 @@ export const PublicTierBracketPage: React.FC = () => {
   // Handle missing tier / friendly aliases (e.g. /:slug/brackets, /:slug/view, /:slug/manage/bracket)
   if (!tierData) {
     if (tournamentFallback && tournamentFallback.tiers.length > 0) {
-      const stored = getStoredTierSlug(slug);
-      const targetTier =
-        tournamentFallback.tiers.find(t => t.slug === stored || t.id === stored) ||
-        tournamentFallback.tiers[0];
+      const sorted = [...tournamentFallback.tiers].sort((a, b) => a.priority - b.priority);
+      const targetTier = sorted.find(t => t.slug === tierSlug || t.id === tierSlug) || sorted[0];
       const prefix = isManageRoute
         ? `/${tournamentFallback.slug}/manage/bracket`
         : `/${tournamentFallback.slug}`;
@@ -133,7 +99,7 @@ export const PublicTierBracketPage: React.FC = () => {
           {emptyContent}
         </TournamentLayout>
       ) : (
-        <SpectatorLayout tournament={tournamentFallback} activeView="bracket" onOpenShare={() => setIsShareModalOpen(true)}>
+        <SpectatorLayout tournament={tournamentFallback} activeView="bracket">
           {emptyContent}
         </SpectatorLayout>
       );
@@ -150,22 +116,81 @@ export const PublicTierBracketPage: React.FC = () => {
     );
   }
 
-  const { tournament: activeTournament, tier: activeTier } = tierData;
+  return (
+    <TierBracketView
+      key={tierData.tier.id}
+      tournament={tierData.tournament}
+      tier={tierData.tier}
+      isManageRoute={isManageRoute}
+      isObsMode={isObsMode}
+      urlView={urlView}
+      chroma={searchParams.get('chroma')}
+    />
+  );
+};
+
+/**
+ * Tier 2: Keyed Feature View
+ * - key={tier.id} ensures fresh, deterministic state on tier changes without useEffect resets
+ * - Manages view mode, search filtering, and share modal
+ */
+interface TierBracketViewProps {
+  tournament: Tournament;
+  tier: TournamentTier;
+  isManageRoute: boolean;
+  isObsMode: boolean;
+  urlView: BracketViewMode | null;
+  chroma: string | null;
+}
+
+const TierBracketView: React.FC<TierBracketViewProps> = ({
+  tournament,
+  tier,
+  isManageRoute,
+  isObsMode,
+  urlView,
+  chroma,
+}) => {
+  const canManage = isManageRoute;
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [playerSearchTerm, setPlayerSearchTerm] = useState('');
 
-  // Reset player search when switching tiers
-  useEffect(() => {
-    setPlayerSearchTerm('');
-  }, [activeTier.id]);
+  // View mode resolution
+  const [localViewMode, setLocalViewMode] = useState<BracketViewMode>(() => {
+    if (urlView) return urlView;
+    if (isObsMode) return 'fit';
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      return 'feed';
+    }
+    return 'standard';
+  });
 
-  // Compute matching player in the active tier bracket
+  // Sync with explicit URL view changes
+  useEffect(() => {
+    if (urlView) {
+      setLocalViewMode(urlView);
+    }
+  }, [urlView]);
+
+  // Synchronize OBS body styling
+  useEffect(() => {
+    if (isObsMode) {
+      document.body.classList.add('obs-overlay-mode');
+    } else {
+      document.body.classList.remove('obs-overlay-mode');
+    }
+    return () => {
+      document.body.classList.remove('obs-overlay-mode');
+    };
+  }, [isObsMode]);
+
+  // Compute highlighted player in active tier bracket
   const highlightedPlayer = useMemo(() => {
     const q = playerSearchTerm.trim().toLowerCase();
-    if (!q || !activeTier.bracket) return null;
+    if (!q || !tier.bracket) return null;
 
-    // Collect all players participating in this tier bracket
     const playerMap = new Map<string, { id: string; name: string }>();
-    Object.values(activeTier.bracket.matchesById).forEach(m => {
+    Object.values(tier.bracket.matchesById).forEach((m: BracketMatch) => {
       if (m.player1?.player?.id && m.player1.player.name) {
         playerMap.set(m.player1.player.id, { id: m.player1.player.id, name: m.player1.player.name });
       }
@@ -177,35 +202,33 @@ export const PublicTierBracketPage: React.FC = () => {
     const candidates = Array.from(playerMap.values());
     const matches = candidates.filter(p => p.name.toLowerCase().includes(q));
 
-    if (matches.length === 1) {
-      return matches[0];
-    }
+    if (matches.length === 1) return matches[0];
     if (matches.length > 1) {
       const exact = matches.find(p => p.name.toLowerCase() === q);
       if (exact) return exact;
     }
     return null;
-  }, [playerSearchTerm, activeTier.bracket]);
+  }, [playerSearchTerm, tier.bracket]);
 
-  // OBS Overlay Mode: strip all chrome, navbars, and sidebars completely
+  // OBS Overlay Mode
   if (isObsMode) {
     return (
       <ObsBracketView
-        tournament={activeTournament}
-        tier={activeTier}
+        tournament={tournament}
+        tier={tier}
         viewMode={localViewMode}
         chroma={chroma}
       />
     );
   }
 
-  const tierBg = activeTier.backgroundColor || 'var(--color-bg-base)';
+  const tierBg = tier.backgroundColor || 'var(--color-bg-base)';
 
   const pageContent = (
     <>
       <BracketTierBar
-        tournament={activeTournament}
-        activeTier={activeTier}
+        tournament={tournament}
+        activeTier={tier}
         viewMode={localViewMode}
         onChangeViewMode={setLocalViewMode}
         canManage={canManage}
@@ -232,19 +255,19 @@ export const PublicTierBracketPage: React.FC = () => {
                 {canManage ? 'Manage Bracket' : 'Tournament Bracket'}
               </span>
               <span style={{ color: 'var(--color-text-muted)', fontSize: '0.7rem' }}>•</span>
-              <span style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: activeTier.primaryColor || 'var(--color-gold-bright)' }}>
-                {activeTier.name}
+              <span style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: tier.primaryColor || 'var(--color-gold-bright)' }}>
+                {tier.name}
               </span>
             </div>
             <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#ffffff', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.25 }}>
-              {activeTournament.name}
+              {tournament.name}
             </h1>
           </div>
 
           <MatchCardFeed
-            key={activeTier.id}
-            tournament={activeTournament}
-            tier={activeTier}
+            key={tier.id}
+            tournament={tournament}
+            tier={tier}
             canManage={canManage}
           />
         </main>
@@ -260,8 +283,8 @@ export const PublicTierBracketPage: React.FC = () => {
           }}
         >
           <BracketVisualizer
-            tournament={activeTournament}
-            tier={activeTier}
+            tournament={tournament}
+            tier={tier}
             isObsMode={false}
             canManage={canManage}
             obsView={localViewMode}
@@ -274,8 +297,8 @@ export const PublicTierBracketPage: React.FC = () => {
       <ShareBracketModal
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
-        tournament={activeTournament}
-        tier={activeTier}
+        tournament={tournament}
+        tier={tier}
       />
     </>
   );
@@ -283,8 +306,8 @@ export const PublicTierBracketPage: React.FC = () => {
   if (isManageRoute) {
     return (
       <TournamentLayout
-        tournament={activeTournament}
-        activeTier={activeTier}
+        tournament={tournament}
+        activeTier={tier}
         activeView="bracket"
         contentStyle={{
           background: tierBg,
@@ -301,8 +324,8 @@ export const PublicTierBracketPage: React.FC = () => {
 
   return (
     <SpectatorLayout
-      tournament={activeTournament}
-      activeTier={activeTier}
+      tournament={tournament}
+      activeTier={tier}
       activeView="bracket"
       onOpenShare={() => setIsShareModalOpen(true)}
       contentStyle={{
@@ -317,4 +340,3 @@ export const PublicTierBracketPage: React.FC = () => {
     </SpectatorLayout>
   );
 };
-
