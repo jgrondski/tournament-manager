@@ -114,6 +114,7 @@ export const App: React.FC = () => {
             <Route path="/:slug/obs" element={<OBSHubPage />} />
 
             {/* Dedicated OBS Broadcast Overlay Endpoints */}
+            <Route path="/:slug/obs/bracket" element={<ObsOverlayPage />} />
             <Route path="/:slug/obs/bracket/:tierSlug" element={<ObsOverlayPage />} />
             <Route path="/:slug/obs/match/:matchId" element={<ObsOverlayPage />} />
             <Route path="/obs/overlay/:slug/:tierSlug" element={<ObsOverlayPage />} />

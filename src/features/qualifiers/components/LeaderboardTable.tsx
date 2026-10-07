@@ -158,7 +158,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
               </tr>
             ) : (
               filteredRows.map((row: LeaderboardRankRow, idx) => {
-                const cutoffInfo = cutoffRanks.get(row.rank);
+                const cutoffInfo = typeof row.rank === 'number' ? cutoffRanks.get(row.rank) : undefined;
                 const assignedTier = row.assignedTier;
                 const isTierQualified = Boolean(hasBrackets && assignedTier && !row.isDNQ);
                 const tierColor = assignedTier?.primaryColor || '#f59e0b';
@@ -203,19 +203,19 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                             borderRadius: '50%',
                             background: isTierQualified
                               ? tierColor
-                              : row.rank <= 3
+                              : typeof row.rank === 'number' && row.rank <= 3
                               ? 'var(--color-gold-bg)'
                               : 'rgba(255,255,255,0.05)',
                             color: isTierQualified
                               ? tierContrastColor
-                              : row.rank <= 3
+                              : typeof row.rank === 'number' && row.rank <= 3
                               ? 'var(--color-gold-bright)'
                               : 'var(--color-text-secondary)',
                             fontSize: '0.8rem',
                             fontWeight: 700,
                           }}
                         >
-                          {row.rank}
+                          {row.rank ?? '—'}
                         </span>
                       </td>
 

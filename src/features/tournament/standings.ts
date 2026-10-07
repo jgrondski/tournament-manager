@@ -693,7 +693,7 @@ export function calculateGlobalStandings(tournament: Tournament): GlobalStanding
   leaderboard.forEach(row => {
     if (typeof row.rank === 'number') {
       qualRankMap.set(row.player.id, row.rank);
-    } else {
+    } else if (typeof row.globalRank === 'number') {
       qualRankMap.set(row.player.id, row.globalRank);
     }
     qualScoreMap.set(row.player.id, row.finalScore);

@@ -237,7 +237,7 @@ export const TournamentCard: React.FC<TournamentCardProps> = ({
         </Link>
 
         <Link
-          to={`/${tournament.slug}/leaderboard`}
+          to={`/${tournament.slug}/manage/qualifiers`}
           className={!hasTiers ? 'btn btn-primary' : 'btn btn-secondary'}
           style={{ padding: '0.55rem 0.75rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
         >
@@ -245,7 +245,7 @@ export const TournamentCard: React.FC<TournamentCardProps> = ({
         </Link>
 
         <Link
-          to={`/${tournament.slug}/standings`}
+          to={`/${tournament.slug}/manage/standings`}
           className="btn btn-secondary"
           style={{ padding: '0.55rem 0.75rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
         >

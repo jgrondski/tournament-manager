@@ -9,14 +9,15 @@ import { BracketTierBar } from '../features/bracket/components/BracketTierBar';
 import { BracketViewMode } from '../features/bracket/bracketLayout';
 import { MatchCardFeed } from '../features/bracket/components/MatchCardFeed';
 import { ShareBracketModal } from '../features/bracket/components/ShareBracketModal';
-import { generateDraftBracketsForTournament } from '../features/qualifiers/scoring';
+import { useBracketTier } from '../features/bracket/hooks/useBracketTier';
+import { ObsBracketView } from '../features/obs/components/ObsBracketView';
 
 export const PublicTierBracketPage: React.FC = () => {
   const { slug, tierSlug } = useParams<{ slug: string; tierSlug: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { getTierBySlug, getTournamentBySlug } = useTournament();
+  const { getTournamentBySlug } = useTournament();
 
   const isManageRoute = location.pathname.includes('/manage/');
   const canManage = isManageRoute;
@@ -44,8 +45,15 @@ export const PublicTierBracketPage: React.FC = () => {
     }
   }, [urlView]);
 
-  const tierData = slug && tierSlug ? getTierBySlug(slug, tierSlug) : undefined;
+  const { isLoading: isStoreLoading } = useTournament();
+  const {
+    tournament,
+    tier,
+    isLoading: isBracketLoading,
+  } = useBracketTier(slug, tierSlug, { initialViewMode: localViewMode });
+
   const tournamentFallback = slug ? getTournamentBySlug(slug) : undefined;
+  const tierData = tournament && tier ? { tournament, tier } : undefined;
 
   // If in OBS mode, ensure background is transparent or chroma
   useEffect(() => {
@@ -65,6 +73,37 @@ export const PublicTierBracketPage: React.FC = () => {
       setStoredTierSlug(slug, tierData.tier.slug);
     }
   }, [tierData?.tier?.slug, slug]);
+
+  // Loading state gate: prevent false "Bracket Not Found" flash while database initializes
+  if (isStoreLoading || isBracketLoading) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'var(--color-bg-base, #0b0e14)',
+          color: 'var(--color-text-secondary, #94a3b8)',
+          fontSize: '0.95rem',
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+          <div
+            style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%',
+              border: '3px solid rgba(245, 158, 11, 0.2)',
+              borderTopColor: 'var(--color-gold-bright, #f59e0b)',
+              animation: 'spin 0.8s linear infinite',
+            }}
+          />
+          <span>Loading tournament bracket...</span>
+        </div>
+      </div>
+    );
+  }
 
   // Handle missing tier / friendly aliases (e.g. /:slug/brackets, /:slug/view, /:slug/manage/bracket)
   if (!tierData) {
@@ -134,36 +173,22 @@ export const PublicTierBracketPage: React.FC = () => {
     );
   }
 
-  const { tournament, tier: rawTier } = tierData;
-
-  // Guarantee draft bracket preview when tournament is unlocked / pre-match play
-  const tier = useMemo(() => {
-    if (!rawTier) return rawTier;
-    if (!tournament.isLocked && (!rawTier.bracket || !rawTier.bracket.rounds || rawTier.bracket.rounds.length === 0)) {
-      const draftTiers = generateDraftBracketsForTournament(tournament);
-      const matched = draftTiers.find(t => t.id === rawTier.id || t.slug === rawTier.slug);
-      if (matched?.bracket && matched.bracket.rounds?.length > 0) {
-        return matched;
-      }
-    }
-    return rawTier;
-  }, [rawTier, tournament]);
-
+  const { tournament: activeTournament, tier: activeTier } = tierData;
   const [playerSearchTerm, setPlayerSearchTerm] = useState('');
 
   // Reset player search when switching tiers
   useEffect(() => {
     setPlayerSearchTerm('');
-  }, [tier?.id]);
+  }, [activeTier.id]);
 
   // Compute matching player in the active tier bracket
   const highlightedPlayer = useMemo(() => {
     const q = playerSearchTerm.trim().toLowerCase();
-    if (!q || !tier?.bracket) return null;
+    if (!q || !activeTier.bracket) return null;
 
     // Collect all players participating in this tier bracket
     const playerMap = new Map<string, { id: string; name: string }>();
-    Object.values(tier.bracket.matchesById).forEach(m => {
+    Object.values(activeTier.bracket.matchesById).forEach(m => {
       if (m.player1?.player?.id && m.player1.player.name) {
         playerMap.set(m.player1.player.id, { id: m.player1.player.id, name: m.player1.player.name });
       }
@@ -183,43 +208,27 @@ export const PublicTierBracketPage: React.FC = () => {
       if (exact) return exact;
     }
     return null;
-  }, [playerSearchTerm, tier?.bracket]);
+  }, [playerSearchTerm, activeTier.bracket]);
 
   // OBS Overlay Mode: strip all chrome, navbars, and sidebars completely
   if (isObsMode) {
-    const chromaBg = chroma
-      ? chroma.startsWith('#')
-        ? chroma
-        : chroma.toLowerCase() === 'green'
-        ? '#00ff00'
-        : chroma.toLowerCase() === 'magenta'
-        ? '#ff00ff'
-        : chroma.toLowerCase() === 'blue'
-        ? '#0000ff'
-        : `#${chroma}`
-      : 'transparent';
-
     return (
-      <div className="obs-mode-canvas" style={{ width: '100%', minHeight: '100vh', background: chromaBg }}>
-        <BracketVisualizer
-          tournament={tournament}
-          tier={tier}
-          isObsMode={true}
-          canManage={false}
-          obsView={localViewMode}
-          chroma={chroma}
-        />
-      </div>
+      <ObsBracketView
+        tournament={activeTournament}
+        tier={activeTier}
+        viewMode={localViewMode}
+        chroma={chroma}
+      />
     );
   }
 
-  const tierBg = tier.backgroundColor || 'var(--color-bg-base)';
+  const tierBg = activeTier.backgroundColor || 'var(--color-bg-base)';
 
   const pageContent = (
     <>
       <BracketTierBar
-        tournament={tournament}
-        activeTier={tier}
+        tournament={activeTournament}
+        activeTier={activeTier}
         viewMode={localViewMode}
         onChangeViewMode={setLocalViewMode}
         canManage={canManage}
@@ -246,19 +255,19 @@ export const PublicTierBracketPage: React.FC = () => {
                 {canManage ? 'Manage Bracket' : 'Tournament Bracket'}
               </span>
               <span style={{ color: 'var(--color-text-muted)', fontSize: '0.7rem' }}>•</span>
-              <span style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: tier.primaryColor || 'var(--color-gold-bright)' }}>
-                {tier.name}
+              <span style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: activeTier.primaryColor || 'var(--color-gold-bright)' }}>
+                {activeTier.name}
               </span>
             </div>
             <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#ffffff', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.25 }}>
-              {tournament.name}
+              {activeTournament.name}
             </h1>
           </div>
 
           <MatchCardFeed
-            key={tier.id}
-            tournament={tournament}
-            tier={tier}
+            key={activeTier.id}
+            tournament={activeTournament}
+            tier={activeTier}
             canManage={canManage}
           />
         </main>
@@ -274,8 +283,8 @@ export const PublicTierBracketPage: React.FC = () => {
           }}
         >
           <BracketVisualizer
-            tournament={tournament}
-            tier={tier}
+            tournament={activeTournament}
+            tier={activeTier}
             isObsMode={false}
             canManage={canManage}
             obsView={localViewMode}
@@ -288,8 +297,8 @@ export const PublicTierBracketPage: React.FC = () => {
       <ShareBracketModal
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
-        tournament={tournament}
-        tier={tier}
+        tournament={activeTournament}
+        tier={activeTier}
       />
     </>
   );
@@ -297,8 +306,8 @@ export const PublicTierBracketPage: React.FC = () => {
   if (isManageRoute) {
     return (
       <TournamentLayout
-        tournament={tournament}
-        activeTier={tier}
+        tournament={activeTournament}
+        activeTier={activeTier}
         activeView="bracket"
         contentStyle={{
           background: tierBg,
@@ -315,8 +324,8 @@ export const PublicTierBracketPage: React.FC = () => {
 
   return (
     <SpectatorLayout
-      tournament={tournament}
-      activeTier={tier}
+      tournament={activeTournament}
+      activeTier={activeTier}
       activeView="bracket"
       onOpenShare={() => setIsShareModalOpen(true)}
       contentStyle={{
@@ -331,3 +340,4 @@ export const PublicTierBracketPage: React.FC = () => {
     </SpectatorLayout>
   );
 };
+

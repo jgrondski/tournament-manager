@@ -648,7 +648,6 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
         hoveredAncestry={hoveredAncestry}
         focusedMatchId={focusedMatchId}
         isObsMode={isObsMode}
-        canManage={canManage}
         onSlotHover={handleSlotHover}
         onChampHover={handleChampHover}
         onPlayerClick={handlePlayerClick}

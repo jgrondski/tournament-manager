@@ -29,7 +29,6 @@ interface BracketMatchCardProps {
   tier: TournamentTier;
   isPhase2View?: boolean;
   isObsMode?: boolean;
-  canManage?: boolean;
   primaryColor: string;
   secondaryColor: string;
   textColor: string;
@@ -71,7 +70,6 @@ export const BracketMatchCard: React.FC<BracketMatchCardProps> = ({
   tier,
   isPhase2View = false,
   isObsMode = false,
-  canManage = true,
   primaryColor,
   secondaryColor,
   textColor,
@@ -346,9 +344,7 @@ export const BracketMatchCard: React.FC<BracketMatchCardProps> = ({
       {/* Match Card Body */}
       <div
         onClick={() => {
-          if (!isObsMode && canManage && isPlayable && tournament.isLocked) {
-            onSelectMatch(match, match.stage === 'GRAND_FINALS_RESET' ? 'Grand Finals' : round.name);
-          } else if (!isObsMode && !canManage && isPlayable) {
+          if (!isObsMode && tournament.isLocked && isPlayable) {
             onSelectMatch(match, match.stage === 'GRAND_FINALS_RESET' ? 'Grand Finals' : round.name);
           }
         }}
@@ -383,7 +379,7 @@ export const BracketMatchCard: React.FC<BracketMatchCardProps> = ({
             : 'none',
           outlineOffset: isFocusedMatch ? '2px' : '0px',
           animation: isFocusedMatch ? 'matchZoomPulse 2.4s ease-in-out' : undefined,
-          cursor: !isObsMode && (canManage ? (isPlayable && tournament.isLocked) : isPlayable) ? 'pointer' : 'default',
+          cursor: !isObsMode && tournament.isLocked && isPlayable ? 'pointer' : 'default',
           opacity: hoveredAncestry
             ? isCardInAncestry
               ? 1

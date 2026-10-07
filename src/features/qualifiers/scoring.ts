@@ -6,7 +6,7 @@ import {
   PointsThreshold,
   QualifierStatus,
 } from '../tournament/types';
-import { SeededPlayer } from '../bracket/types';
+import { SeededPlayer, BracketStructure } from '../bracket/types';
 import { generateTraditionalBracket, generateFlatBracket, generateDoubleEliminationBracket } from '../bracket/math';
 
 export const MAXOUT_THRESHOLD = 999999;
@@ -18,8 +18,8 @@ export interface MaxoutKickerResult {
 }
 
 export interface LeaderboardRankRow {
-  rank: number;
-  globalRank: number;
+  rank?: number;
+  globalRank?: number;
   player: PlayerProfile;
   attempts: number[];
   formattedDetail: string; // e.g. "Ao2 (3 attempts)", "Max of 4", "180 pts"
@@ -225,7 +225,11 @@ export function deriveLeaderboard(tournament: Tournament): LeaderboardRankRow[] 
     };
   });
 
-  // Sort rows deterministically:
+  // Partition into competitors who have completed at least one attempt vs competitors with 0 attempts
+  const qualifiedRows = rawRows.filter(r => r.attempts.length > 0);
+  const unstartedRows = rawRows.filter(r => r.attempts.length === 0);
+
+  // Sort qualifiedRows deterministically:
   // 1. If HIGH_SCORE:
   //    a. maxout_count descending
   //    b. If maxout_count > 0: kicker_score descending
@@ -236,7 +240,7 @@ export function deriveLeaderboard(tournament: Tournament): LeaderboardRankRow[] 
   //    If other formats: finalScore descending
   // 2. Earlier timestamp first (for ties)
   // 3. Player ID ascending fallback
-  rawRows.sort((a, b) => {
+  qualifiedRows.sort((a, b) => {
     if (tournament.qualFormat === 'HIGH_SCORE') {
       const aMax = a.maxoutCount || 0;
       const bMax = b.maxoutCount || 0;
@@ -289,9 +293,9 @@ export function deriveLeaderboard(tournament: Tournament): LeaderboardRankRow[] 
     currentCutoff = endRank;
   }
 
-  // Assign ranks, tier cutoffs, and tier seeds
+  // Assign ranks, tier cutoffs, and tier seeds ONLY to players with recorded attempts
   let activeRankCounter = 1;
-  const result: LeaderboardRankRow[] = rawRows.map((item, idx) => {
+  const qualifiedResult: LeaderboardRankRow[] = qualifiedRows.map((item, idx) => {
     const rank = activeRankCounter++;
     // Find matching tier range
     const matchingRange = tierRanges.find(
@@ -332,15 +336,65 @@ export function deriveLeaderboard(tournament: Tournament): LeaderboardRankRow[] 
     };
   });
 
-  return result;
+  // Competitors with 0 attempts stay in the roster as unstarted without rank or bracket tier seeding
+  unstartedRows.sort((a, b) => a.player.name.localeCompare(b.player.name));
+  const unstartedResult: LeaderboardRankRow[] = unstartedRows.map(item => ({
+    ...item,
+    rank: undefined,
+    globalRank: undefined,
+    assignedTier: undefined,
+    tierSeed: undefined,
+    isDNQ: false,
+  }));
+
+  return [...qualifiedResult, ...unstartedResult];
 }
 
 /**
  * Recalculates brackets for each tier from the dynamic leaderboard standings.
+/**
+ * Generates a full populated bracket structure for a given tier and seeded players.
+ * Guarantees that all N slots (up to tier capacity) are filled with valid seeds or placeholders.
+ */
+export function generateFullTierBracket(tier: TournamentTier, availablePlayers: SeededPlayer[]): BracketStructure {
+  const capacity = Math.max(tier.playerCount || 2, 2);
+  // Combine available players with placeholder seeds for any unfilled slots
+  const fullSeeds: SeededPlayer[] = Array.from({ length: capacity }, (_, idx) => {
+    const seedNum = idx + 1;
+    const existing = availablePlayers.find(p => p.seed === seedNum);
+    if (existing) {
+      return existing;
+    }
+    return {
+      id: `placeholder-seed-${tier.id}-${seedNum}`,
+      name: `Seed ${seedNum}`,
+      seed: seedNum,
+    };
+  });
+
+  const options = {
+    tierId: tier.id,
+    bestOf: tier.bestOf,
+    roundBestOfOverrides: tier.roundBestOfOverrides,
+    bracketRouting: tier.bracketRouting,
+    flatWidth: tier.flatWidth,
+    finalsCutoff: tier.finalsCutoff,
+  };
+
+  return tier.eliminationType === 'DOUBLE'
+    ? generateDoubleEliminationBracket(fullSeeds, options)
+    : tier.bracketType === 'FLAT'
+      ? generateFlatBracket(fullSeeds, tier.flatWidth || 4, options)
+      : generateTraditionalBracket(fullSeeds, options);
+}
+
+/**
+ * Computes projected draft brackets for all tiers of a tournament.
  * Used during DRAFT mode to keep bracket previews live and reactive.
  */
 export function generateDraftBracketsForTournament(tournament: Tournament): TournamentTier[] {
   const sortedTiers = [...tournament.tiers].sort((a, b) => a.priority - b.priority);
+
 
   // If manual seeding is active, bypass qualifiers leaderboard and seed directly from manualSeeds
   if (tournament.seedingMethod === 'MANUAL') {
@@ -365,31 +419,9 @@ export function generateDraftBracketsForTournament(tournament: Tournament): Tour
         };
       });
 
-      if (seededPlayers.length >= 2) {
-        const options = {
-          tierId: tier.id,
-          bestOf: tier.bestOf,
-          roundBestOfOverrides: tier.roundBestOfOverrides,
-          bracketRouting: tier.bracketRouting,
-          flatWidth: tier.flatWidth,
-          finalsCutoff: tier.finalsCutoff,
-        };
-        const newBracket =
-          tier.eliminationType === 'DOUBLE'
-            ? generateDoubleEliminationBracket(seededPlayers, options)
-            : tier.bracketType === 'FLAT'
-              ? generateFlatBracket(seededPlayers, tier.flatWidth || 4, options)
-              : generateTraditionalBracket(seededPlayers, options);
-
-        return {
-          ...tier,
-          bracket: newBracket,
-        };
-      }
-
       return {
         ...tier,
-        bracket: { rounds: [], totalMatches: 0 } as any,
+        bracket: generateFullTierBracket(tier, seededPlayers),
       };
     });
   }
@@ -410,70 +442,9 @@ export function generateDraftBracketsForTournament(tournament: Tournament): Tour
       playstyle: row.player.playstyle,
     }));
 
-    // If we have at least 2 players, generate fresh mathematical bracket
-    if (seededPlayers.length >= 2) {
-      const options = {
-        tierId: tier.id,
-        bestOf: tier.bestOf,
-        roundBestOfOverrides: tier.roundBestOfOverrides,
-        bracketRouting: tier.bracketRouting,
-        flatWidth: tier.flatWidth,
-        finalsCutoff: tier.finalsCutoff,
-      };
-      const newBracket =
-        tier.eliminationType === 'DOUBLE'
-          ? generateDoubleEliminationBracket(seededPlayers, options)
-          : tier.bracketType === 'FLAT'
-            ? generateFlatBracket(seededPlayers, tier.flatWidth || 4, options)
-            : generateTraditionalBracket(seededPlayers, options);
-
-      return {
-        ...tier,
-        bracket: newBracket,
-      };
-    }
-
-    // If insufficient players and tournament has no qualifiers/seeds/players
-    if (
-      (tournament.playersPool || []).length === 0 &&
-      (tournament.qualifierSubmissions || []).length === 0 &&
-      (tournament.manualSeeds || []).length === 0
-    ) {
-      if (tier.bracket && tier.bracket.rounds && tier.bracket.rounds.length > 0) {
-        return tier;
-      }
-      if (tier.playerCount >= 2) {
-        const placeholderSeeds: SeededPlayer[] = Array.from({ length: tier.playerCount }, (_, i) => ({
-          id: `seed-${i + 1}`,
-          name: `Seed ${i + 1}`,
-          seed: i + 1,
-        }));
-        const options = {
-          tierId: tier.id,
-          bestOf: tier.bestOf,
-          roundBestOfOverrides: tier.roundBestOfOverrides,
-          bracketRouting: tier.bracketRouting,
-          flatWidth: tier.flatWidth,
-          finalsCutoff: tier.finalsCutoff,
-        };
-        const placeholderBracket =
-          tier.eliminationType === 'DOUBLE'
-            ? generateDoubleEliminationBracket(placeholderSeeds, options)
-            : tier.bracketType === 'FLAT'
-              ? generateFlatBracket(placeholderSeeds, tier.flatWidth || 4, options)
-              : generateTraditionalBracket(placeholderSeeds, options);
-        return {
-          ...tier,
-          bracket: placeholderBracket,
-        };
-      }
-      return {
-        ...tier,
-        bracket: { rounds: [], totalMatches: 0, matchesById: {} } as any,
-      };
-    }
-
-    // Keep existing structure if insufficient players
-    return tier;
+    return {
+      ...tier,
+      bracket: generateFullTierBracket(tier, seededPlayers),
+    };
   });
 }

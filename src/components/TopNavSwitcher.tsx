@@ -142,7 +142,9 @@ export const TopNavSwitcher: React.FC = () => {
             }}
           >
             <Link
-              to={`/${activeTournament.slug}/leaderboard`}
+              to={activeTournament.isLocked && activeTournament.tiers?.length
+                ? `/${activeTournament.slug}/manage/bracket/${activeTournament.tiers[0].slug}`
+                : `/${activeTournament.slug}/manage/qualifiers`}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',

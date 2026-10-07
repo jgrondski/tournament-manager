@@ -47,7 +47,6 @@ interface BracketCanvasProps {
   } | null;
   focusedMatchId: string | null;
   isObsMode?: boolean;
-  canManage?: boolean;
   onSlotHover: (matchId: string | null, slotNum: 1 | 2 | null) => void;
   onChampHover: (champPlayerId?: string | null) => void;
   onPlayerClick: (pId: string, pName: string, country?: string) => void;
@@ -84,7 +83,6 @@ export const BracketCanvas: React.FC<BracketCanvasProps> = ({
   hoveredAncestry,
   focusedMatchId,
   isObsMode = false,
-  canManage = true,
   onSlotHover,
   onChampHover,
   onPlayerClick,
@@ -254,7 +252,6 @@ export const BracketCanvas: React.FC<BracketCanvasProps> = ({
               tier={tier}
               isPhase2View={isPhase2View}
               isObsMode={isObsMode}
-              canManage={canManage}
               primaryColor={primaryColor}
               secondaryColor={secondaryColor}
               textColor={textColor}

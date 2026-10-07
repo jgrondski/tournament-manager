@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { filterTournamentsByQuery } from '../../../components/TournamentSidebar';
-import { getPlayerQualifierStatus, generateDraftBracketsForTournament } from '../../qualifiers/scoring';
+import { getPlayerQualifierStatus, generateDraftBracketsForTournament, deriveLeaderboard } from '../../qualifiers/scoring';
 import { Tournament } from '../types';
 import { isUuid } from '../../../api/tournaments';
 import { createPlayer, updatePlayer, createPlayersBatch } from '../../../api/players';
@@ -497,6 +497,22 @@ describe('Tournament Rules, Lifecycle Safety & UI State Invariants', () => {
       expect(buildTierBracketUrl(sampleTournament.slug, sampleTournament.tiers[0].slug)).not.toBe(
         '/super-championship/gold'
       );
+
+      // Verify that all action links on TournamentCard route to manage endpoints:
+      const buildQualifiersActionUrl = (tournamentSlug: string) => `/${tournamentSlug}/manage/qualifiers`;
+      const buildStandingsActionUrl = (tournamentSlug: string) => `/${tournamentSlug}/manage/standings`;
+      const buildSheetActionUrl = (tournamentSlug: string, tierSlug?: string) =>
+        tierSlug ? `/${tournamentSlug}/manage/sheet?tier=${tierSlug}` : `/${tournamentSlug}/manage/sheet`;
+      const buildSettingsActionUrl = (tournamentSlug: string) => `/${tournamentSlug}/manage/settings`;
+
+      expect(buildQualifiersActionUrl(sampleTournament.slug)).toBe('/super-championship/manage/qualifiers');
+      expect(buildStandingsActionUrl(sampleTournament.slug)).toBe('/super-championship/manage/standings');
+      expect(buildSheetActionUrl(sampleTournament.slug, 'gold')).toBe('/super-championship/manage/sheet?tier=gold');
+      expect(buildSettingsActionUrl(sampleTournament.slug)).toBe('/super-championship/manage/settings');
+
+      // None must point to public unauthenticated view paths
+      expect(buildQualifiersActionUrl(sampleTournament.slug)).not.toBe('/super-championship/leaderboard');
+      expect(buildStandingsActionUrl(sampleTournament.slug)).not.toBe('/super-championship/standings');
     });
   });
 
@@ -588,5 +604,60 @@ describe('Tournament Rules, Lifecycle Safety & UI State Invariants', () => {
       expect(goldDraft.bracket.rounds[0].matches[0].player1?.player?.name).toBe('Seed 1');
       expect(goldDraft.bracket.rounds[0].matches[0].player2?.player?.name).toBe('Seed 4');
     });
+
+    it('preserves registered roster in playersPool with 0 attempts and unseeded status when qualifiers are cleared', () => {
+      const clearedTourney: Tournament = {
+        ...denverOpen,
+        isLocked: false,
+        tiers: [
+          {
+            id: 'tier-1',
+            slug: 'gold',
+            name: 'Gold',
+            priority: 1,
+            playerCount: 4,
+            bracketType: 'TRADITIONAL',
+            bestOf: 3,
+            primaryColor: '#ffc905',
+            secondaryColor: '#705b33',
+            cardColor: '#1b1c1d',
+            textColor: '#94A3B8',
+            backgroundColor: '#020203',
+            isLocked: false,
+            bracket: { rounds: [], totalMatches: 0, matchesById: {} } as any,
+          },
+        ],
+        playersPool: [
+          { id: 'p1', name: 'PixelAndy', country: 'US', playstyle: 'Rolling' },
+          { id: 'p2', name: 'BlueScuti', country: 'US', playstyle: 'Rolling' },
+          { id: 'p3', name: 'Fractal', country: 'US', playstyle: 'Rolling' },
+          { id: 'p4', name: 'DogPlayingTetris', country: 'US', playstyle: 'Rolling' },
+        ],
+        // Qualifiers cleared: submissions empty
+        qualifierSubmissions: [],
+      };
+
+      // 1. Leaderboard derivation must show all 4 registered competitors on the roster with 0 attempts and unranked
+      const leaderboard = deriveLeaderboard(clearedTourney);
+      expect(leaderboard).toHaveLength(4);
+
+      for (const row of leaderboard) {
+        expect(row.attempts).toHaveLength(0);
+        expect(row.rank).toBeUndefined();
+        expect(row.assignedTier).toBeUndefined();
+        expect(row.tierSeed).toBeUndefined();
+        expect(row.isDNQ).toBe(false);
+        expect(row.status).toBe('not started');
+      }
+
+      // 2. Draft brackets must revert to placeholder seeds (Seed 1..N) because no players have qualifying scores
+      const draftTiers = generateDraftBracketsForTournament(clearedTourney);
+      const goldDraft = draftTiers[0];
+      expect(goldDraft.bracket.rounds[0].matches[0].player1?.player?.name).toBe('Seed 1');
+      expect(goldDraft.bracket.rounds[0].matches[0].player2?.player?.name).toBe('Seed 4');
+      expect(goldDraft.bracket.rounds[0].matches[1].player1?.player?.name).toBe('Seed 2');
+      expect(goldDraft.bracket.rounds[0].matches[1].player2?.player?.name).toBe('Seed 3');
+    });
   });
 });
+

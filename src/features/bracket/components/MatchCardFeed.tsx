@@ -435,9 +435,7 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({
               <div
                 key={match.id}
                 onClick={() => {
-                  if (canManage && isPlayable && tournament.isLocked) {
-                    setActiveMatch(match);
-                  } else if (!canManage && isPlayable) {
+                  if (tournament.isLocked && isPlayable) {
                     setActiveMatch(match);
                   }
                 }}
@@ -461,7 +459,7 @@ export const MatchCardFeed: React.FC<MatchCardFeedProps> = ({
                     ? 'var(--shadow-md)'
                     : 'var(--shadow-sm)',
                   padding: '0.75rem',
-                  cursor: (canManage ? (isPlayable && tournament.isLocked) : isPlayable) ? 'pointer' : 'default',
+                  cursor: tournament.isLocked && isPlayable ? 'pointer' : 'default',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '0.55rem',
