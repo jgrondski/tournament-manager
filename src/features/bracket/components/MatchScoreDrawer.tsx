@@ -39,6 +39,7 @@ export const MatchScoreDrawer: React.FC<MatchScoreDrawerProps> = ({
   const [bestOf, setBestOf] = useState<number>(match?.bestOf || 5);
   const [games, setGames] = useState<Array<{ p1: string; p2: string; winner: string | null }>>([]);
   const [hasTiebreaker, setHasTiebreaker] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!match) return;
@@ -130,9 +131,9 @@ export const MatchScoreDrawer: React.FC<MatchScoreDrawerProps> = ({
     setGames(updated);
   };
 
-  const handleBestOfChange = (newBestOf: number) => {
+  const handleBestOfChange = async (newBestOf: number) => {
     setBestOf(newBestOf);
-    updateMatchBestOf(tournamentId, tierId, match.id, newBestOf);
+    await updateMatchBestOf(tournamentId, tierId, match.id, newBestOf);
     const updated = [...games];
     while (updated.length < newBestOf) {
       updated.push({ p1: '', p2: '', winner: null });
@@ -157,34 +158,44 @@ export const MatchScoreDrawer: React.FC<MatchScoreDrawerProps> = ({
     });
   };
 
-  const handleSaveAndAdvance = () => {
-    const formattedGames = games.map((g, idx) => ({
-      gameNumber: idx + 1,
-      player1Points: g.p1.trim() !== '' ? parseInt(g.p1, 10) : null,
-      player2Points: g.p2.trim() !== '' ? parseInt(g.p2, 10) : null,
-      winnerPlayerId: g.winner,
-    }));
+  const handleSaveAndAdvance = async () => {
+    setIsSaving(true);
+    try {
+      const formattedGames = games.map((g, idx) => ({
+        gameNumber: idx + 1,
+        player1Points: g.p1.trim() !== '' ? parseInt(g.p1, 10) : null,
+        player2Points: g.p2.trim() !== '' ? parseInt(g.p2, 10) : null,
+        winnerPlayerId: g.winner,
+      }));
 
-    const hasTiedGame = formattedGames.some(
-      g => g.winnerPlayerId === 'TIE' || (g.player1Points !== null && g.player1Points === g.player2Points && g.player1Points > 0)
-    );
-    const hasRemainingTiebreaker = games.length > bestOf;
-    const shouldRecordTiebreaker = Boolean((hasTiebreaker || hasRemainingTiebreaker || hasTiedGame) && (hasTiedGame || hasRemainingTiebreaker));
+      const hasTiedGame = formattedGames.some(
+        g => g.winnerPlayerId === 'TIE' || (g.player1Points !== null && g.player1Points === g.player2Points && g.player1Points > 0)
+      );
+      const hasRemainingTiebreaker = games.length > bestOf;
+      const shouldRecordTiebreaker = Boolean((hasTiebreaker || hasRemainingTiebreaker || hasTiedGame) && (hasTiedGame || hasRemainingTiebreaker));
 
-    saveMatchScores(
-      tournamentId,
-      tierId,
-      match.id,
-      formattedGames,
-      shouldRecordTiebreaker
-    );
-    onClose();
+      await saveMatchScores(
+        tournamentId,
+        tierId,
+        match.id,
+        formattedGames,
+        shouldRecordTiebreaker
+      );
+      onClose();
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleForfeit = (winnerPlayerId: string) => {
+  const handleForfeit = async (winnerPlayerId: string) => {
     if (window.confirm(`Award forfeit win to ${winnerPlayerId === p1?.id ? p1Name : p2Name}?`)) {
-      forfeitMatch(tournamentId, tierId, match.id, winnerPlayerId);
-      onClose();
+      setIsSaving(true);
+      try {
+        await forfeitMatch(tournamentId, tierId, match.id, winnerPlayerId);
+        onClose();
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -559,6 +570,7 @@ export const MatchScoreDrawer: React.FC<MatchScoreDrawerProps> = ({
           <button
             type="button"
             onClick={handleSaveAndAdvance}
+            disabled={isSaving}
             style={{
               flex: 2,
               display: 'inline-flex',
@@ -572,13 +584,27 @@ export const MatchScoreDrawer: React.FC<MatchScoreDrawerProps> = ({
               border: 'none',
               fontWeight: 700,
               fontSize: '0.9rem',
-              cursor: 'pointer',
+              cursor: isSaving ? 'not-allowed' : 'pointer',
+              opacity: isSaving ? 0.7 : 1,
               boxShadow: `0 2px 14px ${colorWithAlpha(primaryColor, 0.4)}`,
               transition: 'all 0.15s ease',
             }}
           >
-            <Check size={18} />
-            <span>{matchDecided ? 'Save & Advance Winner' : 'Save Match Progress'}</span>
+            {isSaving ? (
+              <div
+                style={{
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '50%',
+                  border: '2px solid rgba(255,255,255,0.3)',
+                  borderTopColor: '#ffffff',
+                  animation: 'spin 0.8s linear infinite',
+                }}
+              />
+            ) : (
+              <Check size={18} />
+            )}
+            <span>{isSaving ? 'Saving...' : matchDecided ? 'Save & Advance Winner' : 'Save Match Progress'}</span>
           </button>
         </div>
       </div>

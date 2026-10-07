@@ -124,6 +124,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [tierToDelete, setTierToDelete] = useState<{ index: number; tier: TournamentTier } | null>(null);
   const [dataActionToConfirm, setDataActionToConfirm] = useState<'MATCHES' | 'QUALS' | 'ALL' | null>(null);
+  const [isExecutingAction, setIsExecutingAction] = useState(false);
   const [simFeedback, setSimFeedback] = useState<string | null>(null);
   const [openThemes, setOpenThemes] = useState<Record<string, boolean>>({});
 
@@ -660,8 +661,8 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
           {tournament.isLocked ? (
             <button
               type="button"
-              onClick={() => {
-                const res = unlockBrackets(tournament.id);
+              onClick={async () => {
+                const res = await unlockBrackets(tournament.id);
                 if (!res.success && res.error) {
                   setSettingsUnlockError(res.error);
                 } else {
@@ -842,23 +843,29 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
         dataActionToConfirm={dataActionToConfirm}
         qualifierCount={seedingMethod === 'MANUAL' ? (tournament.manualSeeds?.length || 0) : qualifierCount}
         recordedMatchCount={recordedMatchCount}
-        onConfirmDataAction={() => {
-          if (dataActionToConfirm === 'MATCHES') {
-            clearMatchScores(tournament.id);
-            setSimFeedback('Match scores cleared.');
-          } else if (dataActionToConfirm === 'QUALS') {
-            if (recordedMatchCount > 0) {
-              setSimFeedback('Cannot clear qualifiers while match scores exist. Execute "Clear Matches" first.');
-              setDataActionToConfirm(null);
-              return;
+        isExecutingAction={isExecutingAction}
+        onConfirmDataAction={async () => {
+          setIsExecutingAction(true);
+          try {
+            if (dataActionToConfirm === 'MATCHES') {
+              await clearMatchScores(tournament.id);
+              setSimFeedback('Match scores cleared.');
+            } else if (dataActionToConfirm === 'QUALS') {
+              if (recordedMatchCount > 0) {
+                setSimFeedback('Cannot clear qualifiers while match scores exist. Execute "Clear Matches" first.');
+                setDataActionToConfirm(null);
+                return;
+              }
+              await clearQualifierScores(tournament.id);
+              setSimFeedback(seedingMethod === 'MANUAL' ? 'Registered seeds cleared.' : 'Qualifier scores cleared.');
+            } else if (dataActionToConfirm === 'ALL') {
+              await clearAllTournamentData(tournament.id);
+              setSimFeedback('All tournament data cleared.');
             }
-            clearQualifierScores(tournament.id);
-            setSimFeedback(seedingMethod === 'MANUAL' ? 'Registered seeds cleared.' : 'Qualifier scores cleared.');
-          } else if (dataActionToConfirm === 'ALL') {
-            clearAllTournamentData(tournament.id);
-            setSimFeedback('All tournament data cleared.');
+          } finally {
+            setIsExecutingAction(false);
+            setDataActionToConfirm(null);
           }
-          setDataActionToConfirm(null);
         }}
         onCancelDataAction={() => setDataActionToConfirm(null)}
       />

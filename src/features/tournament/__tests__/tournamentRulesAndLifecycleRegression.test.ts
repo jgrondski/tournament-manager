@@ -628,10 +628,10 @@ describe('Tournament Rules, Lifecycle Safety & UI State Invariants', () => {
           },
         ],
         playersPool: [
-          { id: 'p1', name: 'PixelAndy', country: 'US', playstyle: 'Rolling' },
-          { id: 'p2', name: 'BlueScuti', country: 'US', playstyle: 'Rolling' },
-          { id: 'p3', name: 'Fractal', country: 'US', playstyle: 'Rolling' },
-          { id: 'p4', name: 'DogPlayingTetris', country: 'US', playstyle: 'Rolling' },
+          { id: 'p1', name: 'PixelAndy', country: 'US', playstyle: 'Rolling', personalBest: 1200000 },
+          { id: 'p2', name: 'BlueScuti', country: 'US', playstyle: 'Rolling', personalBest: 1200000 },
+          { id: 'p3', name: 'Fractal', country: 'US', playstyle: 'Rolling', personalBest: 1200000 },
+          { id: 'p4', name: 'DogPlayingTetris', country: 'US', playstyle: 'Rolling', personalBest: 1200000 },
         ],
         // Qualifiers cleared: submissions empty
         qualifierSubmissions: [],

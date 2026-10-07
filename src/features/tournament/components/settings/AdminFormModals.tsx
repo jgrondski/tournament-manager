@@ -11,6 +11,7 @@ interface AdminFormModalsProps {
   dataActionToConfirm: 'MATCHES' | 'QUALS' | 'ALL' | null;
   qualifierCount: number;
   recordedMatchCount: number;
+  isExecutingAction?: boolean;
   onConfirmDataAction: () => void;
   onCancelDataAction: () => void;
 }
@@ -24,6 +25,7 @@ export const AdminFormModals: React.FC<AdminFormModalsProps> = ({
   dataActionToConfirm,
   qualifierCount,
   recordedMatchCount,
+  isExecutingAction,
   onConfirmDataAction,
   onCancelDataAction,
 }) => {
@@ -222,6 +224,7 @@ export const AdminFormModals: React.FC<AdminFormModalsProps> = ({
               <button
                 type="button"
                 onClick={onCancelDataAction}
+                disabled={isExecutingAction}
                 className="btn btn-secondary"
                 style={{ padding: '0.5rem 1rem' }}
               >
@@ -230,10 +233,23 @@ export const AdminFormModals: React.FC<AdminFormModalsProps> = ({
               <button
                 type="button"
                 onClick={onConfirmDataAction}
+                disabled={isExecutingAction}
                 className="btn btn-danger"
-                style={{ padding: '0.5rem 1.25rem' }}
+                style={{ padding: '0.5rem 1.25rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
               >
-                Yes, Clear Data
+                {isExecutingAction && (
+                  <div
+                    style={{
+                      width: '14px',
+                      height: '14px',
+                      borderRadius: '50%',
+                      border: '2px solid rgba(255,255,255,0.3)',
+                      borderTopColor: '#ffffff',
+                      animation: 'spin 0.8s linear infinite',
+                    }}
+                  />
+                )}
+                <span>{isExecutingAction ? 'Clearing Data...' : 'Yes, Clear Data'}</span>
               </button>
             </div>
           </div>

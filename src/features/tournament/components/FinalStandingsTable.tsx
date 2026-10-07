@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Tournament, TournamentTier, PlayerProfile, Playstyle } from '../types';
 import { calculateGlobalStandings, GlobalStandingRow } from '../standings';
 import { colorWithAlpha, getContrastingTextColor, getAlternateShade } from '../../bracket/colorUtils';
@@ -207,6 +207,10 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
     );
   }
 
+  const location = useLocation();
+  const isManage = location.pathname.includes('/manage');
+  const defaultTierSlug = tournament.tiers[0]?.slug;
+
   if (!tournament.isLocked) {
     return (
       <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', width: '100%' }}>
@@ -215,12 +219,20 @@ export const FinalStandingsTable: React.FC<FinalStandingsTableProps> = ({
           Qualifiers are currently running and tournament brackets have not been locked into match play. Final standings will become available once qualifiers conclude and brackets are finalized.
         </p>
         <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-          <button onClick={() => navigate(`/${tournament.slug}/leaderboard`)} className="btn btn-secondary">
+          <button
+            onClick={() => navigate(isManage ? `/${tournament.slug}/manage/qualifiers` : `/${tournament.slug}/leaderboard`)}
+            className="btn btn-secondary"
+          >
             🏆 View Qualifiers
           </button>
-          <button onClick={() => navigate(`/${tournament.slug}/${tournament.tiers[0]?.slug}`)} className="btn btn-secondary">
-            🌲 Visual Bracket
-          </button>
+          {defaultTierSlug && (
+            <button
+              onClick={() => navigate(isManage ? `/${tournament.slug}/manage/bracket/${defaultTierSlug}` : `/${tournament.slug}/${defaultTierSlug}`)}
+              className="btn btn-secondary"
+            >
+              🌲 Visual Bracket
+            </button>
+          )}
           <button onClick={() => navigate(`/${tournament.slug}/manage/settings`)} className="btn btn-primary">
             ⚙️ Finalize in Settings
           </button>

@@ -5,7 +5,7 @@ import { useTournament } from '../../tournament/store';
 import { computeOrganizationMetrics } from '../metrics';
 import { TopNavSwitcher } from '../../../components/TopNavSwitcher';
 import { TierThemeColors } from '../../bracket/colorUtils';
-import { QualFormat, PointsThreshold, DEFAULT_POINTS_THRESHOLDS, OrgTierTheme, Tournament } from '../../tournament/types';
+import { QualFormat, PointsThreshold, DEFAULT_POINTS_THRESHOLDS, OrgTierTheme, Tournament, Organization } from '../../tournament/types';
 import { CreateTournamentModal } from '../../tournament/components/CreateTournamentModal';
 import {
   Building2,
@@ -18,77 +18,18 @@ import { OrgTournamentsTab } from './OrgTournamentsTab';
 import { OrgBrandingTab } from './OrgBrandingTab';
 import { OrgSettingsTab } from './OrgSettingsTab';
 import { OrgMetadataModal } from './OrgMetadataModal';
+import { LoadingScreen } from '../../../components/LoadingScreen';
 
 export const OrganizationDashboard: React.FC = () => {
   const { orgSlug } = useParams<{ orgSlug: string }>();
-  const { updateOrganization, deleteOrganization, getOrganizationBySlug } = useOrganization();
-  const { tournaments, deleteTournament } = useTournament();
-  const navigate = useNavigate();
+  const { getOrganizationBySlug, isLoading, isHydrated } = useOrganization();
+  const { isLoading: isTourneyLoading, isHydrated: isTourneyHydrated } = useTournament();
+
+  if (isLoading || !isHydrated || isTourneyLoading || !isTourneyHydrated) {
+    return <LoadingScreen message="Loading organization..." />;
+  }
 
   const org = getOrganizationBySlug(orgSlug || '');
-
-  const [activeTab, setActiveTab] = useState<'tournaments' | 'branding' | 'settings'>('tournaments');
-  const [tourneySearch, setTourneySearch] = useState('');
-  const [isEditMetadataOpen, setIsEditMetadataOpen] = useState(false);
-  const [isCreateTourneyOpen, setIsCreateTourneyOpen] = useState(false);
-  const [saveToast, setSaveToast] = useState<string | null>(null);
-  const [webhookTestStatus, setWebhookTestStatus] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [tournamentToDelete, setTournamentToDelete] = useState<Tournament | null>(null);
-
-  const confirmDeleteTournament = () => {
-    if (tournamentToDelete) {
-      deleteTournament(tournamentToDelete.id);
-      setTournamentToDelete(null);
-    }
-  };
-
-  // Metadata form state
-  const [editName, setEditName] = useState(org?.name || '');
-  const [editSlug, setEditSlug] = useState(org?.slug || '');
-  const [editDescription, setEditDescription] = useState(org?.description || '');
-  const [editWebsite, setEditWebsite] = useState(org?.website || '');
-  const [editLogoUrl, setEditLogoUrl] = useState(org?.logoUrl || org?.branding?.logoUrl || '');
-  const [editBannerUrl, setEditBannerUrl] = useState(org?.bannerUrl || org?.branding?.bannerUrl || '');
-
-  // Branding Primary & Multi-tier state
-  const initialColors = org?.themeColors || org?.branding?.themeColors || {
-    primaryColor: org?.brandColor || '#ffc905',
-    secondaryColor: '#705b33',
-    cardColor: '#1b1c1d',
-    textColor: '#94A3B8',
-    backgroundColor: '#020203',
-  };
-  const [primaryTheme, setPrimaryTheme] = useState<TierThemeColors>(initialColors);
-  const [primaryTextSize, setPrimaryTextSize] = useState<'compact' | 'normal' | 'large'>('normal');
-  const [tierThemes, setTierThemes] = useState<OrgTierTheme[]>(org?.tierThemes || []);
-
-  // Settings state
-  const [qualFormat, setQualFormat] = useState<QualFormat>(org?.defaultRules?.qualFormat || 'AVERAGE_OF_X');
-  const [qualAverageCount, setQualAverageCount] = useState<number | undefined>(org?.defaultRules?.qualAverageCount || 2);
-  const [pointsConfig, setPointsConfig] = useState<PointsThreshold[]>(
-    org?.defaultRules?.pointsConfig || DEFAULT_POINTS_THRESHOLDS
-  );
-  const [bestOf, setBestOf] = useState<number>(org?.defaultRules?.bestOf || 5);
-  const [discordWebhookUrl, setDiscordWebhookUrl] = useState(org?.discordWebhookUrl || '');
-
-  const showToast = (msg: string) => {
-    setSaveToast(msg);
-    setTimeout(() => setSaveToast(null), 3000);
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
-          setter(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  };
 
   if (!org) {
     return (
@@ -109,14 +50,85 @@ export const OrganizationDashboard: React.FC = () => {
     );
   }
 
+  return <OrganizationDashboardLoaded key={org.id} org={org} />;
+};
+
+const OrganizationDashboardLoaded: React.FC<{ org: Organization }> = ({ org }) => {
+  const { updateOrganization, deleteOrganization } = useOrganization();
+  const { tournaments, deleteTournament } = useTournament();
+  const navigate = useNavigate();
+
+  const [activeTab, setActiveTab] = useState<'tournaments' | 'branding' | 'settings'>('tournaments');
+  const [tourneySearch, setTourneySearch] = useState('');
+  const [isEditMetadataOpen, setIsEditMetadataOpen] = useState(false);
+  const [isCreateTourneyOpen, setIsCreateTourneyOpen] = useState(false);
+  const [saveToast, setSaveToast] = useState<string | null>(null);
+  const [webhookTestStatus, setWebhookTestStatus] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [tournamentToDelete, setTournamentToDelete] = useState<Tournament | null>(null);
+
+  const confirmDeleteTournament = async () => {
+    if (tournamentToDelete) {
+      await deleteTournament(tournamentToDelete.id);
+      setTournamentToDelete(null);
+    }
+  };
+
+  // Metadata form state
+  const [editName, setEditName] = useState(org.name || '');
+  const [editSlug, setEditSlug] = useState(org.slug || '');
+  const [editDescription, setEditDescription] = useState(org.description || '');
+  const [editWebsite, setEditWebsite] = useState(org.website || '');
+  const [editLogoUrl, setEditLogoUrl] = useState(org.logoUrl || org.branding?.logoUrl || '');
+  const [editBannerUrl, setEditBannerUrl] = useState(org.bannerUrl || org.branding?.bannerUrl || '');
+
+  // Branding Primary & Multi-tier state
+  const initialColors = org.themeColors || org.branding?.themeColors || {
+    primaryColor: org.brandColor || '#ffc905',
+    secondaryColor: '#705b33',
+    cardColor: '#1b1c1d',
+    textColor: '#94A3B8',
+    backgroundColor: '#020203',
+  };
+  const [primaryTheme, setPrimaryTheme] = useState<TierThemeColors>(initialColors);
+  const [primaryTextSize, setPrimaryTextSize] = useState<'compact' | 'normal' | 'large'>('normal');
+  const [tierThemes, setTierThemes] = useState<OrgTierTheme[]>(org.tierThemes || []);
+
+  // Settings state
+  const [qualFormat, setQualFormat] = useState<QualFormat>(org.defaultRules?.qualFormat || 'AVERAGE_OF_X');
+  const [qualAverageCount, setQualAverageCount] = useState<number | undefined>(org.defaultRules?.qualAverageCount || 2);
+  const [pointsConfig, setPointsConfig] = useState<PointsThreshold[]>(
+    org.defaultRules?.pointsConfig || DEFAULT_POINTS_THRESHOLDS
+  );
+  const [bestOf, setBestOf] = useState<number>(org.defaultRules?.bestOf || 5);
+  const [discordWebhookUrl, setDiscordWebhookUrl] = useState(org.discordWebhookUrl || '');
+
+  const showToast = (msg: string) => {
+    setSaveToast(msg);
+    setTimeout(() => setSaveToast(null), 3000);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          setter(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const metrics = computeOrganizationMetrics(org.id, tournaments);
   const orgTournaments = tournaments.filter(t => t.organizationId === org.id);
 
-  const handleSaveMetadata = (e: React.FormEvent) => {
+  const handleSaveMetadata = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editName.trim() || !editSlug.trim()) return;
 
-    updateOrganization(org.id, {
+    await updateOrganization(org.id, {
       name: editName.trim(),
       slug: editSlug.trim(),
       description: editDescription.trim() || undefined,
@@ -132,18 +144,20 @@ export const OrganizationDashboard: React.FC = () => {
     }
   };
 
-  const handleDeleteOrganization = () => {
+  const handleDeleteOrganization = async () => {
     if (orgTournaments.length > 0) {
       setDeleteError(`Cannot delete ${org.name} because it has ${orgTournaments.length} tournament(s) linked to it.`);
       return;
     }
-    deleteOrganization(org.id);
-    navigate('/organizations');
+    const res = await deleteOrganization(org.id);
+    if (res.success) {
+      navigate('/organizations');
+    }
   };
 
-  const handleSaveBranding = (e: React.FormEvent) => {
+  const handleSaveBranding = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateOrganization(org.id, {
+    await updateOrganization(org.id, {
       brandColor: primaryTheme.primaryColor,
       themeColors: primaryTheme,
       tierThemes,
@@ -154,7 +168,7 @@ export const OrganizationDashboard: React.FC = () => {
       },
     });
 
-    showToast('Branding palettes saved successfully.');
+    showToast('Brand colors & tier themes updated successfully.');
   };
 
   const handleAddTierTheme = () => {
@@ -186,9 +200,9 @@ export const OrganizationDashboard: React.FC = () => {
     setTierThemes(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSaveSettings = (e: React.FormEvent) => {
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateOrganization(org.id, {
+    await updateOrganization(org.id, {
       discordWebhookUrl: discordWebhookUrl.trim() || undefined,
       defaultRules: {
         ...org.defaultRules,

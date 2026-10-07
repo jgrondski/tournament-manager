@@ -26,6 +26,7 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
 
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerProfile | null>(null);
   const [scoreInput, setScoreInput] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -72,12 +73,17 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
     setScoreInput(cleaned);
   };
 
-  const handleSubmitScore = (e: React.FormEvent) => {
+  const handleSubmitScore = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPlayer || !isScoreValid) return;
+    if (!selectedPlayer || !isScoreValid || isSubmitting) return;
 
-    submitQualifierScore(tournament.id, selectedPlayer.id, numericScore);
-    setScoreInput('');
+    setIsSubmitting(true);
+    try {
+      await submitQualifierScore(tournament.id, selectedPlayer.id, numericScore);
+      setScoreInput('');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -253,12 +259,15 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
                   />
                   <button
                     type="submit"
-                    disabled={!isScoreValid}
+                    disabled={!isScoreValid || isSubmitting}
                     className="btn btn-primary"
                     style={{
                       padding: '0.5rem 1.25rem',
-                      opacity: !isScoreValid ? 0.45 : 1,
-                      cursor: !isScoreValid ? 'not-allowed' : 'pointer',
+                      opacity: !isScoreValid || isSubmitting ? 0.45 : 1,
+                      cursor: !isScoreValid || isSubmitting ? 'not-allowed' : 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
                     }}
                     title={
                       !selectedPlayer
@@ -268,7 +277,21 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
                         : 'Submit qualifier score'
                     }
                   >
-                    <Plus size={16} /> Submit
+                    {isSubmitting ? (
+                      <div
+                        style={{
+                          width: '14px',
+                          height: '14px',
+                          borderRadius: '50%',
+                          border: '2px solid rgba(255,255,255,0.3)',
+                          borderTopColor: '#ffffff',
+                          animation: 'spin 0.8s linear infinite',
+                        }}
+                      />
+                    ) : (
+                      <Plus size={16} />
+                    )}
+                    <span>{isSubmitting ? 'Saving...' : 'Submit'}</span>
                   </button>
                 </div>
               </form>
@@ -310,7 +333,9 @@ export const QualifierEntryModal: React.FC<QualifierEntryModalProps> = ({
                         </div>
                         <button
                           type="button"
-                          onClick={() => deleteQualifierScore(tournament.id, sub.id)}
+                          onClick={async () => {
+                            await deleteQualifierScore(tournament.id, sub.id);
+                          }}
                           style={{
                             background: 'transparent',
                             border: 'none',

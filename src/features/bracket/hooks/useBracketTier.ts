@@ -36,7 +36,7 @@ export function useBracketTier(
   tierSlug?: string,
   options?: UseBracketTierOptions
 ): UseBracketTierResult {
-  const { getTournamentBySlug, isLoading: isStoreLoading, tournaments } = useTournament();
+  const { getTournamentBySlug, isLoading: isStoreLoading, isHydrated } = useTournament();
 
   const [viewMode, setViewMode] = useState<BracketViewMode>(options?.initialViewMode || 'standard');
 
@@ -46,8 +46,8 @@ export function useBracketTier(
     }
   }, [options?.initialViewMode]);
 
-  // Loading gate: If tournaments array has not been populated yet and store is fetching
-  const isInitializing = isStoreLoading || (tournaments.length === 0 && !tournamentSlug);
+  // Loading gate: while store is loading or not yet hydrated
+  const isInitializing = isStoreLoading || !isHydrated;
 
   const rawTournament = tournamentSlug ? getTournamentBySlug(tournamentSlug) : undefined;
 
@@ -147,7 +147,7 @@ export function useBracketTier(
     layout,
     rounds,
     championPlayer,
-    isLoading: isStoreLoading && !rawTournament,
+    isLoading: isInitializing && !rawTournament,
     notFound,
     isDraft: Boolean(rawTournament && !rawTournament.isLocked),
     viewMode,

@@ -6,13 +6,14 @@ import { SpectatorLayout } from '../components/SpectatorLayout';
 import { LeaderboardTable } from '../features/qualifiers/components/LeaderboardTable';
 import { ManualSeedingManager } from '../features/tournament/components/seeding/ManualSeedingManager';
 import { ShareBracketModal } from '../features/bracket/components/ShareBracketModal';
+import { LoadingScreen } from '../components/LoadingScreen';
 
 export const PublicLeaderboardPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { getTournamentBySlug } = useTournament();
+  const { getTournamentBySlug, isLoading, isHydrated } = useTournament();
 
   const isManageRoute = location.pathname.includes('/manage/');
   const isObsMode = searchParams.get('obs') === 'true';
@@ -29,6 +30,10 @@ export const PublicLeaderboardPage: React.FC = () => {
       document.body.classList.remove('obs-overlay-mode');
     };
   }, [isObsMode]);
+
+  if (isLoading || !isHydrated) {
+    return <LoadingScreen message="Loading leaderboard..." />;
+  }
 
   const tournament = slug ? getTournamentBySlug(slug) : undefined;
   if (!tournament) {

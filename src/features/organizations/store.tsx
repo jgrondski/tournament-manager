@@ -8,24 +8,34 @@ export const DEFAULT_ORGANIZATIONS: Organization[] = [];
 
 interface OrganizationContextType {
   organizations: Organization[];
+  isLoading: boolean;
+  isHydrated: boolean;
   getOrganizationById: (id: string) => Organization | undefined;
   getOrganizationBySlug: (slug: string) => Organization | undefined;
-  createOrganization: (input: CreateOrganizationInput) => Organization;
-  updateOrganization: (id: string, updates: Partial<Organization>) => void;
-  deleteOrganization: (id: string, hasAssociatedTournaments?: boolean) => { success: boolean; error?: string };
+  createOrganization: (input: CreateOrganizationInput) => Promise<Organization>;
+  updateOrganization: (id: string, updates: Partial<Organization>) => Promise<Organization | null>;
+  deleteOrganization: (id: string, hasAssociatedTournaments?: boolean) => Promise<{ success: boolean; error?: string }>;
   orgError: string | null;
   clearOrgError: () => void;
 }
 
-const OrganizationContext = createContext<OrganizationContextType | null>(null);
+export const OrganizationContext = createContext<OrganizationContextType | null>(null);
 
-export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [organizations, setOrganizations] = useState<Organization[]>(DEFAULT_ORGANIZATIONS);
+export const OrganizationProvider: React.FC<{
+  children: React.ReactNode;
+  initialOrganizations?: Organization[];
+  initialHydrated?: boolean;
+}> = ({ children, initialOrganizations, initialHydrated }) => {
+  const [organizations, setOrganizations] = useState<Organization[]>(initialOrganizations || DEFAULT_ORGANIZATIONS);
+  const [isLoading, setIsLoading] = useState<boolean>(!initialHydrated);
+  const [isHydrated, setIsHydrated] = useState<boolean>(initialHydrated ?? false);
   const [orgError, setOrgError] = useState<string | null>(null);
   const clearOrgError = () => setOrgError(null);
 
   useEffect(() => {
+    if (initialHydrated) return;
     let isMounted = true;
+    setIsLoading(true);
     if (typeof window !== 'undefined' && typeof fetch === 'function') {
       fetch('/api/organizations')
         .then(res => {
@@ -41,7 +51,16 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           if (isMounted) {
             setOrganizations([]);
           }
+        })
+        .finally(() => {
+          if (isMounted) {
+            setIsLoading(false);
+            setIsHydrated(true);
+          }
         });
+    } else {
+      setIsLoading(false);
+      setIsHydrated(true);
     }
     return () => {
       isMounted = false;
@@ -56,7 +75,7 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return organizations.find(o => o.slug === slug || o.id === slug);
   };
 
-  const createOrganization = (input: CreateOrganizationInput): Organization => {
+  const createOrganization = async (input: CreateOrganizationInput): Promise<Organization> => {
     const slug = input.slug.trim().toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-');
     const theme = input.themeColors || input.branding?.themeColors || {
       primaryColor: input.brandColor || '#ffc905',
@@ -91,54 +110,55 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
 
     if (typeof window !== 'undefined' && typeof fetch === 'function') {
-      fetch('/api/organizations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newOrg),
-      })
-        .then(res => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return res.json();
-        })
-        .then(saved => {
-          if (saved && saved.id) {
-            setOrganizations(prev => [saved, ...prev.filter(o => o.id !== saved.id)]);
-          }
-        })
-        .catch(err => {
-          setOrgError(`Failed to create organization: ${err.message}`);
+      try {
+        const res = await fetch('/api/organizations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newOrg),
         });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const saved = await res.json();
+        if (saved && saved.id) {
+          setOrganizations(prev => [saved, ...prev.filter(o => o.id !== saved.id)]);
+          return saved;
+        }
+      } catch (err: any) {
+        setOrgError(`Failed to create organization: ${err.message}`);
+        throw err;
+      }
     }
 
+    setOrganizations(prev => [newOrg, ...prev]);
     return newOrg;
   };
 
-  const updateOrganization = (id: string, updates: Partial<Organization>) => {
+  const updateOrganization = async (id: string, updates: Partial<Organization>): Promise<Organization | null> => {
     if (typeof window !== 'undefined' && typeof fetch === 'function') {
-      fetch(`/api/organizations/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates),
-      })
-        .then(res => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return res.json();
-        })
-        .then(saved => {
-          if (saved && saved.id) {
-            setOrganizations(prev => prev.map(o => (o.id === id ? saved : o)));
-          }
-        })
-        .catch(err => {
-          setOrgError(`Failed to update organization: ${err.message}`);
+      try {
+        const res = await fetch(`/api/organizations/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updates),
         });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const saved = await res.json();
+        if (saved && saved.id) {
+          setOrganizations(prev => prev.map(o => (o.id === id ? saved : o)));
+          return saved;
+        }
+      } catch (err: any) {
+        setOrgError(`Failed to update organization: ${err.message}`);
+        throw err;
+      }
     }
+    setOrganizations(prev => prev.map(o => (o.id === id ? { ...o, ...updates } : o)));
+    return organizations.find(o => o.id === id) || null;
   };
 
-  const deleteOrganization = (
+  const deleteOrganization = async (
     id: string,
     hasAssociatedTournaments?: boolean
-  ): { success: boolean; error?: string } => {
+  ): Promise<{ success: boolean; error?: string }> => {
     if (hasAssociatedTournaments) {
       return {
         success: false,
@@ -147,18 +167,20 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
 
     if (typeof window !== 'undefined' && typeof fetch === 'function') {
-      fetch(`/api/organizations/${id}`, {
-        method: 'DELETE',
-      })
-        .then(res => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          setOrganizations(prev => prev.filter(o => o.id !== id));
-        })
-        .catch(err => {
-          setOrgError(`Failed to delete organization: ${err.message}`);
+      try {
+        const res = await fetch(`/api/organizations/${id}`, {
+          method: 'DELETE',
         });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        setOrganizations(prev => prev.filter(o => o.id !== id));
+        return { success: true };
+      } catch (err: any) {
+        setOrgError(`Failed to delete organization: ${err.message}`);
+        return { success: false, error: err.message };
+      }
     }
 
+    setOrganizations(prev => prev.filter(o => o.id !== id));
     return { success: true };
   };
 
@@ -166,6 +188,8 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     <OrganizationContext.Provider
       value={{
         organizations,
+        isLoading,
+        isHydrated,
         getOrganizationById,
         getOrganizationBySlug,
         createOrganization,

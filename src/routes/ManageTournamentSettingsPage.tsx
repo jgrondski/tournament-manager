@@ -4,13 +4,18 @@ import { useTournament } from '../features/tournament/store';
 import { TournamentLayout } from '../components/TournamentLayout';
 import { TournamentAdminForm } from '../features/tournament/components/TournamentAdminForm';
 import { AlertTriangle, X, Settings } from 'lucide-react';
+import { LoadingScreen } from '../components/LoadingScreen';
 
 export const ManageTournamentSettingsPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const { getTournamentBySlug } = useTournament();
+  const { getTournamentBySlug, isLoading, isHydrated } = useTournament();
   const [isDirty, setIsDirty] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
+
+  if (isLoading || !isHydrated) {
+    return <LoadingScreen message="Loading tournament settings..." />;
+  }
 
   const tournament = slug ? getTournamentBySlug(slug) : undefined;
   if (!tournament) {

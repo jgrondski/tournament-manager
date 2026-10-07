@@ -17,13 +17,20 @@ export const VerifyBracketModal: React.FC<VerifyBracketModalProps> = ({
   const { lockTournament } = useTournament();
   const [step, setStep] = useState<1 | 2>(1);
 
+  const [isLocking, setIsLocking] = useState(false);
+
   if (!isOpen) return null;
 
   const totalPlayers = tournament.tiers.reduce((acc, t) => acc + t.playerCount, 0);
 
-  const handleConfirm = () => {
-    lockTournament(tournament.id);
-    onClose();
+  const handleConfirm = async () => {
+    setIsLocking(true);
+    try {
+      await lockTournament(tournament.id);
+      onClose();
+    } finally {
+      setIsLocking(false);
+    }
   };
 
   return (
@@ -221,11 +228,25 @@ export const VerifyBracketModal: React.FC<VerifyBracketModalProps> = ({
           ) : (
             <button
               onClick={handleConfirm}
+              disabled={isLocking}
               className="btn btn-primary"
-              style={{ padding: '0.5rem 1.25rem' }}
+              style={{ padding: '0.5rem 1.25rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
             >
-              <CheckCircle2 size={16} />
-              Yes, Lock Seeds &amp; Begin Matches
+              {isLocking ? (
+                <div
+                  style={{
+                    width: '14px',
+                    height: '14px',
+                    borderRadius: '50%',
+                    border: '2px solid rgba(255,255,255,0.3)',
+                    borderTopColor: '#ffffff',
+                    animation: 'spin 0.8s linear infinite',
+                  }}
+                />
+              ) : (
+                <CheckCircle2 size={16} />
+              )}
+              <span>{isLocking ? 'Locking Seeds...' : 'Yes, Lock Seeds & Begin Matches'}</span>
             </button>
           )}
         </div>

@@ -6,6 +6,7 @@ export interface TournamentSettingsHook {
   activeTournamentId: string | null;
   activeTournament?: Tournament;
   isLoading: boolean;
+  isHydrated: boolean;
   isDbConnected: boolean;
   dbError: string | null;
   apiError?: string | null;
@@ -24,15 +25,15 @@ export interface TournamentSettingsHook {
       Tournament,
       'id' | 'matchScores' | 'playersPool' | 'qualifierSubmissions' | 'tournamentPlayers'
     >
-  ) => Tournament;
+  ) => Promise<Tournament>;
   updateTournament: (tournamentId: string, updates: Partial<Tournament>) => Promise<Tournament | null>;
-  deleteTournament: (tournamentId: string) => void;
+  deleteTournament: (tournamentId: string) => Promise<boolean>;
   saveTiers: (tournamentId: string, tiers: TournamentTier[]) => Promise<Tournament | null>;
-  lockTournament: (tournamentId: string) => void;
-  unlockBrackets: (tournamentId: string) => { success: boolean; error?: string };
-  clearAllTournamentData: (tournamentId: string) => void;
-  seedQualifiers: (tournamentId: string) => void;
-  simulateFullTournament: (tournamentId: string) => void;
+  lockTournament: (tournamentId: string) => Promise<Tournament | null>;
+  unlockBrackets: (tournamentId: string) => Promise<{ success: boolean; error?: string }>;
+  clearAllTournamentData: (tournamentId: string) => Promise<Tournament | null>;
+  seedQualifiers: (tournamentId: string) => Promise<Tournament | null>;
+  simulateFullTournament: (tournamentId: string) => Promise<Tournament | null>;
   setSeedingMethod: (tournamentId: string, method: SeedingMethod) => void;
   setManualSeeds: (tournamentId: string, playerIds: string[]) => void;
   reorderManualSeed: (tournamentId: string, fromIndex: number, toIndex: number) => void;
@@ -52,6 +53,7 @@ export function useTournamentSettings(): TournamentSettingsHook {
     activeTournamentId: store.activeTournamentId,
     activeTournament: store.activeTournament,
     isLoading: store.isLoading,
+    isHydrated: store.isHydrated,
     isDbConnected: store.isDbConnected,
     dbError: store.dbError,
     apiError: store.apiError,

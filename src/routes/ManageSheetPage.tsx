@@ -6,12 +6,17 @@ import { TournamentLayout } from '../components/TournamentLayout';
 import { OrganizerSheetMatrix } from '../features/bracket/components/OrganizerSheetMatrix';
 import { getContrastingTextColor } from '../features/bracket/colorUtils';
 import { GitBranch } from 'lucide-react';
+import { LoadingScreen } from '../components/LoadingScreen';
 
 export const ManageSheetPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { getTournamentBySlug } = useTournament();
+  const { getTournamentBySlug, isLoading, isHydrated } = useTournament();
+
+  if (isLoading || !isHydrated) {
+    return <LoadingScreen message="Loading master sheet..." />;
+  }
 
   const tournament = slug ? getTournamentBySlug(slug) : undefined;
   if (!tournament) {
@@ -143,7 +148,7 @@ export const ManageSheetPage: React.FC = () => {
         </div>
 
         <Link
-          to={`/${tournament.slug}/${tier.slug}`}
+          to={`/${tournament.slug}/manage/bracket/${tier.slug}`}
           className="btn btn-secondary"
           style={{
             padding: '0.35rem 0.75rem',

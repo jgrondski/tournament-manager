@@ -33,7 +33,7 @@ export const ManualSlotOverrideSection: React.FC<ManualSlotOverrideSectionProps>
   const [overrideError, setOverrideError] = useState<string | null>(null);
   const [overrideSuccess, setOverrideSuccess] = useState<string | null>(null);
 
-  const handleApplyOverride = () => {
+  const handleApplyOverride = async () => {
     setOverrideError(null);
     setOverrideSuccess(null);
     const chosenTargetId = targetMatchId || roundMatches[0]?.id;
@@ -41,7 +41,7 @@ export const ManualSlotOverrideSection: React.FC<ManualSlotOverrideSectionProps>
       setOverrideError('Please select a target match in this round.');
       return;
     }
-    const res = swapMatchSlots(tournamentId, tierId, {
+    const res = await swapMatchSlots(tournamentId, tierId, {
       sourceMatchId: match.id,
       sourceSlot,
       targetMatchId: chosenTargetId,

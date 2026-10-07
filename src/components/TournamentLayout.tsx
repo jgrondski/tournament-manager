@@ -1,6 +1,7 @@
 import React from 'react';
 import { Tournament, TournamentTier } from '../features/tournament/types';
 import { TournamentSidebar, SidebarNavView } from './TournamentSidebar';
+import { ErrorBoundary } from './ErrorBoundary';
 
 interface TournamentLayoutProps {
   tournament?: Tournament;
@@ -46,7 +47,9 @@ export const TournamentLayout: React.FC<TournamentLayoutProps> = ({
           ...contentStyle,
         }}
       >
-        {children}
+        <ErrorBoundary fallbackTitle="View Failed to Render">
+          {children}
+        </ErrorBoundary>
       </div>
     </div>
   );

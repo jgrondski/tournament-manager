@@ -14,14 +14,16 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { QualFormat } from '../../tournament/types';
+import { LoadingScreen } from '../../../components/LoadingScreen';
 
 export const OrganizationDirectory: React.FC = () => {
-  const { organizations, createOrganization } = useOrganization();
+  const { organizations, createOrganization, isLoading, isHydrated } = useOrganization();
   const { tournaments } = useTournament();
   const navigate = useNavigate();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form state for new Organization
   const [orgName, setOrgName] = useState('');
@@ -60,40 +62,45 @@ export const OrganizationDirectory: React.FC = () => {
     setOrgSlug(slug);
   };
 
-  const handleCreateOrg = (e: React.FormEvent) => {
+  const handleCreateOrg = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!orgName.trim() || !orgSlug.trim()) return;
+    setIsSubmitting(true);
 
-    const themeColors: TierThemeColors = {
-      primaryColor,
-      secondaryColor,
-      cardColor,
-      textColor,
-      backgroundColor,
-    };
-
-    const created = createOrganization({
-      name: orgName.trim(),
-      slug: orgSlug.trim(),
-      description: orgDescription.trim() || undefined,
-      website: orgWebsite.trim() || undefined,
-      logoUrl: orgLogoUrl.trim() || undefined,
-      bannerUrl: orgBannerUrl.trim() || undefined,
-      brandColor,
-      themeColors,
-      discordWebhookUrl: discordWebhookUrl.trim() || undefined,
-      defaultRules: {
-        qualFormat: defaultQualFormat,
-        qualAverageCount: defaultAvgCount,
-        qualWindowMinutes: 120,
-        bestOf: defaultBestOf,
+    try {
+      const themeColors: TierThemeColors = {
         primaryColor,
         secondaryColor,
-      },
-    });
+        cardColor,
+        textColor,
+        backgroundColor,
+      };
 
-    setIsCreateModalOpen(false);
-    navigate(`/org/${created.slug}`);
+      const created = await createOrganization({
+        name: orgName.trim(),
+        slug: orgSlug.trim(),
+        description: orgDescription.trim() || undefined,
+        website: orgWebsite.trim() || undefined,
+        logoUrl: orgLogoUrl.trim() || undefined,
+        bannerUrl: orgBannerUrl.trim() || undefined,
+        brandColor,
+        themeColors,
+        discordWebhookUrl: discordWebhookUrl.trim() || undefined,
+        defaultRules: {
+          qualFormat: defaultQualFormat,
+          qualAverageCount: defaultAvgCount,
+          qualWindowMinutes: 120,
+          bestOf: defaultBestOf,
+          primaryColor,
+          secondaryColor,
+        },
+      });
+
+      setIsCreateModalOpen(false);
+      navigate(`/org/${created.slug}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const filteredOrgs = organizations.filter(org => {
@@ -104,6 +111,10 @@ export const OrganizationDirectory: React.FC = () => {
       (org.description || '').toLowerCase().includes(q)
     );
   });
+
+  if (isLoading || !isHydrated) {
+    return <LoadingScreen message="Loading organizations..." />;
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg-base)', padding: '0 0 4rem' }}>
@@ -642,11 +653,23 @@ export const OrganizationDirectory: React.FC = () => {
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
-                  <button type="button" onClick={() => setIsCreateModalOpen(false)} className="btn btn-secondary">
+                  <button type="button" onClick={() => setIsCreateModalOpen(false)} disabled={isSubmitting} className="btn btn-secondary">
                     Cancel
                   </button>
-                  <button type="submit" className="btn btn-primary">
-                    Save Organization
+                  <button type="submit" disabled={isSubmitting} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                    {isSubmitting && (
+                      <div
+                        style={{
+                          width: '14px',
+                          height: '14px',
+                          borderRadius: '50%',
+                          border: '2px solid rgba(255,255,255,0.3)',
+                          borderTopColor: '#ffffff',
+                          animation: 'spin 0.8s linear infinite',
+                        }}
+                      />
+                    )}
+                    <span>{isSubmitting ? 'Saving...' : 'Save Organization'}</span>
                   </button>
                 </div>
               </form>

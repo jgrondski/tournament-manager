@@ -124,7 +124,10 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
 
   // Internal collapse state with localStorage persistence if not controlled externally
   const [internalCollapsed, setInternalCollapsed] = useState<boolean>(() => {
-    return localStorage.getItem('tm_sidebar_collapsed') === 'true';
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem('tm_sidebar_collapsed') === 'true';
+    }
+    return false;
   });
 
   const isCollapsed = controlledIsCollapsed !== undefined ? controlledIsCollapsed : internalCollapsed;
@@ -135,7 +138,9 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
     } else {
       const nextState = !isCollapsed;
       setInternalCollapsed(nextState);
-      localStorage.setItem('tm_sidebar_collapsed', String(nextState));
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('tm_sidebar_collapsed', String(nextState));
+      }
     }
   };
 
@@ -182,14 +187,21 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
     navigate(url);
   };
 
-  const handleUnlockClick = (e: React.MouseEvent) => {
+  const [isUnlocking, setIsUnlocking] = useState(false);
+
+  const handleUnlockClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!activeTourney) return;
-    const res = unlockBrackets(activeTourney.id);
-    if (!res.success && res.error) {
-      setUnlockError(res.error);
-    } else {
-      setUnlockError(null);
+    if (!activeTourney || isUnlocking) return;
+    setIsUnlocking(true);
+    try {
+      const res = await unlockBrackets(activeTourney.id);
+      if (!res.success && res.error) {
+        setUnlockError(res.error);
+      } else {
+        setUnlockError(null);
+      }
+    } finally {
+      setIsUnlocking(false);
     }
   };
 
@@ -780,6 +792,7 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
                 <button
                   type="button"
                   onClick={handleUnlockClick}
+                  disabled={isUnlocking}
                   style={{
                     width: '100%',
                     display: 'flex',
@@ -793,15 +806,30 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
                     color: '#38bdf8',
                     fontSize: '0.68rem',
                     fontWeight: 700,
-                    cursor: 'pointer',
+                    cursor: isUnlocking ? 'not-allowed' : 'pointer',
+                    opacity: isUnlocking ? 0.7 : 1,
                     transition: 'all 0.15s ease',
                   }}
                   title="Match play in progress (Locked). Click to unlock back to Qualifiers."
                 >
-                  <ShieldCheck size={11} color="#38bdf8" style={{ flexShrink: 0 }} />
+                  {isUnlocking ? (
+                    <div
+                      style={{
+                        width: '10px',
+                        height: '10px',
+                        borderRadius: '50%',
+                        border: '1.5px solid rgba(56, 189, 248, 0.3)',
+                        borderTopColor: '#38bdf8',
+                        animation: 'spin 0.8s linear infinite',
+                        flexShrink: 0,
+                      }}
+                    />
+                  ) : (
+                    <ShieldCheck size={11} color="#38bdf8" style={{ flexShrink: 0 }} />
+                  )}
                   {!isCollapsed && (
                     <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      Match Play (Unlock)
+                      {isUnlocking ? 'Unlocking...' : 'Match Play (Unlock)'}
                     </span>
                   )}
                 </button>

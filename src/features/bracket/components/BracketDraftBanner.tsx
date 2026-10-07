@@ -19,8 +19,8 @@ export const BracketDraftBanner: React.FC<BracketDraftBannerProps> = ({
 
   const isDraft = !tournament.isLocked;
 
-  const handleUnlockClick = () => {
-    const res = unlockBrackets(tournament.id);
+  const handleUnlockClick = async () => {
+    const res = await unlockBrackets(tournament.id);
     if (!res.success && res.error) {
       setUnlockError(res.error);
     } else {

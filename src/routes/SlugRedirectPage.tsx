@@ -1,13 +1,16 @@
 import React, { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTournament } from '../features/tournament/store';
+import { LoadingScreen } from '../components/LoadingScreen';
 
 export const SlugRedirectPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const { getTournamentBySlug } = useTournament();
+  const { getTournamentBySlug, isLoading, isHydrated } = useTournament();
 
   useEffect(() => {
+    if (isLoading || !isHydrated) return;
+
     if (!slug) {
       navigate('/', { replace: true });
       return;
@@ -24,11 +27,7 @@ export const SlugRedirectPage: React.FC = () => {
     const highestPriorityTier = [...tournament.tiers].sort((a, b) => a.priority - b.priority)[0];
     const defaultTierSlug = highestPriorityTier.slug;
     navigate(`/${slug}/${defaultTierSlug}`, { replace: true });
-  }, [slug, navigate, getTournamentBySlug]);
+  }, [slug, navigate, getTournamentBySlug, isLoading, isHydrated]);
 
-  return (
-    <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-      Loading tournament...
-    </div>
-  );
+  return <LoadingScreen message="Loading tournament..." />;
 };

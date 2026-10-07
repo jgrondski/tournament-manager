@@ -1,5 +1,5 @@
 import { useTournament } from '../store';
-import type { MatchScoreRecord } from '../types';
+import type { MatchScoreRecord, Tournament } from '../types';
 
 export interface MatchesHook {
   activeMatchScores: Record<string, MatchScoreRecord>;
@@ -11,7 +11,7 @@ export interface MatchesHook {
     p1Points: number | null,
     p2Points: number | null,
     declaredWinnerId?: string | null
-  ) => void;
+  ) => Promise<Tournament | null>;
   saveMatchScores: (
     tournamentId: string,
     tierId: string,
@@ -23,10 +23,10 @@ export interface MatchesHook {
       winnerPlayerId: string | null;
     }>,
     hasTiebreaker?: boolean
-  ) => void;
-  updateMatchBestOf: (tournamentId: string, tierId: string, matchId: string, bestOf: number) => void;
-  forfeitMatch: (tournamentId: string, tierId: string, matchId: string, winnerPlayerId: string) => void;
-  clearMatchScores: (tournamentId: string) => void;
+  ) => Promise<Tournament | null>;
+  updateMatchBestOf: (tournamentId: string, tierId: string, matchId: string, bestOf: number) => Promise<Tournament | null>;
+  forfeitMatch: (tournamentId: string, tierId: string, matchId: string, winnerPlayerId: string) => Promise<Tournament | null>;
+  clearMatchScores: (tournamentId: string) => Promise<Tournament | null>;
   swapMatchSlots: (
     tournamentId: string,
     tierId: string,
@@ -36,7 +36,7 @@ export interface MatchesHook {
       targetMatchId: string;
       targetSlot: 1 | 2;
     }
-  ) => { success: boolean; error?: string };
+  ) => Promise<{ success: boolean; error?: string }>;
 }
 
 export function useMatches(): MatchesHook {

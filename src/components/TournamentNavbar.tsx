@@ -66,8 +66,8 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
     });
   };
 
-  const handleUnlockClick = () => {
-    const res = unlockBrackets(tournament.id);
+  const handleUnlockClick = async () => {
+    const res = await unlockBrackets(tournament.id);
     if (!res.success && res.error) {
       setUnlockError(res.error);
     } else {

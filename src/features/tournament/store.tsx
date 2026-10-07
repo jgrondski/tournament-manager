@@ -19,6 +19,7 @@ interface TournamentContextType {
   activeTournamentId: string | null;
   activeTournament?: Tournament;
   isLoading: boolean;
+  isHydrated: boolean;
   isDbConnected: boolean;
   dbError: string | null;
   checkDbHealth: () => Promise<boolean>;
@@ -37,13 +38,13 @@ interface TournamentContextType {
       Tournament,
       'id' | 'matchScores' | 'playersPool' | 'qualifierSubmissions' | 'tournamentPlayers'
     >
-  ) => Tournament;
+  ) => Promise<Tournament>;
   updateTournament: (tournamentId: string, updates: Partial<Tournament>) => Promise<Tournament | null>;
   saveTiers: (tournamentId: string, tiers: TournamentTier[]) => Promise<Tournament | null>;
   addPlayerToPool: (tournamentId: string, player: Omit<PlayerProfile, 'id'>) => PlayerProfile;
   updatePlayerInPool: (tournamentId: string, playerId: string, updates: Partial<PlayerProfile>) => void;
-  submitQualifierScore: (tournamentId: string, playerId: string, score: number) => void;
-  deleteQualifierScore: (tournamentId: string, submissionId: string) => void;
+  submitQualifierScore: (tournamentId: string, playerId: string, score: number) => Promise<Tournament | null>;
+  deleteQualifierScore: (tournamentId: string, submissionId: string) => Promise<Tournament | null>;
   togglePlayerDisqualification: (
     tournamentId: string,
     playerId: string,
@@ -59,8 +60,8 @@ interface TournamentContextType {
     playerId: string,
     isVerified?: boolean
   ) => void;
-  lockTournament: (tournamentId: string) => void;
-  unlockBrackets: (tournamentId: string) => { success: boolean; error?: string };
+  lockTournament: (tournamentId: string) => Promise<Tournament | null>;
+  unlockBrackets: (tournamentId: string) => Promise<{ success: boolean; error?: string }>;
   recordGameScore: (
     tournamentId: string,
     tierId: string,
@@ -69,7 +70,7 @@ interface TournamentContextType {
     p1Points: number | null,
     p2Points: number | null,
     declaredWinnerId?: string | null
-  ) => void;
+  ) => Promise<Tournament | null>;
   saveMatchScores: (
     tournamentId: string,
     tierId: string,
@@ -81,17 +82,17 @@ interface TournamentContextType {
       winnerPlayerId: string | null;
     }>,
     hasTiebreaker?: boolean
-  ) => void;
-  updateMatchBestOf: (tournamentId: string, tierId: string, matchId: string, bestOf: number) => void;
-  forfeitMatch: (tournamentId: string, tierId: string, matchId: string, winnerPlayerId: string) => void;
+  ) => Promise<Tournament | null>;
+  updateMatchBestOf: (tournamentId: string, tierId: string, matchId: string, bestOf: number) => Promise<Tournament | null>;
+  forfeitMatch: (tournamentId: string, tierId: string, matchId: string, winnerPlayerId: string) => Promise<Tournament | null>;
   addQualifierScore: (tournamentId: string, entry: Omit<QualifierScore, 'id' | 'totalScore'>) => void;
   verifyQualifierScore: (tournamentId: string, qualifierId: string, verified: boolean) => void;
-  clearMatchScores: (tournamentId: string) => void;
-  clearQualifierScores: (tournamentId: string) => void;
-  clearAllTournamentData: (tournamentId: string) => void;
-  seedQualifiers: (tournamentId: string) => void;
-  simulateFullTournament: (tournamentId: string) => void;
-  deleteTournament: (tournamentId: string) => void;
+  clearMatchScores: (tournamentId: string) => Promise<Tournament | null>;
+  clearQualifierScores: (tournamentId: string) => Promise<Tournament | null>;
+  clearAllTournamentData: (tournamentId: string) => Promise<Tournament | null>;
+  seedQualifiers: (tournamentId: string) => Promise<Tournament | null>;
+  simulateFullTournament: (tournamentId: string) => Promise<Tournament | null>;
+  deleteTournament: (tournamentId: string) => Promise<boolean>;
   addGlobalPlayer: (player: Omit<PlayerProfile, 'id'>) => PlayerProfile;
   updateGlobalPlayer: (playerId: string, updates: Partial<PlayerProfile>) => void;
   deleteGlobalPlayer: (playerId: string) => void;
@@ -111,7 +112,7 @@ interface TournamentContextType {
       targetMatchId: string;
       targetSlot: 1 | 2;
     }
-  ) => { success: boolean; error?: string };
+  ) => Promise<{ success: boolean; error?: string }>;
   setSeedingMethod: (tournamentId: string, method: SeedingMethod) => void;
   setManualSeeds: (tournamentId: string, playerIds: string[]) => void;
   reorderManualSeed: (tournamentId: string, fromIndex: number, toIndex: number) => void;
@@ -234,7 +235,7 @@ export function jumpSeedsBunched(
   ];
 }
 
-const TournamentContext = createContext<TournamentContextType | null>(null);
+export const TournamentContext = createContext<TournamentContextType | null>(null);
 
 async function apiCall(endpoint: string, options: RequestInit = {}) {
   if (typeof fetch === 'undefined') return null;
@@ -248,12 +249,17 @@ async function apiCall(endpoint: string, options: RequestInit = {}) {
   return await res.json();
 }
 
-export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const TournamentProvider: React.FC<{
+  children: React.ReactNode;
+  initialTournaments?: Tournament[];
+  initialHydrated?: boolean;
+}> = ({ children, initialTournaments, initialHydrated }) => {
   assertDatabaseConfig();
-  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [tournaments, setTournaments] = useState<Tournament[]>(initialTournaments || []);
   const [globalPlayers, setGlobalPlayers] = useState<PlayerProfile[]>([]);
   const [activeTournamentId, setActiveTournamentId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState<boolean>(!initialHydrated);
+  const [isHydrated, setIsHydrated] = useState<boolean>(initialHydrated ?? false);
   const [isDbConnected, setIsDbConnected] = useState<boolean>(true);
   const [dbError, setDbError] = useState<string | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -292,6 +298,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (Array.isArray(players)) setGlobalPlayers(players);
       } finally {
         setIsLoading(false);
+        setIsHydrated(true);
       }
     }
   };
@@ -336,6 +343,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   // Hydrate initial state from PostgreSQL via API
   useEffect(() => {
+    if (initialHydrated) return;
     let isMounted = true;
     async function hydrate() {
       setIsLoading(true);
@@ -368,6 +376,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       } finally {
         if (isMounted) {
           setIsLoading(false);
+          setIsHydrated(true);
         }
       }
     }
@@ -426,12 +435,12 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return { tournament, tier };
   };
 
-  const createTournament = (
+  const createTournament = async (
     data: Omit<
       Tournament,
       'id' | 'matchScores' | 'playersPool' | 'qualifierSubmissions' | 'tournamentPlayers'
     >
-  ): Tournament => {
+  ): Promise<Tournament> => {
     const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : generateUUID();
     const newTourney: Tournament = {
       ...data,
@@ -454,33 +463,32 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       newTourney.tiers = generateDraftBracketsForTournament(newTourney);
     }
 
-    setTournaments(prev => [newTourney, ...prev.filter(t => t.id !== newTourney.id && t.slug !== newTourney.slug)]);
-    setActiveTournamentId(newTourney.id);
-
-    apiCall('/api/tournaments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newTourney),
-    })
-      .then(saved => {
-        if (saved && saved.id) {
-          setIsDbConnected(true);
-          setDbError(null);
-          setTournaments(prev => [
-            saved,
-            ...prev.filter(t => t.id !== saved.id && t.id !== newTourney.id && t.slug !== saved.slug)
-          ]);
-          setActiveTournamentId(saved.id);
-          console.log(`[Store] Tournament "${saved.name}" created and saved to database.`);
-        }
-      })
-      .catch(err => {
-        console.error(`[Store] Failed to save tournament "${newTourney.name}" to database:`, err);
-        setApiError(`Failed to save tournament "${newTourney.name}" to database: ${err.message}`);
-        setIsDbConnected(false);
-        setDbError(err.message);
+    try {
+      const saved = await apiCall('/api/tournaments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newTourney),
       });
-    return newTourney;
+
+      const canonical = saved && saved.id ? saved : newTourney;
+      setIsDbConnected(true);
+      setDbError(null);
+      setTournaments(prev => [
+        canonical,
+        ...prev.filter(t => t.id !== canonical.id && t.id !== newTourney.id && t.slug !== canonical.slug),
+      ]);
+      setActiveTournamentId(canonical.id);
+      console.log(`[Store] Tournament "${canonical.name}" created and saved to database.`);
+      return canonical;
+    } catch (err: any) {
+      console.error(`[Store] Failed to save tournament "${newTourney.name}" to database:`, err);
+      setApiError(`Failed to save tournament "${newTourney.name}" to database: ${err.message}`);
+      setIsDbConnected(false);
+      setDbError(err.message);
+      setTournaments(prev => [newTourney, ...prev.filter(t => t.id !== newTourney.id && t.slug !== newTourney.slug)]);
+      setActiveTournamentId(newTourney.id);
+      return newTourney;
+    }
   };
 
   const updateTournament = async (
@@ -612,40 +620,44 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       });
   };
 
-  const submitQualifierScore = (tournamentId: string, playerId: string, score: number) => {
+  const submitQualifierScore = async (tournamentId: string, playerId: string, score: number): Promise<Tournament | null> => {
     const tournament = tournaments.find(t => t.id === tournamentId || t.slug === tournamentId);
-    if (!tournament) return;
+    if (!tournament) return null;
 
-    apiCall(`/api/tournaments/${tournament.id}/qualifiers`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId, score }),
-    })
-      .then(saved => {
-        if (saved && saved.id) {
-          setTournaments(prev => prev.map(t => (t.id === saved.id ? saved : t)));
-        }
-      })
-      .catch(err => {
-        setApiError(`Failed to submit qualifier score: ${err.message}`);
+    try {
+      const saved = await apiCall(`/api/tournaments/${tournament.id}/qualifiers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId, score }),
       });
+      if (saved && saved.id) {
+        setTournaments(prev => prev.map(t => (t.id === saved.id ? saved : t)));
+        return saved;
+      }
+      return null;
+    } catch (err: any) {
+      setApiError(`Failed to submit qualifier score: ${err.message}`);
+      return null;
+    }
   };
 
-  const deleteQualifierScore = (tournamentId: string, submissionId: string) => {
+  const deleteQualifierScore = async (tournamentId: string, submissionId: string): Promise<Tournament | null> => {
     const tournament = tournaments.find(t => t.id === tournamentId || t.slug === tournamentId);
-    if (!tournament) return;
+    if (!tournament) return null;
 
-    apiCall(`/api/tournaments/${tournament.id}/qualifiers/${submissionId}`, {
-      method: 'DELETE',
-    })
-      .then(saved => {
-        if (saved && saved.id) {
-          setTournaments(prev => prev.map(t => (t.id === saved.id ? saved : t)));
-        }
-      })
-      .catch(err => {
-        setApiError(`Failed to delete qualifier score: ${err.message}`);
+    try {
+      const saved = await apiCall(`/api/tournaments/${tournament.id}/qualifiers/${submissionId}`, {
+        method: 'DELETE',
       });
+      if (saved && saved.id) {
+        setTournaments(prev => prev.map(t => (t.id === saved.id ? saved : t)));
+        return saved;
+      }
+      return null;
+    } catch (err: any) {
+      setApiError(`Failed to delete qualifier score: ${err.message}`);
+      return null;
+    }
   };
 
   const togglePlayerDisqualification = (
@@ -716,22 +728,24 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     syncTournamentToApi({ ...tournament, tournamentPlayers: updatedPlayers });
   };
 
-  const lockTournament = (tournamentId: string) => {
+  const lockTournament = async (tournamentId: string): Promise<Tournament | null> => {
     const tournament = tournaments.find(t => t.id === tournamentId || t.slug === tournamentId);
-    if (!tournament) return;
+    if (!tournament) return null;
 
-    apiCall(`/api/tournaments/${tournament.id}/lock`, { method: 'POST' })
-      .then(saved => {
-        if (saved && saved.id) {
-          setTournaments(prev => prev.map(t => (t.id === saved.id ? saved : t)));
-        }
-      })
-      .catch(err => {
-        setApiError(`Failed to lock tournament: ${err.message}`);
-      });
+    try {
+      const saved = await apiCall(`/api/tournaments/${tournament.id}/lock`, { method: 'POST' });
+      if (saved && saved.id) {
+        setTournaments(prev => prev.map(t => (t.id === saved.id ? saved : t)));
+        return saved;
+      }
+      return null;
+    } catch (err: any) {
+      setApiError(`Failed to lock tournament: ${err.message}`);
+      return null;
+    }
   };
 
-  const unlockBrackets = (tournamentId: string): { success: boolean; error?: string } => {
+  const unlockBrackets = async (tournamentId: string): Promise<{ success: boolean; error?: string }> => {
     const tournament = tournaments.find(t => t.id === tournamentId || t.slug === tournamentId);
     if (!tournament) return { success: false, error: 'Tournament not found' };
 
@@ -753,20 +767,21 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       };
     }
 
-    apiCall(`/api/tournaments/${tournament.id}/unlock`, { method: 'POST' })
-      .then(saved => {
-        if (saved && saved.id) {
-          setTournaments(prev => prev.map(t => (t.id === saved.id ? saved : t)));
-        }
-      })
-      .catch(err => {
-        setApiError(`Failed to unlock brackets: ${err.message}`);
-      });
-
-    return { success: true };
+    try {
+      const saved = await apiCall(`/api/tournaments/${tournament.id}/unlock`, { method: 'POST' });
+      if (saved && saved.id) {
+        setTournaments(prev => prev.map(t => (t.id === saved.id ? saved : t)));
+        return { success: true };
+      }
+      return { success: false, error: 'Failed to unlock brackets' };
+    } catch (err: any) {
+      const msg = err.message || 'Failed to unlock brackets';
+      setApiError(`Failed to unlock brackets: ${msg}`);
+      return { success: false, error: msg };
+    }
   };
 
-  const recordGameScore = (
+  const recordGameScore = async (
     tournamentId: string,
     tierId: string,
     matchId: string,
@@ -774,12 +789,12 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     p1Points: number | null,
     p2Points: number | null,
     declaredWinnerId?: string | null
-  ) => {
+  ): Promise<Tournament | null> => {
     const tournament = tournaments.find(t => t.id === tournamentId || t.slug === tournamentId);
-    if (!tournament) return;
+    if (!tournament) return null;
     const tier = tournament.tiers.find(t => t.id === tierId);
     const targetMatch = tier?.bracket.matchesById[matchId];
-    if (!targetMatch) return;
+    if (!targetMatch) return null;
 
     const currentRecord = tournament.matchScores[matchId] || {
       matchId,
@@ -822,26 +837,28 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       });
     }
 
-    apiCall(`/api/tournaments/${tournament.id}/matches/${matchId}/score`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tierId,
-        scoredGames: existingGames,
-        bestOf: currentRecord.bestOf,
-      }),
-    })
-      .then(saved => {
-        if (saved && saved.id) {
-          setTournaments(prev => prev.map(t => (t.id === saved.id ? saved : t)));
-        }
-      })
-      .catch(err => {
-        setApiError(`Failed to save game score to database: ${err.message}`);
+    try {
+      const saved = await apiCall(`/api/tournaments/${tournament.id}/matches/${matchId}/score`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tierId,
+          scoredGames: existingGames,
+          bestOf: currentRecord.bestOf,
+        }),
       });
+      if (saved && saved.id) {
+        setTournaments(prev => prev.map(t => (t.id === saved.id ? saved : t)));
+        return saved;
+      }
+      return null;
+    } catch (err: any) {
+      setApiError(`Failed to save game score to database: ${err.message}`);
+      return null;
+    }
   };
 
-  const saveMatchScores = (
+  const saveMatchScores = async (
     tournamentId: string,
     tierId: string,
     matchId: string,
@@ -852,58 +869,62 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       winnerPlayerId: string | null;
     }>,
     hasTiebreaker?: boolean
-  ) => {
+  ): Promise<Tournament | null> => {
     const tournament = tournaments.find(t => t.id === tournamentId || t.slug === tournamentId);
-    if (!tournament) return;
+    if (!tournament) return null;
     const tier = tournament.tiers.find(t => t.id === tierId);
     const targetMatch = tier?.bracket.matchesById[matchId];
     const bestOf = targetMatch?.bestOf || tier?.bestOf || 5;
 
-    apiCall(`/api/tournaments/${tournament.id}/matches/${matchId}/score`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tierId,
-        scoredGames,
-        bestOf,
-        hasTiebreaker,
-      }),
-    })
-      .then(saved => {
-        if (saved && saved.id) {
-          setTournaments(prev => prev.map(t => (t.id === saved.id ? saved : t)));
-        }
-      })
-      .catch(err => {
-        setApiError(`Failed to save match scores to database: ${err.message}`);
+    try {
+      const saved = await apiCall(`/api/tournaments/${tournament.id}/matches/${matchId}/score`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tierId,
+          scoredGames,
+          bestOf,
+          hasTiebreaker,
+        }),
       });
+      if (saved && saved.id) {
+        setTournaments(prev => prev.map(t => (t.id === saved.id ? saved : t)));
+        return saved;
+      }
+      return null;
+    } catch (err: any) {
+      setApiError(`Failed to save match scores to database: ${err.message}`);
+      return null;
+    }
   };
 
-  const updateMatchBestOf = (
+  const updateMatchBestOf = async (
     tournamentId: string,
     tierId: string,
     matchId: string,
     bestOf: number
-  ) => {
+  ): Promise<Tournament | null> => {
     const tournament = tournaments.find(t => t.id === tournamentId || t.slug === tournamentId);
-    if (!tournament) return;
+    if (!tournament) return null;
 
-    apiCall(`/api/tournaments/${tournament.id}/matches/${matchId}/best-of`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tierId, bestOf }),
-    })
-      .then(saved => {
-        if (saved && saved.id) {
-          setTournaments(prev => prev.map(t => (t.id === saved.id ? saved : t)));
-        }
-      })
-      .catch(err => {
-        setApiError(`Failed to update match best-of: ${err.message}`);
+    try {
+      const saved = await apiCall(`/api/tournaments/${tournament.id}/matches/${matchId}/best-of`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tierId, bestOf }),
       });
+      if (saved && saved.id) {
+        setTournaments(prev => prev.map(t => (t.id === saved.id ? saved : t)));
+        return saved;
+      }
+      return null;
+    } catch (err: any) {
+      setApiError(`Failed to update match best-of: ${err.message}`);
+      return null;
+    }
   };
 
-  const swapMatchSlotsAction = (
+  const swapMatchSlotsAction = async (
     tournamentId: string,
     tierId: string,
     payload: {
@@ -912,49 +933,52 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       targetMatchId: string;
       targetSlot: 1 | 2;
     }
-  ): { success: boolean; error?: string } => {
+  ): Promise<{ success: boolean; error?: string }> => {
     const tournament = tournaments.find(t => t.id === tournamentId || t.slug === tournamentId);
     if (!tournament) return { success: false, error: 'Tournament not found' };
 
-    apiCall(`/api/tournaments/${tournament.id}/matches/swap-slots`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tierId, ...payload }),
-    })
-      .then(saved => {
-        if (saved && saved.id) {
-          setTournaments(prev => prev.map(t => (t.id === saved.id ? saved : t)));
-        }
-      })
-      .catch(err => {
-        setApiError(`Failed to swap match slots: ${err.message}`);
+    try {
+      const saved = await apiCall(`/api/tournaments/${tournament.id}/matches/swap-slots`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tierId, ...payload }),
       });
-
-    return { success: true };
+      if (saved && saved.id) {
+        setTournaments(prev => prev.map(t => (t.id === saved.id ? saved : t)));
+        return { success: true };
+      }
+      return { success: false, error: 'Failed to swap match slots' };
+    } catch (err: any) {
+      const msg = err.message || 'Failed to swap match slots';
+      setApiError(`Failed to swap match slots: ${msg}`);
+      return { success: false, error: msg };
+    }
   };
 
-  const forfeitMatch = (
+  const forfeitMatch = async (
     tournamentId: string,
     tierId: string,
     matchId: string,
     winnerPlayerId: string
-  ) => {
+  ): Promise<Tournament | null> => {
     const tournament = tournaments.find(t => t.id === tournamentId || t.slug === tournamentId);
-    if (!tournament) return;
+    if (!tournament) return null;
 
-    apiCall(`/api/tournaments/${tournament.id}/matches/${matchId}/forfeit`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tierId, winnerPlayerId }),
-    })
-      .then(saved => {
-        if (saved && saved.id) {
-          setTournaments(prev => prev.map(t => (t.id === saved.id ? saved : t)));
-        }
-      })
-      .catch(err => {
-        setApiError(`Failed to record forfeit: ${err.message}`);
+    try {
+      const saved = await apiCall(`/api/tournaments/${tournament.id}/matches/${matchId}/forfeit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tierId, winnerPlayerId }),
       });
+      if (saved && saved.id) {
+        setTournaments(prev => prev.map(t => (t.id === saved.id ? saved : t)));
+        return saved;
+      }
+      return null;
+    } catch (err: any) {
+      setApiError(`Failed to record forfeit: ${err.message}`);
+      return null;
+    }
   };
 
   const addQualifierScore = (
@@ -1045,89 +1069,100 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       });
   };
 
-  const clearMatchScores = (tournamentId: string) => {
+  const clearMatchScores = async (tournamentId: string): Promise<Tournament | null> => {
     const tournament = tournaments.find(t => t.id === tournamentId || t.slug === tournamentId);
-    if (!tournament) return;
-    apiCall(`/api/tournaments/${tournament.id}/matches`, { method: 'DELETE' })
-      .then(saved => {
-        if (saved && saved.id) {
-          setTournaments(prev => prev.map(t => (t.id === saved.id ? saved : t)));
-        }
-      })
-      .catch(err => {
-        setApiError(`Failed to clear match scores: ${err.message}`);
-      });
+    if (!tournament) return null;
+    try {
+      const saved = await apiCall(`/api/tournaments/${tournament.id}/matches`, { method: 'DELETE' });
+      if (saved && saved.id) {
+        setTournaments(prev => prev.map(t => (t.id === saved.id ? saved : t)));
+        return saved;
+      }
+      return null;
+    } catch (err: any) {
+      setApiError(`Failed to clear match scores: ${err.message}`);
+      return null;
+    }
   };
 
-  const clearQualifierScores = (tournamentId: string) => {
+  const clearQualifierScores = async (tournamentId: string): Promise<Tournament | null> => {
     const tournament = tournaments.find(t => t.id === tournamentId || t.slug === tournamentId);
-    if (!tournament) return;
-    apiCall(`/api/tournaments/${tournament.id}/qualifiers`, { method: 'DELETE' })
-      .then(saved => {
-        if (saved && saved.id) {
-          setTournaments(prev => prev.map(t => (t.id === saved.id ? saved : t)));
-        }
-      })
-      .catch(err => {
-        setApiError(`Failed to clear qualifier scores: ${err.message}`);
-      });
+    if (!tournament) return null;
+    try {
+      const saved = await apiCall(`/api/tournaments/${tournament.id}/qualifiers`, { method: 'DELETE' });
+      if (saved && saved.id) {
+        setTournaments(prev => prev.map(t => (t.id === saved.id ? saved : t)));
+        return saved;
+      }
+      return null;
+    } catch (err: any) {
+      setApiError(`Failed to clear qualifier scores: ${err.message}`);
+      return null;
+    }
   };
 
-  const clearAllTournamentData = (tournamentId: string) => {
+  const clearAllTournamentData = async (tournamentId: string): Promise<Tournament | null> => {
     const tournament = tournaments.find(t => t.id === tournamentId || t.slug === tournamentId);
-    if (!tournament) return;
-    apiCall(`/api/tournaments/${tournament.id}/clear-all`, { method: 'POST' })
-      .then(saved => {
-        if (saved && saved.id) {
-          setTournaments(prev => prev.map(t => (t.id === saved.id ? saved : t)));
-        }
-      })
-      .catch(err => {
-        setApiError(`Failed to clear all tournament data: ${err.message}`);
-      });
+    if (!tournament) return null;
+    try {
+      const saved = await apiCall(`/api/tournaments/${tournament.id}/clear-all`, { method: 'POST' });
+      if (saved && saved.id) {
+        setTournaments(prev => prev.map(t => (t.id === saved.id ? saved : t)));
+        return saved;
+      }
+      return null;
+    } catch (err: any) {
+      setApiError(`Failed to clear all tournament data: ${err.message}`);
+      return null;
+    }
   };
 
-  const seedQualifiers = (tournamentId: string) => {
+  const seedQualifiers = async (tournamentId: string): Promise<Tournament | null> => {
     const tournament = tournaments.find(t => t.id === tournamentId || t.slug === tournamentId);
-    if (!tournament) return;
-    apiCall(`/api/tournaments/${tournament.id}/simulate/seed-quals`, { method: 'POST' })
-      .then(saved => {
-        if (saved && saved.id) {
-          setTournaments(prev => prev.map(t => (t.id === saved.id ? saved : t)));
-        }
-      })
-      .catch(err => {
-        setApiError(`Failed to seed qualifiers: ${err.message}`);
-      });
+    if (!tournament) return null;
+    try {
+      const saved = await apiCall(`/api/tournaments/${tournament.id}/simulate/seed-quals`, { method: 'POST' });
+      if (saved && saved.id) {
+        setTournaments(prev => prev.map(t => (t.id === saved.id ? saved : t)));
+        return saved;
+      }
+      return null;
+    } catch (err: any) {
+      setApiError(`Failed to seed qualifiers: ${err.message}`);
+      return null;
+    }
   };
 
-  const simulateFullTournament = (tournamentId: string) => {
+  const simulateFullTournament = async (tournamentId: string): Promise<Tournament | null> => {
     const tournament = tournaments.find(t => t.id === tournamentId || t.slug === tournamentId);
-    if (!tournament) return;
-    apiCall(`/api/tournaments/${tournament.id}/simulate/full`, { method: 'POST' })
-      .then(saved => {
-        if (saved && saved.id) {
-          setTournaments(prev => prev.map(t => (t.id === saved.id ? saved : t)));
-        }
-      })
-      .catch(err => {
-        setApiError(`Failed to simulate tournament: ${err.message}`);
-      });
+    if (!tournament) return null;
+    try {
+      const saved = await apiCall(`/api/tournaments/${tournament.id}/simulate/full`, { method: 'POST' });
+      if (saved && saved.id) {
+        setTournaments(prev => prev.map(t => (t.id === saved.id ? saved : t)));
+        return saved;
+      }
+      return null;
+    } catch (err: any) {
+      setApiError(`Failed to simulate tournament: ${err.message}`);
+      return null;
+    }
   };
 
-  const deleteTournament = (tournamentId: string) => {
+  const deleteTournament = async (tournamentId: string): Promise<boolean> => {
     const tournament = tournaments.find(t => t.id === tournamentId || t.slug === tournamentId);
     const targetId = tournament?.id || tournamentId;
-    apiCall(`/api/tournaments/${targetId}`, { method: 'DELETE' })
-      .then(() => {
-        setTournaments(prev => prev.filter(t => t.id !== targetId && t.slug !== targetId));
-        if (activeTournamentId === targetId || activeTournament?.slug === targetId) {
-          setActiveTournamentId(null);
-        }
-      })
-      .catch(err => {
-        setApiError(`Failed to delete tournament: ${err.message}`);
-      });
+    try {
+      await apiCall(`/api/tournaments/${targetId}`, { method: 'DELETE' });
+      setTournaments(prev => prev.filter(t => t.id !== targetId && t.slug !== targetId));
+      if (activeTournamentId === targetId || activeTournament?.slug === targetId) {
+        setActiveTournamentId(null);
+      }
+      return true;
+    } catch (err: any) {
+      setApiError(`Failed to delete tournament: ${err.message}`);
+      return false;
+    }
   };
 
   const addGlobalPlayer = (player: Omit<PlayerProfile, 'id'>): PlayerProfile => {
@@ -1670,6 +1705,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         activeTournamentId,
         activeTournament,
         isLoading,
+        isHydrated,
         simulateSampleTournament,
         setActiveTournamentId,
         getTournamentBySlug,

@@ -11,13 +11,14 @@ import { MatchCardFeed } from '../features/bracket/components/MatchCardFeed';
 import { ShareBracketModal } from '../features/bracket/components/ShareBracketModal';
 import { useBracketTier } from '../features/bracket/hooks/useBracketTier';
 import { ObsBracketView } from '../features/obs/components/ObsBracketView';
+import { LoadingScreen } from '../components/LoadingScreen';
 
 export const PublicTierBracketPage: React.FC = () => {
   const { slug, tierSlug } = useParams<{ slug: string; tierSlug: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { getTournamentBySlug } = useTournament();
+  const { getTournamentBySlug, isLoading: isStoreLoading, isHydrated } = useTournament();
 
   const isManageRoute = location.pathname.includes('/manage/');
   const canManage = isManageRoute;
@@ -45,7 +46,6 @@ export const PublicTierBracketPage: React.FC = () => {
     }
   }, [urlView]);
 
-  const { isLoading: isStoreLoading } = useTournament();
   const {
     tournament,
     tier,
@@ -75,34 +75,8 @@ export const PublicTierBracketPage: React.FC = () => {
   }, [tierData?.tier?.slug, slug]);
 
   // Loading state gate: prevent false "Bracket Not Found" flash while database initializes
-  if (isStoreLoading || isBracketLoading) {
-    return (
-      <div
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'var(--color-bg-base, #0b0e14)',
-          color: 'var(--color-text-secondary, #94a3b8)',
-          fontSize: '0.95rem',
-        }}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
-          <div
-            style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%',
-              border: '3px solid rgba(245, 158, 11, 0.2)',
-              borderTopColor: 'var(--color-gold-bright, #f59e0b)',
-              animation: 'spin 0.8s linear infinite',
-            }}
-          />
-          <span>Loading tournament bracket...</span>
-        </div>
-      </div>
-    );
+  if (isStoreLoading || isBracketLoading || !isHydrated) {
+    return <LoadingScreen message="Loading tournament bracket..." />;
   }
 
   // Handle missing tier / friendly aliases (e.g. /:slug/brackets, /:slug/view, /:slug/manage/bracket)
@@ -115,7 +89,10 @@ export const PublicTierBracketPage: React.FC = () => {
       const prefix = isManageRoute
         ? `/${tournamentFallback.slug}/manage/bracket`
         : `/${tournamentFallback.slug}`;
-      return <Navigate to={`${prefix}/${targetTier.slug}`} replace />;
+      const targetPath = `${prefix}/${targetTier.slug}`;
+      if (location.pathname !== targetPath) {
+        return <Navigate to={targetPath} replace />;
+      }
     }
 
     if (tournamentFallback && tournamentFallback.tiers.length === 0) {

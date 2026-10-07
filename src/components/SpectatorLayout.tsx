@@ -11,6 +11,7 @@ import {
   Share2,
   Building2,
 } from 'lucide-react';
+import { ErrorBoundary } from './ErrorBoundary';
 
 export type SpectatorNavView = 'leaderboard' | 'standings' | 'bracket';
 
@@ -247,7 +248,9 @@ export const SpectatorLayout: React.FC<SpectatorLayoutProps> = ({
           ...contentStyle,
         }}
       >
-        {children}
+        <ErrorBoundary fallbackTitle="Spectator View Failed to Render">
+          {children}
+        </ErrorBoundary>
       </div>
     </div>
   );

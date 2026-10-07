@@ -35,6 +35,7 @@ export const CreateTournamentModal: React.FC<CreateTournamentModalProps> = ({
   const [newTourneyFormat, setNewTourneyFormat] = useState<QualFormat>('AVERAGE_OF_X');
   const [newTourneyAvgCount, setNewTourneyAvgCount] = useState<number | undefined>(2);
   const [avgCountError, setAvgCountError] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
 
   // Sync with fixedOrgId or organizations loading
   useEffect(() => {
@@ -64,9 +65,9 @@ export const CreateTournamentModal: React.FC<CreateTournamentModalProps> = ({
     setNewTourneySlug(slug);
   };
 
-  const handleCreateSubmit = (e: React.FormEvent) => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTourneyName.trim() || !newTourneySlug.trim()) return;
+    if (!newTourneyName.trim() || !newTourneySlug.trim() || isCreating) return;
 
     let parsedAvgCount = 2;
     if (newTourneyFormat === 'AVERAGE_OF_X') {
@@ -79,26 +80,31 @@ export const CreateTournamentModal: React.FC<CreateTournamentModalProps> = ({
 
     const org = getOrganizationById(newTourneyOrgId);
 
-    const created = createTournament(
-      createEmptyTournament({
-        name: newTourneyName.trim(),
-        slug: newTourneySlug.trim(),
-        organizationId: newTourneyOrgId,
-        date: newTourneyDate.trim() || 'Upcoming',
-        location: newTourneyLocation.trim() || 'TBD',
-        qualFormat: newTourneyFormat,
-        qualAverageCount: parsedAvgCount,
-        pointsConfig: newTourneyFormat === 'POINTS'
-          ? (org?.defaultRules?.pointsConfig || DEFAULT_POINTS_THRESHOLDS)
-          : undefined,
-      })
-    );
+    setIsCreating(true);
+    try {
+      const created = await createTournament(
+        createEmptyTournament({
+          name: newTourneyName.trim(),
+          slug: newTourneySlug.trim(),
+          organizationId: newTourneyOrgId,
+          date: newTourneyDate.trim() || 'Upcoming',
+          location: newTourneyLocation.trim() || 'TBD',
+          qualFormat: newTourneyFormat,
+          qualAverageCount: parsedAvgCount,
+          pointsConfig: newTourneyFormat === 'POINTS'
+            ? (org?.defaultRules?.pointsConfig || DEFAULT_POINTS_THRESHOLDS)
+            : undefined,
+        })
+      );
 
-    onClose();
-    if (onCreated) {
-      onCreated(created);
-    } else {
-      navigate(`/${created.slug}/manage/settings`);
+      onClose();
+      if (onCreated) {
+        onCreated(created);
+      } else {
+        navigate(`/${created.slug}/manage/settings`);
+      }
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -268,12 +274,30 @@ export const CreateTournamentModal: React.FC<CreateTournamentModalProps> = ({
             <button
               type="button"
               onClick={onClose}
+              disabled={isCreating}
               className="btn btn-secondary"
             >
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary">
-              Create &amp; Configure
+            <button
+              type="submit"
+              disabled={isCreating}
+              className="btn btn-primary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}
+            >
+              {isCreating && (
+                <div
+                  style={{
+                    width: '14px',
+                    height: '14px',
+                    borderRadius: '50%',
+                    border: '2px solid rgba(255,255,255,0.3)',
+                    borderTopColor: '#ffffff',
+                    animation: 'spin 0.8s linear infinite',
+                  }}
+                />
+              )}
+              <span>{isCreating ? 'Creating...' : 'Create & Configure'}</span>
             </button>
           </div>
         </form>

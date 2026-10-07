@@ -5,13 +5,14 @@ import { TournamentLayout } from '../components/TournamentLayout';
 import { SpectatorLayout } from '../components/SpectatorLayout';
 import { FinalStandingsTable } from '../features/tournament/components/FinalStandingsTable';
 import { ShareBracketModal } from '../features/bracket/components/ShareBracketModal';
+import { LoadingScreen } from '../components/LoadingScreen';
 
 export const FinalStandingsPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { getTournamentBySlug } = useTournament();
+  const { getTournamentBySlug, isLoading, isHydrated } = useTournament();
 
   const isManageRoute = location.pathname.includes('/manage/');
   const isObsMode = searchParams.get('obs') === 'true';
@@ -28,6 +29,10 @@ export const FinalStandingsPage: React.FC = () => {
       document.body.classList.remove('obs-overlay-mode');
     };
   }, [isObsMode]);
+
+  if (isLoading || !isHydrated) {
+    return <LoadingScreen message="Loading final standings..." />;
+  }
 
   const tournament = slug ? getTournamentBySlug(slug) : undefined;
   if (!tournament) {

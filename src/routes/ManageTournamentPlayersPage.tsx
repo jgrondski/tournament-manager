@@ -19,6 +19,7 @@ import {
   X,
   Layers,
 } from 'lucide-react';
+import { LoadingScreen } from '../components/LoadingScreen';
 
 export const ManageTournamentPlayersPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -29,6 +30,8 @@ export const ManageTournamentPlayersPage: React.FC = () => {
     addPlayerToPool,
     importPlayersToTournament,
     globalPlayers,
+    isLoading,
+    isHydrated,
   } = useTournament();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -76,6 +79,10 @@ export const ManageTournamentPlayersPage: React.FC = () => {
     );
   }, [playerToRemove, matchScores]);
 
+  if (isLoading || !isHydrated) {
+    return <LoadingScreen message="Loading tournament players..." />;
+  }
+
   if (!tournament) {
     return (
       <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
@@ -90,23 +97,23 @@ export const ManageTournamentPlayersPage: React.FC = () => {
   const currentPlayers = tournament.playersPool || [];
   const totalCapacity = (tournament.tiers || []).reduce((sum, t) => sum + (t.playerCount || 0), 0);
 
-  const handleRegisterNewCompetitor = (playerData: Omit<PlayerProfile, 'id'>) => {
-    addPlayerToPool(tournament.id, playerData);
+  const handleRegisterNewCompetitor = async (playerData: Omit<PlayerProfile, 'id'>) => {
+    await addPlayerToPool(tournament.id, playerData);
   };
 
-  const handleImportGlobalPlayers = (playersToImport: PlayerProfile[]) => {
-    importPlayersToTournament(tournament.id, playersToImport);
+  const handleImportGlobalPlayers = async (playersToImport: PlayerProfile[]) => {
+    await importPlayersToTournament(tournament.id, playersToImport);
   };
 
-  const handleImportAllGlobal = () => {
+  const handleImportAllGlobal = async () => {
     if (availableGlobalPlayers.length > 0) {
-      importPlayersToTournament(tournament.id, availableGlobalPlayers);
+      await importPlayersToTournament(tournament.id, availableGlobalPlayers);
     }
   };
 
-  const handleConfirmRemove = () => {
+  const handleConfirmRemove = async () => {
     if (!playerToRemove || playerToRemoveHasMatches) return;
-    removePlayerFromTournament(tournament.id, playerToRemove.id);
+    await removePlayerFromTournament(tournament.id, playerToRemove.id);
     setPlayerToRemove(null);
   };
 

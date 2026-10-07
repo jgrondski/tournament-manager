@@ -117,6 +117,12 @@ export function createApiMiddleware() {
         }
       }
 
+      // POST /api/client-log
+      if (pathname === '/api/client-log' && method === 'POST') {
+        console.error('[CLIENT RUNTIME ERROR]:', JSON.stringify(body, null, 2));
+        return sendJson(res, 200, { ok: true });
+      }
+
       // --- PLAYERS ENDPOINTS ---
       // GET /api/players
       if (pathname === '/api/players' && method === 'GET') {
