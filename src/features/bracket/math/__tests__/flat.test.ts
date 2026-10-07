@@ -86,6 +86,38 @@ describe('generateFlatBracket', () => {
       // Verify R1 matches point to R2 matches
       expect(r1Matches[0].nextMatchId).toBeDefined();
       expect(r1Matches[1].nextMatchId).toBeDefined();
+
+      // Verify Round 2 (Championship QF) alternating bye pairing and seed separation:
+      // Match 0: Seed 1 vs Winner of R1 m0 (which has lowest seed 10)
+      // Match 1: Seed 4 vs Seed 5 (alternating bye match, sum=9)
+      // Match 2: Seed 2 vs Winner of R1 m1 (which has 2nd lowest seed 9)
+      // Match 3: Seed 3 vs Seed 6 (alternating bye match, sum=9)
+      const r2Matches = bracket.rounds[1].matches;
+      expect(r2Matches[0].player1.player?.seed).toBe(1);
+      expect(r2Matches[0].player2.sourceMatchId).toBe(r1Matches[0].id);
+
+      expect(r2Matches[1].player1.player?.seed).toBe(4);
+      expect(r2Matches[1].player2.player?.seed).toBe(5);
+
+      expect(r2Matches[2].player1.player?.seed).toBe(2);
+      expect(r2Matches[2].player2.sourceMatchId).toBe(r1Matches[1].id);
+
+      expect(r2Matches[3].player1.player?.seed).toBe(3);
+      expect(r2Matches[3].player2.player?.seed).toBe(6);
+
+      // Verify Semifinals routing separates seeds 1 and 2:
+      // Match 0 & 1 -> Semis Match 0 (Top half: 1 & 4)
+      // Match 2 & 3 -> Semis Match 1 (Bottom half: 2 & 3)
+      const sfMatches = bracket.rounds[2].matches;
+      expect(r2Matches[0].nextMatchId).toBe(sfMatches[0].id);
+      expect(r2Matches[1].nextMatchId).toBe(sfMatches[0].id);
+      expect(r2Matches[2].nextMatchId).toBe(sfMatches[1].id);
+      expect(r2Matches[3].nextMatchId).toBe(sfMatches[1].id);
+
+      // Finals: Semis 0 and Semis 1 feed the Championship Final
+      const finalMatch = bracket.rounds[3].matches[0];
+      expect(sfMatches[0].nextMatchId).toBe(finalMatch.id);
+      expect(sfMatches[1].nextMatchId).toBe(finalMatch.id);
     });
 
     it('correctly structures N=12 and flatWidth=4', () => {
@@ -122,6 +154,24 @@ describe('generateFlatBracket', () => {
 
       expect(r1[3].player1.player?.seed).toBe(8);
       expect(r1[3].player2.player?.seed).toBe(9);
+
+      // Verify R2 Championship QF routing:
+      // Seed 1 faces winner of R1 m0 (contains lowest seed 12)
+      // Seed 2 faces winner of R1 m1 (contains 2nd lowest seed 11)
+      // Seed 3 faces winner of R1 m2 (contains 3rd lowest seed 10)
+      // Seed 4 faces winner of R1 m3 (contains 4th lowest seed 9)
+      const r2 = bracket.rounds[1].matches;
+      expect(r2[0].player1.player?.seed).toBe(1);
+      expect(r2[0].player2.sourceMatchId).toBe(r1[0].id);
+
+      expect(r2[1].player1.player?.seed).toBe(4);
+      expect(r2[1].player2.sourceMatchId).toBe(r1[3].id);
+
+      expect(r2[2].player1.player?.seed).toBe(2);
+      expect(r2[2].player2.sourceMatchId).toBe(r1[1].id);
+
+      expect(r2[3].player1.player?.seed).toBe(3);
+      expect(r2[3].player2.sourceMatchId).toBe(r1[2].id);
     });
 
     it('correctly structures N=16 and flatWidth=4 across multiple preliminary tiers', () => {

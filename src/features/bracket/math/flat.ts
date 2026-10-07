@@ -5,7 +5,7 @@ import {
   GenerateBracketOptions,
   SeededPlayer,
 } from '../types';
-import { getRoundName } from './seed-utils';
+import { getRoundName, getStandardSeedingPairs } from './seed-utils';
 import { generateTraditionalBracket } from './traditional';
 
 /**
@@ -132,45 +132,57 @@ export function generateFlatBracket(
     }
   }
 
-  // Step 3: Route preliminary rounds forward into subsequent rounds
-  // Each match m in preliminary round r feeds into round r+1
-  for (let r = 1; r <= numPrelimRounds; r++) {
+  // Step 3: Route preliminary rounds forward and connect into Championship Round
+  // Preliminary rounds 1 through numPrelimRounds - 1 feed horizontally into the next preliminary round
+  for (let r = 1; r < numPrelimRounds; r++) {
     const currentRound = rounds[r - 1];
     const nextRound = rounds[r];
-    const offset = nextRound.matches.length - currentRound.matches.length;
-
     for (let m = 0; m < currentRound.matches.length; m++) {
       const match = currentRound.matches[m];
-      const targetMatch = nextRound.matches[m + offset];
-
+      const targetMatch = nextRound.matches[m];
       match.nextMatchId = targetMatch.id;
       match.nextMatchSlot = 2;
       targetMatch.player2.sourceMatchId = match.id;
     }
   }
 
+  // The last preliminary round (Round numPrelimRounds) feeds into the Championship Round (Round numPrelimRounds + 1)
+  // Championship round matches follow standard seeding pairs for sFinal (e.g. for 8: [1,8], [4,5], [2,7], [3,6])
+  const champPairs = getStandardSeedingPairs(sFinal);
+  const champRound = rounds[numPrelimRounds];
+  // Sort championship match indices by their opponent seed descending (lowest seed first)
+  // e.g. for sFinal=8: match 0 (opp 8), match 2 (opp 7), match 3 (opp 6), match 1 (opp 5)
+  const sortedChampMatchIndices = Array.from({ length: mChamp }, (_, i) => i)
+    .sort((a, b) => champPairs[b][1] - champPairs[a][1]);
+
+  const lastPrelimRound = rounds[numPrelimRounds - 1];
+  const numPrelimFeeds = lastPrelimRound.matches.length;
+
+  for (let i = 0; i < numPrelimFeeds; i++) {
+    const prelimMatch = lastPrelimRound.matches[i];
+    const targetMatchIndex = sortedChampMatchIndices[i];
+    const targetMatch = champRound.matches[targetMatchIndex];
+
+    prelimMatch.nextMatchId = targetMatch.id;
+    prelimMatch.nextMatchSlot = 2;
+    targetMatch.player2.sourceMatchId = prelimMatch.id;
+  }
+
   // Step 4: Seed entering players into match slots
   // Populate Round 1:
   const round1SeedsStart = totalPlayers - 2 * m1 + 1;
-  const round1Subset: number[] = [];
-  for (let s = round1SeedsStart; s <= totalPlayers; s++) {
-    round1Subset.push(s);
-  }
-
-  // Pair highest vs lowest in Round 1 subset
   for (let m = 0; m < m1; m++) {
     const match = rounds[0].matches[m];
-    const highSeed = round1Subset[m];
-    const lowSeed = round1Subset[round1Subset.length - 1 - m];
+    const highSeed = round1SeedsStart + m;
+    const lowSeed = totalPlayers - m;
 
     match.player1 = { player: playerBySeed.get(highSeed) ?? null };
     match.player2 = { player: playerBySeed.get(lowSeed) ?? null };
   }
 
-  // Populate entering seeds for subsequent rounds (Rounds 2 through numPrelimRounds + 1)
-  // Higher seeds enter in later rounds, filling slot 1 of active matches
+  // Populate intermediate preliminary rounds (Rounds 2 through numPrelimRounds)
   let currentSeed = round1SeedsStart - 1;
-  for (let r = 2; r <= numPrelimRounds + 1; r++) {
+  for (let r = 2; r <= numPrelimRounds; r++) {
     const round = rounds[r - 1];
     for (let m = 0; m < round.matches.length; m++) {
       const match = round.matches[m];
@@ -182,6 +194,21 @@ export function generateFlatBracket(
         match.player2 = { player: playerBySeed.get(currentSeed) ?? null };
         currentSeed--;
       }
+    }
+  }
+
+  // Populate Championship Round:
+  // Slot 1 is always the match leader (champPairs[m][0])
+  // Slot 2 is either fed by a preliminary match (already wired with sourceMatchId) OR directly filled by the opponent bye player (champPairs[m][1])
+  for (let m = 0; m < mChamp; m++) {
+    const champMatch = champRound.matches[m];
+    const leaderSeed = champPairs[m][0];
+    const opponentSeed = champPairs[m][1];
+
+    champMatch.player1 = { player: playerBySeed.get(leaderSeed) ?? null };
+
+    if (!champMatch.player2.sourceMatchId) {
+      champMatch.player2 = { player: playerBySeed.get(opponentSeed) ?? null };
     }
   }
 

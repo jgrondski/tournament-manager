@@ -231,15 +231,21 @@ export const DataSimulationSection: React.FC<DataSimulationSectionProps> = ({
             <button
               type="button"
               onClick={() => onRequestDataAction('QUALS')}
-              disabled={seedCount === 0}
+              disabled={seedCount === 0 || hasRecordedMatches}
               className="btn btn-secondary"
               style={{
                 padding: '0.38rem 0.75rem',
                 fontSize: '0.78rem',
-                opacity: seedCount === 0 ? 0.4 : 1,
-                cursor: seedCount === 0 ? 'not-allowed' : 'pointer',
+                opacity: (seedCount === 0 || hasRecordedMatches) ? 0.4 : 1,
+                cursor: (seedCount === 0 || hasRecordedMatches) ? 'not-allowed' : 'pointer',
               }}
-              title={seedCount === 0 ? (isManual ? 'No registered seeds to clear' : 'No qualifier scores to clear') : (isManual ? 'Clear all registered player seeds' : 'Clear all qualifier submissions')}
+              title={
+                hasRecordedMatches
+                  ? 'Cannot clear qualifier data while match scores exist. Execute "Clear Matches" first.'
+                  : seedCount === 0
+                  ? (isManual ? 'No registered seeds to clear' : 'No qualifier scores to clear')
+                  : (isManual ? 'Clear all registered player seeds' : 'Clear all qualifier submissions')
+              }
             >
               {isManual ? `Clear Seeds (${seedCount})` : `Clear Quals (${seedCount})`}
             </button>

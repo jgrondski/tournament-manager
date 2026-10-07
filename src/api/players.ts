@@ -5,6 +5,9 @@ import { getDb } from '../db';
 export interface PlayerRecord {
   id: string;
   name: string;
+  displayName: string | null;
+  nickname: string | null;
+  twitchUsername: string | null;
   country: string | null;
   avatarType: 'flag' | 'custom';
   avatarUrl: string | null;
@@ -18,6 +21,9 @@ export interface PlayerRecord {
 
 export async function createPlayer(data: {
   name: string;
+  displayName?: string;
+  nickname?: string;
+  twitchUsername?: string;
   country?: string;
   avatarType?: 'flag' | 'custom';
   avatarUrl?: string;
@@ -40,10 +46,15 @@ export async function createPlayer(data: {
     throw new Error(`Player with name "${trimmed}" already exists`);
   }
 
+  const cleanTwitch = data.twitchUsername ? data.twitchUsername.trim().replace(/^@/, '') : null;
+
   const [created] = await db
     .insert(players)
     .values({
       name: trimmed,
+      displayName: data.displayName?.trim() || null,
+      nickname: data.nickname?.trim() || null,
+      twitchUsername: cleanTwitch || null,
       country: data.country || null,
       avatarType: data.avatarType || 'flag',
       avatarUrl: data.avatarUrl || null,
@@ -58,6 +69,9 @@ export async function createPlayer(data: {
 
 export async function createPlayersBatch(records: Array<{
   name: string;
+  displayName?: string;
+  nickname?: string;
+  twitchUsername?: string;
   country?: string;
   avatarType?: 'flag' | 'custom';
   avatarUrl?: string;
@@ -72,6 +86,9 @@ export async function createPlayersBatch(records: Array<{
     .insert(players)
     .values(records.map(r => ({
       name: r.name.trim(),
+      displayName: r.displayName?.trim() || null,
+      nickname: r.nickname?.trim() || null,
+      twitchUsername: r.twitchUsername ? r.twitchUsername.trim().replace(/^@/, '') : null,
       country: r.country || null,
       avatarType: r.avatarType || 'flag',
       avatarUrl: r.avatarUrl || null,
@@ -101,9 +118,13 @@ export async function updatePlayer(
   updates: Partial<Omit<PlayerRecord, 'id' | 'createdAt'>>
 ): Promise<PlayerRecord | null> {
   const db = getDb();
+  const sanitized = { ...updates };
+  if (typeof sanitized.twitchUsername === 'string') {
+    sanitized.twitchUsername = sanitized.twitchUsername.trim().replace(/^@/, '') || null;
+  }
   const [updated] = await db
     .update(players)
-    .set(updates)
+    .set(sanitized)
     .where(eq(players.id, id))
     .returning();
   return (updated as PlayerRecord) || null;

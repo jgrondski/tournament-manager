@@ -110,7 +110,7 @@ flowchart TD
     end
 
     subgraph TrackB["Track B: Mathematical Rules & Logic Bug Fixes (Omen's Loose Notes)"]
-        B1["• Flat Bracket Bye Seed Alternation (1 vs N)<br>• Points Qual 0-Point Tiebreaker (High Score)<br>• Clear Quals vs Matches Speedbump Hierarchy<br>• Settings 'Add Tier' Button Position<br>• Homepage Navigation to Public Views<br>• Player Identity: Twitch vs Name vs Nickname<br>• Pre-Lock Bracket Visibility in OBS Overlays (Note 1)"]
+        B1["• Flat Bracket Bye Seed Alternation (1 vs N)<br>• Points Qual 0-Point Tiebreaker (High Score)<br>• Clear Quals vs Matches Speedbump Hierarchy<br>• Settings 'Add Tier' Button Position<br>• Homepage Navigation to Admin Bracket View (/:slug/manage/bracket/:tierSlug)<br>• Player Identity: Twitch vs Name vs Nickname<br>• Pre-Lock Bracket Visibility in OBS Overlays (Note 1)"]
     end
 
     subgraph TrackC["Track C: Phase 8 — Live & Online Qualifiers Engine"]
@@ -143,43 +143,44 @@ flowchart TD
 
 ---
 
-### Track B: Mathematical Rules & Logic Bug Fixes (Omen's Loose Notes)
+### Track B: Mathematical Rules & Logic Bug Fixes (Omen's Loose Notes) [COMPLETE]
 * **Goal:** Eliminate all observed tournament rule discrepancies, navigation misdirections, and simulation safety flaws built on top of the clean decoupled architecture.
+* **Status:** **COMPLETE** (All 7 bug fix items implemented and verified across 415 passing automated regression tests).
 
-#### 1. Flat Bracket Bye Seed Alternation
-* **Problem:** In Flat Single and Double Elimination brackets, byes are currently paired sequentially ($1 \text{ vs } 2, 3 \text{ vs } 4$).
-* **Fix:** Update `flat.ts` and `double-elimination.ts` so byes follow standard competitive tournament bracket alternation: highest seeds receive byes and face the lowest surviving seeds ($1 \text{ vs } N, 2 \text{ vs } N-1$).
-* **Files:** `src/features/bracket/math/flat.ts`, `src/features/bracket/math/double-elimination.ts`.
+#### 1. Flat Bracket Bye Seed Alternation [COMPLETE]
+* **Problem:** In Flat Single and Double Elimination brackets, byes were previously paired sequentially ($1 \text{ vs } 2, 3 \text{ vs } 4$).
+* **Fix:** Updated `seed-utils.ts`, `flat.ts`, and `double-elimination.ts` so byes follow standard competitive tournament bracket alternation: highest seeds receive byes and face the lowest surviving seeds ($1 \text{ vs } N, 2 \text{ vs } N-1$), ensuring Seeds 1 and 2 only meet in the Finals.
+* **Files:** `src/features/bracket/math/seed-utils.ts`, `src/features/bracket/math/flat.ts`, `src/features/bracket/math/double-elimination.ts`.
 
-#### 2. Points Qualifier Tiebreaker for 0-Point Players
-* **Problem:** In `POINTS` qualifier format, players with $0$ points currently float in arbitrary/random order.
-* **Fix:** Update `scoring.ts` to enforce the spec tiebreaker hierarchy: players with $0$ points are deterministically sorted by their highest single game score (`peakScore`).
-* **Files:** `src/features/qualifiers/scoring.ts`.
+#### 2. Points Qualifier Tiebreaker for 0-Point Players [COMPLETE]
+* **Problem:** In `POINTS` qualifier format, players with $0$ points previously floated in arbitrary/random order.
+* **Fix:** Updated `scoring.ts` to compute each player's highest single game score (`peakScore`) and sort descending as the primary tiebreaker for players with 0 points (and tied point totals).
+* **Files:** `src/features/qualifiers/scoring.ts`, `src/features/qualifiers/__tests__/scoring.test.ts`.
 
-#### 3. Simulation & Data Management Safety Hierarchy
-* **Problem:** Admins can accidentally clear qualifier data while active matches exist, creating orphaned match records.
-* **Fix:** In `TournamentAdminForm.tsx`, disable "Clear Quals" whenever active match scores exist. Enforce the strict lifecycle hierarchy: "Clear Matches" must be executed before "Clear Quals" becomes enabled. "Clear All" remains available behind its speedbump confirmation modal.
-* **Files:** `src/features/tournament/components/TournamentAdminForm.tsx`.
+#### 3. Simulation & Data Management Safety Hierarchy [COMPLETE]
+* **Problem:** Admins could accidentally clear qualifier data while active matches existed, creating orphaned match records.
+* **Fix:** In `DataSimulationSection.tsx` and `TournamentAdminForm.tsx`, disabled and blocked "Clear Quals" whenever active match scores exist. Enforced the strict lifecycle hierarchy: "Clear Matches" must be executed before "Clear Quals" becomes enabled.
+* **Files:** `src/features/tournament/components/TournamentAdminForm.tsx`, `src/features/tournament/components/settings/DataSimulationSection.tsx`.
 
-#### 4. Settings "Add Tier" Button Placement
-* **Problem:** The "+ Add Tier" button at the top requires organizers to scroll down to find the newly added tier.
-* **Fix:** Position the "+ Add Tier" button at the bottom of the tiers list when 1 or more tiers exist (retaining it prominently in the empty state when 0 tiers exist).
+#### 4. Settings "Add Tier" Button Placement [COMPLETE]
+* **Problem:** The "+ Add Tier" button at the top required organizers to scroll down to find the newly added tier.
+* **Fix:** Positioned the "+ Add Tier" button at the bottom of the tiers list when 1 or more tiers exist (retaining it prominently in the empty state when 0 tiers exist).
 * **Files:** `src/features/tournament/components/settings/TierManagementSection.tsx`.
 
-#### 5. Homepage Tournament Card Navigation
-* **Problem:** Clicking Bracket, Standings, or Qualifiers on the homepage cards routes users into admin management URLs (`/:slug/manage/*`).
-* **Fix:** Route homepage card links to their clean public/spectator counterparts (`/:slug/bracket`, `/:slug/standings`, `/:slug/leaderboard`).
-* **Files:** `src/routes/TournamentSwitcherPage.tsx`.
+#### 5. Homepage Tournament Card Navigation to Admin Bracket View [COMPLETE]
+* **Problem:** Clicking Bracket (or tier pills) on homepage cards routed users into the public/spectator view (`/:slug/:tierSlug`), forcing organizers to constantly click Admin to access the admin management view.
+* **Fix:** Routed homepage card "Brackets" action button and tier pill links directly to the admin management bracket view (`/:slug/manage/bracket/${tier.slug}`).
+* **Files:** `src/features/tournament/components/TournamentCard.tsx`.
 
-#### 6. Global Player Card Identity
-* **Problem:** The competitor model lacks distinct separation between Twitch handle, competitive display name, and personal nickname.
-* **Fix:** Extend `PlayerProfile` and the database `players` table with `twitchUsername`, `nickname`, and `displayName`, updating the player edit modal and detail drawer.
-* **Files:** `src/features/tournament/types.ts`, `src/db/schema.ts`, `src/features/players/components/PlayerEditModal.tsx`.
+#### 6. Global Player Card Identity [COMPLETE]
+* **Problem:** The competitor model lacked distinct separation between Twitch handle, competitive display name, and personal nickname.
+* **Fix:** Extended `PlayerProfile`, database schema `players` table, API layer, `PlayerEditModal.tsx`, `PlayerDetailDrawer.tsx`, and `PlayerDirectory.tsx` with `displayName`, `nickname`, and `twitchUsername` (sanitizing `@` prefix and providing Twitch stream badges). Ran `npm run db:push` against PostgreSQL container.
+* **Files:** `src/features/tournament/types.ts`, `src/db/schema.ts`, `src/api/players.ts`, `src/features/players/components/PlayerEditModal.tsx`, `src/features/qualifiers/components/PlayerDetailDrawer.tsx`, `src/features/players/components/PlayerDirectory.tsx`.
 
-#### 7. Pre-Lock Bracket Visibility in OBS & Public Overlays (Note 1)
-* **Problem:** When match play hasn't been finalized but bracket tiers have been specified in settings, brackets are visible to admins and in the public view, but OBS overlays do not display or preview them.
-* **Fix:** Update OBS overlay components (`ObsBracketView.tsx`, `ObsMatchCardView.tsx`, and associated routes) to support draft bracket preview mode when `tournament.isLocked === false`, rendering the projected bracket matches rather than an empty state.
-* **Files:** `src/features/obs/components/ObsBracketView.tsx`, `src/features/obs/components/ObsMatchCardView.tsx`, `src/routes/ObsOverlayPage.tsx`.
+#### 7. Pre-Lock Bracket Visibility in OBS Overlays (Note 1) [COMPLETE]
+* **Problem:** When match play hasn't been finalized but bracket tiers have been specified in settings, brackets were visible to admins and in the public view, but OBS overlays did not display or preview them.
+* **Fix:** Created `ObsBracketView.tsx`, `ObsMatchCardView.tsx`, and `ObsOverlayPage.tsx` supporting draft bracket preview mode when `tournament.isLocked === false` with chroma key support (`?chroma=green|#hex`), generating draft/projected match nodes with live qualifier seeds or placeholder seeds and displaying a pulsing "DRAFT PREVIEW" header badge.
+* **Files:** `src/features/obs/components/ObsBracketView.tsx`, `src/features/obs/components/ObsMatchCardView.tsx`, `src/routes/ObsOverlayPage.tsx`, `src/routes/PublicTierBracketPage.tsx`, `src/features/qualifiers/scoring.ts`, `src/App.tsx`.
 
 ---
 

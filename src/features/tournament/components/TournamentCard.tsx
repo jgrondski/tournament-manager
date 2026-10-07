@@ -175,7 +175,7 @@ export const TournamentCard: React.FC<TournamentCardProps> = ({
                 return (
                   <Link
                     key={tier.id}
-                    to={`/${tournament.slug}/${tier.slug}`}
+                    to={`/${tournament.slug}/manage/bracket/${tier.slug}`}
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -220,7 +220,7 @@ export const TournamentCard: React.FC<TournamentCardProps> = ({
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', borderTop: '1px solid var(--color-border-subtle, rgba(255,255,255,0.06))', paddingTop: '1rem' }}>
         {hasTiers && defaultTier && (
           <Link
-            to={`/${tournament.slug}/${defaultTier.slug}`}
+            to={`/${tournament.slug}/manage/bracket/${defaultTier.slug}`}
             className="btn btn-primary"
             style={{ padding: '0.55rem 0.75rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
           >

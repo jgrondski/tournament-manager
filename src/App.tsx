@@ -15,6 +15,7 @@ import { FinalStandingsPage } from './routes/FinalStandingsPage';
 import { SlugRedirectPage } from './routes/SlugRedirectPage';
 import { PlayerDirectoryPage } from './routes/PlayerDirectoryPage';
 import { OBSHubPage } from './routes/OBSHubPage';
+import { ObsOverlayPage } from './routes/ObsOverlayPage';
 import { assertDatabaseConfig } from './db/config';
 import { Database, AlertTriangle } from 'lucide-react';
 
@@ -111,6 +112,12 @@ export const App: React.FC = () => {
 
             {/* OBS Broadcast Studio Hub */}
             <Route path="/:slug/obs" element={<OBSHubPage />} />
+
+            {/* Dedicated OBS Broadcast Overlay Endpoints */}
+            <Route path="/:slug/obs/bracket/:tierSlug" element={<ObsOverlayPage />} />
+            <Route path="/:slug/obs/match/:matchId" element={<ObsOverlayPage />} />
+            <Route path="/obs/overlay/:slug/:tierSlug" element={<ObsOverlayPage />} />
+            <Route path="/obs/match/:slug/:matchId" element={<ObsOverlayPage />} />
 
             {/* Management Views */}
             <Route path="/:slug/manage" element={<PublicTierBracketPage />} />

@@ -124,6 +124,9 @@ export function createApiMiddleware() {
         const profiles: PlayerProfile[] = dbPlayers.map(p => ({
           id: p.id,
           name: p.name,
+          displayName: p.displayName || undefined,
+          nickname: p.nickname || undefined,
+          twitchUsername: p.twitchUsername || undefined,
           country: p.country || undefined,
           avatarType: p.avatarType,
           avatarUrl: p.avatarUrl || undefined,

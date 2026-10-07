@@ -703,6 +703,7 @@ export const BracketVisualizer: React.FC<BracketVisualizerProps> = ({
           isObsMode={isObsMode}
           chromaHex={chromaHex}
           primaryColor={primaryColor}
+          isDraft={!tournament.isLocked}
         />
       )}
 

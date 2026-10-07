@@ -14,6 +14,7 @@ interface BracketBroadcastHeaderProps {
   isObsMode?: boolean;
   chromaHex?: string | null;
   primaryColor: string;
+  isDraft?: boolean;
 }
 
 export const BracketBroadcastHeader: React.FC<BracketBroadcastHeaderProps> = ({
@@ -26,6 +27,7 @@ export const BracketBroadcastHeader: React.FC<BracketBroadcastHeaderProps> = ({
   isObsMode = false,
   chromaHex = null,
   primaryColor,
+  isDraft = false,
 }) => {
   const getStageLabel = () => {
     if (!isAcceleratedHybrid) {
@@ -101,6 +103,36 @@ export const BracketBroadcastHeader: React.FC<BracketBroadcastHeaderProps> = ({
         >
           {tierName}
         </span>
+
+        {isDraft && (
+          <span
+            style={{
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              padding: '0.18rem 0.65rem',
+              borderRadius: 'var(--radius-full)',
+              background: 'rgba(245, 158, 11, 0.22)',
+              color: 'var(--color-gold-bright)',
+              border: '1px solid rgba(245, 158, 11, 0.55)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+            }}
+          >
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: 'var(--color-gold-bright)',
+                boxShadow: '0 0 6px var(--color-gold-bright)',
+              }}
+            />
+            Draft Preview
+          </span>
+        )}
 
         <span
           style={{

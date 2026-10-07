@@ -51,14 +51,6 @@ export const TierManagementSection: React.FC<TierManagementSectionProps> = ({
             Organize 1 to N tiered brackets (Gold, Silver, Bronze) with automatic cutoff ranges and customized themes.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onAddTier}
-          className="btn btn-primary"
-          style={{ padding: '0.4rem 0.85rem', fontSize: '0.82rem' }}
-        >
-          <Plus size={15} /> Add Tier
-        </button>
       </div>
 
       {/* Tiers List */}
@@ -567,6 +559,25 @@ export const TierManagementSection: React.FC<TierManagementSectionProps> = ({
               </div>
             );
           })
+        )}
+
+        {tiers.length > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'flex-start', paddingTop: '0.25rem' }}>
+            <button
+              type="button"
+              onClick={onAddTier}
+              className="btn btn-primary"
+              style={{
+                padding: '0.55rem 1.15rem',
+                fontSize: '0.85rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+              }}
+            >
+              <Plus size={16} /> Add Tier
+            </button>
+          </div>
         )}
       </div>
     </section>

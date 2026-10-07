@@ -15,6 +15,9 @@ export const players = pgTable(
   {
     id: uuid('id').defaultRandom().primaryKey(),
     name: text('name').notNull(),
+    displayName: text('display_name'),
+    nickname: text('nickname'),
+    twitchUsername: text('twitch_username'),
     country: text('country'),
     avatarType: text('avatar_type', { enum: ['flag', 'custom'] }).notNull().default('flag'),
     avatarUrl: text('avatar_url'),

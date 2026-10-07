@@ -9,6 +9,7 @@ import { BracketTierBar } from '../features/bracket/components/BracketTierBar';
 import { BracketViewMode } from '../features/bracket/bracketLayout';
 import { MatchCardFeed } from '../features/bracket/components/MatchCardFeed';
 import { ShareBracketModal } from '../features/bracket/components/ShareBracketModal';
+import { generateDraftBracketsForTournament } from '../features/qualifiers/scoring';
 
 export const PublicTierBracketPage: React.FC = () => {
   const { slug, tierSlug } = useParams<{ slug: string; tierSlug: string }>();
@@ -133,7 +134,20 @@ export const PublicTierBracketPage: React.FC = () => {
     );
   }
 
-  const { tournament, tier } = tierData;
+  const { tournament, tier: rawTier } = tierData;
+
+  // Guarantee draft bracket preview when tournament is unlocked / pre-match play
+  const tier = useMemo(() => {
+    if (!rawTier) return rawTier;
+    if (!tournament.isLocked && (!rawTier.bracket || !rawTier.bracket.rounds || rawTier.bracket.rounds.length === 0)) {
+      const draftTiers = generateDraftBracketsForTournament(tournament);
+      const matched = draftTiers.find(t => t.id === rawTier.id || t.slug === rawTier.slug);
+      if (matched?.bracket && matched.bracket.rounds?.length > 0) {
+        return matched;
+      }
+    }
+    return rawTier;
+  }, [rawTier, tournament]);
 
   const [playerSearchTerm, setPlayerSearchTerm] = useState('');
 

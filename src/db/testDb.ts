@@ -29,6 +29,9 @@ export function setupTestDb() {
     CREATE TABLE players (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       name TEXT NOT NULL,
+      display_name TEXT,
+      nickname TEXT,
+      twitch_username TEXT,
       country TEXT,
       avatar_type TEXT NOT NULL DEFAULT 'flag',
       avatar_url TEXT,

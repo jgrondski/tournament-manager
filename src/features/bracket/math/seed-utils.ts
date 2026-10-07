@@ -23,16 +23,18 @@ export function getNextPowerOfTwo(n: number): number {
  * Example for size 8:
  * [ [1, 8], [4, 5], [2, 7], [3, 6] ]
  */
-export function getStandardSeedingPairs(bracketSize: number): [number, number][] {
+/**
+ * Returns the recursive standard seeding order of match leaders for a power-of-two bracket size.
+ * For size 2: [1]
+ * For size 4: [1, 2] -> feeds pairs [[1, 4], [2, 3]]
+ * For size 8: [1, 4, 2, 3] -> feeds pairs [[1, 8], [4, 5], [2, 7], [3, 6]]
+ * For size 16: [1, 8, 4, 5, 2, 7, 3, 6]
+ */
+export function getStandardLeaders(bracketSize: number): number[] {
   if (bracketSize < 2 || (bracketSize & (bracketSize - 1)) !== 0) {
     throw new Error(`bracketSize must be a power of 2 >= 2, received ${bracketSize}`);
   }
 
-  // Generate recursive standard seeding order of match seed leaders
-  // For size 2: [1]
-  // For size 4: [1, 4]
-  // For size 8: [1, 4, 2, 3]
-  // For size 16: [1, 8, 4, 5, 2, 7, 3, 6]
   let leaders: number[] = [1];
   let currentRoundSize = 2;
 
@@ -47,7 +49,15 @@ export function getStandardSeedingPairs(bracketSize: number): [number, number][]
     currentRoundSize *= 2;
   }
 
-  // For the final round 1 matches, pair each leader with (bracketSize + 1 - leader)
+  return leaders;
+}
+
+/**
+ * Returns the standard seeding pairs for a single-elimination bracket of given power-of-two size.
+ * Each pair represents [seed1, seed2] for round 1 matches.
+ */
+export function getStandardSeedingPairs(bracketSize: number): [number, number][] {
+  const leaders = getStandardLeaders(bracketSize);
   const sum = bracketSize + 1;
   return leaders.map((leader) => [leader, sum - leader]);
 }

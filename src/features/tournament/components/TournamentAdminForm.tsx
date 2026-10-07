@@ -847,6 +847,11 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
             clearMatchScores(tournament.id);
             setSimFeedback('Match scores cleared.');
           } else if (dataActionToConfirm === 'QUALS') {
+            if (recordedMatchCount > 0) {
+              setSimFeedback('Cannot clear qualifiers while match scores exist. Execute "Clear Matches" first.');
+              setDataActionToConfirm(null);
+              return;
+            }
             clearQualifierScores(tournament.id);
             setSimFeedback(seedingMethod === 'MANUAL' ? 'Registered seeds cleared.' : 'Qualifier scores cleared.');
           } else if (dataActionToConfirm === 'ALL') {

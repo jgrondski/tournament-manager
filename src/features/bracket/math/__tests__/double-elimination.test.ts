@@ -282,25 +282,25 @@ describe('Double Elimination Bracket Generators', () => {
       const w1Seeds = w1Matches.flatMap((m) => [m.player1.player?.seed, m.player2.player?.seed]);
       expect(w1Seeds.sort((a, b) => (a ?? 0) - (b ?? 0))).toEqual([17, 18, 19, 20, 21, 22, 23, 24]);
 
-      // W2: Incoming Seeds 13-16 in player1 slot (never seeds 17-24)
+      // W2: Incoming Seeds 13-16 in player1 slot with alternating standard leaders [13, 16, 14, 15]
       const w2Matches = bracket.rounds.find((r) => r.roundIdentifier === 'W2')!.matches;
       const w2IncomingSeeds = w2Matches.map((m) => m.player1.player?.seed);
-      expect(w2IncomingSeeds).toEqual([13, 14, 15, 16]);
+      expect(w2IncomingSeeds).toEqual([13, 16, 14, 15]);
 
-      // W3: Incoming Seeds 9-12 in player1 slot
+      // W3: Incoming Seeds 9-12 with alternating standard leaders [9, 12, 10, 11]
       const w3Matches = bracket.rounds.find((r) => r.roundIdentifier === 'W3')!.matches;
       const w3IncomingSeeds = w3Matches.map((m) => m.player1.player?.seed);
-      expect(w3IncomingSeeds).toEqual([9, 10, 11, 12]);
+      expect(w3IncomingSeeds).toEqual([9, 12, 10, 11]);
 
-      // W4: Incoming Seeds 5-8 in player1 slot
+      // W4: Incoming Seeds 5-8 with alternating standard leaders [5, 8, 6, 7]
       const w4Matches = bracket.rounds.find((r) => r.roundIdentifier === 'W4')!.matches;
       const w4IncomingSeeds = w4Matches.map((m) => m.player1.player?.seed);
-      expect(w4IncomingSeeds).toEqual([5, 6, 7, 8]);
+      expect(w4IncomingSeeds).toEqual([5, 8, 6, 7]);
 
-      // W5: Incoming Seeds 1-4 in player1 slot
+      // W5: Incoming Seeds 1-4 with alternating standard leaders [1, 4, 2, 3]
       const w5Matches = bracket.rounds.find((r) => r.roundIdentifier === 'W5')!.matches;
       const w5IncomingSeeds = w5Matches.map((m) => m.player1.player?.seed);
-      expect(w5IncomingSeeds).toEqual([1, 2, 3, 4]);
+      expect(w5IncomingSeeds).toEqual([1, 4, 2, 3]);
 
       // Advancing WR1 winner to WR2:
       // When WR1 Match 1 winner (Seed 17) advances to WR2 Match 5 (slot 2),
@@ -314,9 +314,14 @@ describe('Double Elimination Bracket Generators', () => {
       expect(advancedW2M1.player2.player?.seed).toBe(17);
 
       // Round 6 (W6): Semifinals (2 matches)
+      // Verify that Seed 1 (W5 Match 1) and Seed 2 (W5 Match 3) feed into DIFFERENT Semifinal matches
       const w6Round = bracket.rounds.find((r) => r.roundIdentifier === 'W6');
       expect(w6Round).toBeDefined();
       expect(w6Round!.matches.length).toBe(2);
+      expect(w5Matches[0].nextMatchId).toBe(w6Round!.matches[0].id); // Seed 1 -> Semis 1
+      expect(w5Matches[1].nextMatchId).toBe(w6Round!.matches[0].id); // Seed 4 -> Semis 1
+      expect(w5Matches[2].nextMatchId).toBe(w6Round!.matches[1].id); // Seed 2 -> Semis 2
+      expect(w5Matches[3].nextMatchId).toBe(w6Round!.matches[1].id); // Seed 3 -> Semis 2
 
       // Round 7 (W7): Winners Finals (1 match)
       const w7Round = bracket.rounds.find((r) => r.roundIdentifier === 'W7');

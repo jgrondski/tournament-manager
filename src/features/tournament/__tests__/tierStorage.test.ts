@@ -75,13 +75,13 @@ describe('Flat Staged Double Elimination Non-Self-Matching WR2 Guarantee', () =>
       expect(m.player2.player!.seed).toBeGreaterThanOrEqual(17);
     }
 
-    // Round 2 (WR2): 4 matches with seeds 13..16 on slotA (player1)
+    // Round 2 (WR2): 4 matches with seeds 13..16 on slotA (player1) with alternating leaders [13, 16, 14, 15]
     const wr2 = bracket.rounds.find((r) => r.roundIdentifier === 'W2')!;
     expect(wr2).toBeDefined();
     const wr2DirectSeeds = wr2.matches.map((m) => m.player1.player!.seed);
-    expect(wr2DirectSeeds).toEqual([13, 14, 15, 16]);
+    expect(wr2DirectSeeds).toEqual([13, 16, 14, 15]);
 
-    // Simulate winning all 4 matches in WR1 (seeds 17, 18, 19, 20 win)
+    // Simulate winning all 4 matches in WR1 (seeds 17, 20, 18, 19 win)
     let currentBracket = bracket;
     for (const m of wr1.matches) {
       const winnerId = m.player1.player!.id;
@@ -90,6 +90,8 @@ describe('Flat Staged Double Elimination Non-Self-Matching WR2 Guarantee', () =>
 
     // Inspect WR2 after WR1 winners advance
     const updatedWr2 = currentBracket.rounds.find((r) => r.roundIdentifier === 'W2')!;
+    const expectedP1Seeds = [13, 16, 14, 15];
+    const expectedP2Seeds = [17, 20, 18, 19];
     for (let i = 0; i < 4; i++) {
       const match = updatedWr2.matches[i];
       const p1 = match.player1.player!;
@@ -103,9 +105,9 @@ describe('Flat Staged Double Elimination Non-Self-Matching WR2 Guarantee', () =>
       expect(p1.name).not.toBe(p2.name);
       expect(p1.seed).not.toBe(p2.seed);
 
-      // Verify specific seeds: slot 1 is 13+i, slot 2 is 17+i
-      expect(p1.seed).toBe(13 + i);
-      expect(p2.seed).toBe(17 + i);
+      // Verify specific seeds match alternating pairings
+      expect(p1.seed).toBe(expectedP1Seeds[i]);
+      expect(p2.seed).toBe(expectedP2Seeds[i]);
     }
   });
 });

@@ -1143,6 +1143,9 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           const profile: PlayerProfile = {
             id: saved.id,
             name: saved.name,
+            displayName: saved.displayName || undefined,
+            nickname: saved.nickname || undefined,
+            twitchUsername: saved.twitchUsername || undefined,
             country: saved.country || undefined,
             avatarType: saved.avatarType || 'flag',
             avatarUrl: saved.avatarUrl || undefined,

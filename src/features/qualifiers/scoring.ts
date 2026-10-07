@@ -24,6 +24,7 @@ export interface LeaderboardRankRow {
   attempts: number[];
   formattedDetail: string; // e.g. "Ao2 (3 attempts)", "Max of 4", "180 pts"
   finalScore: number;
+  peakScore?: number;
   maxoutCount?: number;
   kickerScore?: number;
   isDisqualified: boolean;
@@ -202,6 +203,10 @@ export function deriveLeaderboard(tournament: Tournament): LeaderboardRankRow[] 
       formattedDetail = `${res.totalPoints} pts (${playerSubs.length} attempts)`;
     }
 
+    const peakScore = playerSubs.length > 0
+      ? Math.max(...playerSubs.map(s => s.score))
+      : 0;
+
     const earliestTimestamp = playerSubs.length > 0
       ? Math.min(...playerSubs.map(s => s.submittedAt))
       : Number.MAX_SAFE_INTEGER;
@@ -211,6 +216,7 @@ export function deriveLeaderboard(tournament: Tournament): LeaderboardRankRow[] 
       attempts: playerSubs.map(s => s.score),
       formattedDetail,
       finalScore,
+      peakScore,
       maxoutCount,
       kickerScore,
       isDisqualified,
@@ -224,6 +230,9 @@ export function deriveLeaderboard(tournament: Tournament): LeaderboardRankRow[] 
   //    a. maxout_count descending
   //    b. If maxout_count > 0: kicker_score descending
   //    c. If maxout_count == 0: highest score descending
+  //    If POINTS:
+  //    a. finalScore (totalPoints) descending
+  //    b. Tiebreaker: peakScore descending (specifically for 0-point players and point ties)
   //    If other formats: finalScore descending
   // 2. Earlier timestamp first (for ties)
   // 3. Player ID ascending fallback
@@ -247,6 +256,15 @@ export function deriveLeaderboard(tournament: Tournament): LeaderboardRankRow[] 
         if (b.finalScore !== a.finalScore) {
           return b.finalScore - a.finalScore;
         }
+      }
+    } else if (tournament.qualFormat === 'POINTS') {
+      if (b.finalScore !== a.finalScore) {
+        return b.finalScore - a.finalScore;
+      }
+      const aPeak = a.peakScore ?? 0;
+      const bPeak = b.peakScore ?? 0;
+      if (bPeak !== aPeak) {
+        return bPeak - aPeak;
       }
     } else {
       if (b.finalScore !== a.finalScore) {
@@ -415,12 +433,40 @@ export function generateDraftBracketsForTournament(tournament: Tournament): Tour
       };
     }
 
-    // If insufficient players and tournament has no qualifiers/seeds/players, reset bracket
+    // If insufficient players and tournament has no qualifiers/seeds/players
     if (
       (tournament.playersPool || []).length === 0 &&
       (tournament.qualifierSubmissions || []).length === 0 &&
       (tournament.manualSeeds || []).length === 0
     ) {
+      if (tier.bracket && tier.bracket.rounds && tier.bracket.rounds.length > 0) {
+        return tier;
+      }
+      if (tier.playerCount >= 2) {
+        const placeholderSeeds: SeededPlayer[] = Array.from({ length: tier.playerCount }, (_, i) => ({
+          id: `seed-${i + 1}`,
+          name: `Seed ${i + 1}`,
+          seed: i + 1,
+        }));
+        const options = {
+          tierId: tier.id,
+          bestOf: tier.bestOf,
+          roundBestOfOverrides: tier.roundBestOfOverrides,
+          bracketRouting: tier.bracketRouting,
+          flatWidth: tier.flatWidth,
+          finalsCutoff: tier.finalsCutoff,
+        };
+        const placeholderBracket =
+          tier.eliminationType === 'DOUBLE'
+            ? generateDoubleEliminationBracket(placeholderSeeds, options)
+            : tier.bracketType === 'FLAT'
+              ? generateFlatBracket(placeholderSeeds, tier.flatWidth || 4, options)
+              : generateTraditionalBracket(placeholderSeeds, options);
+        return {
+          ...tier,
+          bracket: placeholderBracket,
+        };
+      }
       return {
         ...tier,
         bracket: { rounds: [], totalMatches: 0, matchesById: {} } as any,

@@ -190,6 +190,9 @@ export type AvatarType = 'flag' | 'custom';
 export interface PlayerProfile {
   id: string;
   name: string;
+  displayName?: string;
+  nickname?: string;
+  twitchUsername?: string;
   country?: string;
   avatarType?: AvatarType;
   avatarUrl?: string;

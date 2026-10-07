@@ -73,10 +73,13 @@ export const PlayerDirectory: React.FC = () => {
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase().trim();
           const matchName = p.name.toLowerCase().includes(q);
+          const matchDisplayName = p.displayName?.toLowerCase().includes(q);
+          const matchNickname = p.nickname?.toLowerCase().includes(q);
+          const matchTwitch = p.twitchUsername?.toLowerCase().includes(q);
           const matchCountry = p.country?.toLowerCase().includes(q);
           const matchPlaystyle = p.playstyle?.toLowerCase().includes(q);
           const matchNotes = p.notes?.toLowerCase().includes(q);
-          if (!matchName && !matchCountry && !matchPlaystyle && !matchNotes) {
+          if (!matchName && !matchDisplayName && !matchNickname && !matchTwitch && !matchCountry && !matchPlaystyle && !matchNotes) {
             return false;
           }
         }
@@ -619,12 +622,34 @@ export const PlayerDirectory: React.FC = () => {
                             {player.name.substring(0, 2).toUpperCase()}
                           </div>
                           <div>
-                            <div style={{ fontWeight: 700, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <div style={{ fontWeight: 700, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                               <PlayerAvatar player={player} />
                               <span>{player.name}</span>
+                              {player.nickname && (
+                                <span style={{ fontSize: '0.8rem', color: 'var(--color-gold-bright)', fontStyle: 'italic', fontWeight: 600 }}>
+                                  &quot;{player.nickname}&quot;
+                                </span>
+                              )}
+                              {player.displayName && player.displayName !== player.name && (
+                                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                                  ({player.displayName})
+                                </span>
+                              )}
                             </div>
-                            <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
-                              ID: {player.id}
+                            <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '0.6rem', marginTop: '0.15rem' }}>
+                              {player.twitchUsername && (
+                                <a
+                                  href={`https://twitch.tv/${player.twitchUsername}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={e => e.stopPropagation()}
+                                  style={{ color: '#c084fc', textDecoration: 'none', fontWeight: 600 }}
+                                  title={`Twitch: ${player.twitchUsername}`}
+                                >
+                                  twitch.tv/{player.twitchUsername}
+                                </a>
+                              )}
+                              <span>ID: {player.id}</span>
                             </div>
                           </div>
                         </div>

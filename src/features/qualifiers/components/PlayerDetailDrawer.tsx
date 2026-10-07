@@ -443,11 +443,24 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
                     alignItems: 'center',
                     gap: '0.5rem',
                     lineHeight: 1.2,
+                    flexWrap: 'wrap',
                   }}
                 >
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {player.name}
                   </span>
+                  {player.nickname && (
+                    <span
+                      style={{
+                        fontSize: '1.1rem',
+                        fontWeight: 700,
+                        fontStyle: 'italic',
+                        color: 'var(--color-gold-bright)',
+                      }}
+                    >
+                      &quot;{player.nickname}&quot;
+                    </span>
+                  )}
                   {isVerified && (
                     <span
                       title="Verified Qualifier Competitor"
@@ -469,11 +482,42 @@ export const PlayerDetailDrawer: React.FC<PlayerDetailDrawerProps> = ({
                   )}
                 </h2>
 
-                {player.country && (
-                  <span style={{ fontSize: '0.78rem', color: textColor, fontWeight: 500 }}>
-                    Representing {player.country}
-                  </span>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
+                  {player.displayName && player.displayName !== player.name && (
+                    <span style={{ fontSize: '0.78rem', color: 'var(--color-gold-bright)', fontWeight: 600 }}>
+                      Alias: {player.displayName}
+                    </span>
+                  )}
+                  {player.country && (
+                    <span style={{ fontSize: '0.78rem', color: textColor, fontWeight: 500 }}>
+                      Representing {player.country}
+                    </span>
+                  )}
+                  {player.twitchUsername && (
+                    <a
+                      href={`https://twitch.tv/${player.twitchUsername}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        fontSize: '0.75rem',
+                        color: '#c084fc',
+                        fontWeight: 600,
+                        textDecoration: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        background: 'rgba(168, 85, 247, 0.15)',
+                        border: '1px solid rgba(168, 85, 247, 0.35)',
+                        borderRadius: 'var(--radius-sm)',
+                        padding: '0.1rem 0.45rem',
+                        transition: 'all 0.15s ease',
+                      }}
+                      title={`Visit ${player.name}'s Twitch Channel`}
+                    >
+                      <span>twitch.tv/{player.twitchUsername}</span>
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
 

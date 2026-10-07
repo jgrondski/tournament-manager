@@ -11,6 +11,7 @@ import {
 import {
   getNextPowerOfTwo,
   getStandardSeedingPairs,
+  getStandardLeaders,
 } from './seed-utils';
 import { generateTraditionalBracket } from './traditional';
 
@@ -722,6 +723,7 @@ export function generateFlatDoubleElim(
   // 1. WINNERS BRACKET
   // ==========================================
   const wrMatchesByRound: BracketMatch[][] = [];
+  const leaders = getStandardLeaders(2 * flatWidth);
 
   // Round 1: Seeds (N - 2W + 1) through N play W matches
   {
@@ -730,8 +732,9 @@ export function generateFlatDoubleElim(
 
     for (let m = 0; m < flatWidth; m++) {
       const id = `${prefix}w1-m${m + 1}`;
-      const s1 = r1SeedStart + m;
-      const s2 = totalPlayers - m;
+      const relRank = leaders[m];
+      const s1 = r1SeedStart + (relRank - 1);
+      const s2 = totalPlayers - (relRank - 1);
       const p1 = playerBySeed.get(s1);
       const p2 = playerBySeed.get(s2);
 
@@ -780,7 +783,8 @@ export function generateFlatDoubleElim(
 
     for (let m = 0; m < flatWidth; m++) {
       const id = `${prefix}w${r}-m${m + 1}`;
-      const stepInSeed = seedStart + m;
+      const relRank = leaders[m];
+      const stepInSeed = seedStart + (relRank - 1);
       const stepInPlayer = playerBySeed.get(stepInSeed);
       const prevMatch = prevWinners[m];
 

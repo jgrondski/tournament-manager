@@ -385,6 +385,65 @@ describe('Qualifiers Scoring Engine', () => {
       const alice = rows.find(r => r.player.id === 'p1');
       expect(alice?.status).toBe('verified');
     });
+
+    it('deterministically tiebreaks 0-point players by peakScore in POINTS qualifier format', () => {
+      const pointsTourney: Tournament = {
+        id: 't-points',
+        organizationId: 'org_test',
+        slug: 't-points',
+        name: 'Points Tournament',
+        date: '2026-10-07',
+        location: 'Online',
+        qualFormat: 'POINTS',
+        pointsConfig: [
+          { minScore: 1000000, points: 100 },
+          { minScore: 800000, points: 50 },
+        ],
+        isLocked: false,
+        tiers: [],
+        matchScores: {},
+        playersPool: [
+          { id: 'p_none', name: 'No Attempts Player', personalBest: 500000, playstyle: 'DAS' },
+          { id: 'p_low', name: 'Low Peak Player', personalBest: 600000, playstyle: 'Rolling' },
+          { id: 'p_high', name: 'High Peak Player', personalBest: 750000, playstyle: 'Rolling' },
+          { id: 'p_scored', name: 'Scored Player', personalBest: 900000, playstyle: 'Rolling' },
+        ],
+        qualifierSubmissions: [
+          // p_scored gets 50 points
+          { id: 's1', tournamentId: 't-points', playerId: 'p_scored', score: 850000, submittedAt: 100 },
+          // p_high gets 0 points (below 800k threshold), peakScore = 750,000
+          { id: 's2', tournamentId: 't-points', playerId: 'p_high', score: 750000, submittedAt: 200 },
+          { id: 's3', tournamentId: 't-points', playerId: 'p_high', score: 400000, submittedAt: 300 },
+          // p_low gets 0 points (below 800k threshold), peakScore = 300,000 (submitted earlier)
+          { id: 's4', tournamentId: 't-points', playerId: 'p_low', score: 300000, submittedAt: 50 },
+          // p_none has 0 attempts -> 0 points, peakScore = 0
+        ],
+        tournamentPlayers: {},
+      };
+
+      const rows = deriveLeaderboard(pointsTourney);
+      expect(rows).toHaveLength(4);
+
+      // Rank 1: Scored Player (50 points)
+      expect(rows[0].player.id).toBe('p_scored');
+      expect(rows[0].finalScore).toBe(50);
+      expect(rows[0].peakScore).toBe(850000);
+
+      // Rank 2: High Peak Player (0 points, peakScore 750,000)
+      expect(rows[1].player.id).toBe('p_high');
+      expect(rows[1].finalScore).toBe(0);
+      expect(rows[1].peakScore).toBe(750000);
+
+      // Rank 3: Low Peak Player (0 points, peakScore 300,000 - despite earlier timestamp)
+      expect(rows[2].player.id).toBe('p_low');
+      expect(rows[2].finalScore).toBe(0);
+      expect(rows[2].peakScore).toBe(300000);
+
+      // Rank 4: No Attempts Player (0 points, peakScore 0)
+      expect(rows[3].player.id).toBe('p_none');
+      expect(rows[3].finalScore).toBe(0);
+      expect(rows[3].peakScore).toBe(0);
+    });
   });
 
   describe('getPlayerQualifierStatus', () => {

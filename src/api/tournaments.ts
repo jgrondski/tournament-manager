@@ -257,6 +257,9 @@ export async function getFullTournament(idOrSlug: string): Promise<Tournament | 
   const playersPool: PlayerProfile[] = (tPlayersList as any[]).map((row: any) => ({
     id: row.player.id,
     name: row.player.name,
+    displayName: row.player.displayName || undefined,
+    nickname: row.player.nickname || undefined,
+    twitchUsername: row.player.twitchUsername || undefined,
     country: row.player.country || undefined,
     avatarType: (row.player.avatarType as any) || 'flag',
     avatarUrl: row.player.avatarUrl || undefined,

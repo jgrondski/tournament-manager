@@ -25,6 +25,9 @@ export const PlayerEditModal: React.FC<PlayerEditModalProps> = ({
   allowDisqualify = false,
 }) => {
   const [name, setName] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [nickname, setNickname] = useState('');
+  const [twitchUsername, setTwitchUsername] = useState('');
   const [country, setCountry] = useState('');
   const [avatarType, setAvatarType] = useState<AvatarType>('flag');
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
@@ -39,6 +42,9 @@ export const PlayerEditModal: React.FC<PlayerEditModalProps> = ({
   useEffect(() => {
     if (initialPlayer) {
       setName(initialPlayer.name);
+      setDisplayName(initialPlayer.displayName || '');
+      setNickname(initialPlayer.nickname || '');
+      setTwitchUsername(initialPlayer.twitchUsername || '');
       setCountry(initialPlayer.country || '');
       setAvatarType(initialPlayer.avatarType || 'flag');
       setAvatarUrl(initialPlayer.avatarUrl);
@@ -50,6 +56,9 @@ export const PlayerEditModal: React.FC<PlayerEditModalProps> = ({
       setError(null);
     } else {
       setName('');
+      setDisplayName('');
+      setNickname('');
+      setTwitchUsername('');
       setCountry('US');
       setAvatarType('flag');
       setAvatarUrl(undefined);
@@ -84,9 +93,13 @@ export const PlayerEditModal: React.FC<PlayerEditModalProps> = ({
     }
 
     const pbNum = parseInt(personalBest.replace(/\D/g, ''), 10) || 0;
+    const cleanTwitch = twitchUsername.trim().replace(/^@/, '');
 
     onSave({
       name: trimmedName,
+      displayName: displayName.trim() || undefined,
+      nickname: nickname.trim() || undefined,
+      twitchUsername: cleanTwitch || undefined,
       country: country.trim().toUpperCase() || undefined,
       avatarType,
       avatarUrl: avatarType === 'custom' ? avatarUrl : undefined,
@@ -259,6 +272,97 @@ export const PlayerEditModal: React.FC<PlayerEditModalProps> = ({
                     </option>
                   ))}
                 </datalist>
+              </div>
+            </div>
+
+            {/* Display Name & Nickname */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '0.35rem' }}>
+                  Display Name / Alias (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Scuti"
+                  value={displayName}
+                  onChange={e => setDisplayName(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.65rem 0.85rem',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--color-border)',
+                    background: 'var(--color-bg-base)',
+                    color: 'var(--color-text-primary)',
+                    fontSize: '0.9rem',
+                  }}
+                />
+                <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginTop: '0.2rem' }}>
+                  Alternative alias used on match cards &amp; streams
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '0.35rem' }}>
+                  Nickname / Moniker (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. The Prodigy"
+                  value={nickname}
+                  onChange={e => setNickname(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.65rem 0.85rem',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--color-border)',
+                    background: 'var(--color-bg-base)',
+                    color: 'var(--color-text-primary)',
+                    fontSize: '0.9rem',
+                  }}
+                />
+                <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginTop: '0.2rem' }}>
+                  Personal moniker rendered in quotes (e.g. Justin &quot;The Prodigy&quot;)
+                </div>
+              </div>
+            </div>
+
+            {/* Twitch Username */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '0.35rem' }}>
+                Twitch Channel (Optional)
+              </label>
+              <div style={{ position: 'relative' }}>
+                <span
+                  style={{
+                    position: 'absolute',
+                    left: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    fontSize: '0.82rem',
+                    color: '#c084fc',
+                    fontWeight: 700,
+                  }}
+                >
+                  twitch.tv/
+                </span>
+                <input
+                  type="text"
+                  placeholder="username"
+                  value={twitchUsername}
+                  onChange={e => setTwitchUsername(e.target.value.replace(/^@/, ''))}
+                  style={{
+                    width: '100%',
+                    padding: '0.65rem 0.85rem 0.65rem 5.6rem',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--color-border)',
+                    background: 'var(--color-bg-base)',
+                    color: 'var(--color-text-primary)',
+                    fontSize: '0.9rem',
+                  }}
+                />
+              </div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginTop: '0.2rem' }}>
+                Twitch handle for live qualifier tracking &amp; broadcast profile links
               </div>
             </div>
 
