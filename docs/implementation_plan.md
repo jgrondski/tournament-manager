@@ -109,7 +109,7 @@ flowchart TD
         A1["• Decouple Monolithic Store (1,770 lines) into Domain Hooks<br>• Centralized Factory & Defaults (defaults.ts)<br>• Standalone CLI Database Seeder (npm run db:seed)<br>• Contract Alignment & Strict Type Invariants<br>• Targeted Fast-Feedback NPM Test Scripts (test:brackets, test:api)<br>• Agent Architecture Cheatsheet in AGENTS.md"]
     end
 
-    subgraph TrackB["Track B: Mathematical Rules & Logic Bug Fixes (Omen's Loose Notes)"]
+    subgraph TrackB["Track B: Mathematical Rules, Lifecycle Safety & Logic Hardening"]
         B1["• Flat Bracket Bye Seed Alternation (1 vs N)<br>• Points Qual 0-Point Tiebreaker (High Score)<br>• Clear Quals vs Matches Speedbump Hierarchy<br>• Settings 'Add Tier' Button Position<br>• Homepage Navigation to Admin Bracket View (/:slug/manage/bracket/:tierSlug)<br>• Player Identity: Twitch vs Name vs Nickname<br>• Pre-Lock Bracket Visibility in OBS Overlays (Note 1)"]
     end
 
@@ -143,7 +143,7 @@ flowchart TD
 
 ---
 
-### Track B: Mathematical Rules & Logic Bug Fixes (Omen's Loose Notes) [COMPLETE]
+### Track B: Mathematical Rules, Lifecycle Safety & Logic Hardening [COMPLETE]
 * **Goal:** Eliminate all observed tournament rule discrepancies, navigation misdirections, and simulation safety flaws built on top of the clean decoupled architecture.
 * **Status:** **COMPLETE** (All 7 bug fix items implemented and verified across 415 passing automated regression tests).
 
@@ -239,10 +239,10 @@ Per workspace guidelines in `AGENTS.md`:
 * **Verification Scope:** Tests must verify failure on the buggy state and pass with the fix across all supported bracket types (Single, Double Elimination variants: Traditional, Flat Staged, Accelerated Hybrid), filter interactions, and tier-switching states.
 * **Test Suite Health:** All tests must pass cleanly (`npm test`) with zero TypeScript errors (`npm run typecheck`).
 
-## 5. Omen's bug notes & Resolution Status
+## 5. Operational Defect Tracking & Verification Status
 
 - **Note 1:** *When match play hasn't been finalized but the brackets have been specified in settings, you can see the brackets as an admin or in public view but not in overlays.*
-  * **Status:** Scheduled under **Track B, Item 7**. Will be addressed directly as part of Track B fixes.
+  * **Status:** **RESOLVED (Track B, Item 7).** OBS overlay components (`ObsBracketView.tsx`, `ObsMatchCardView.tsx`, and dedicated routes) render projected draft brackets and placeholder match seeds prior to match lock with full chroma key support.
 
 - **Note 2:** *When the db is down, there doesn't seem to be any indicators in the main global UI that it's down. If the DB goes down and you were admining a tournament, it also doesn't mention that it's down.*
   * **Status:** **RESOLVED.**

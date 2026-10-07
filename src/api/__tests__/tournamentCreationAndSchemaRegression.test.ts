@@ -84,13 +84,13 @@ describe('Tournament Creation & Schema Regression Tests', () => {
     };
   };
 
-  describe('1. Tournament Creation with Organization ID & Slug ("Omen Open")', () => {
-    it('successfully creates and saves "Omen Open" with organizationId, slug, and metadata', async () => {
-      const omenTourney: Tournament = {
+  describe('1. Tournament Creation with Organization ID & Slug', () => {
+    it('successfully creates and saves tournament with organizationId, slug, and metadata', async () => {
+      const testTourney: Tournament = {
         id: crypto.randomUUID(),
         organizationId: 'org_ctwc',
-        name: 'Omen Open',
-        slug: 'omen-open',
+        name: 'Championship Open',
+        slug: 'championship-open',
         date: '2026-10-04',
         location: 'Online',
         seedingMethod: 'QUALIFIERS',
@@ -119,9 +119,9 @@ describe('Tournament Creation & Schema Regression Tests', () => {
         matchScores: {},
       };
 
-      const saved = await saveFullTournament(omenTourney);
-      expect(saved.name).toBe('Omen Open');
-      expect(saved.slug).toBe('omen-open');
+      const saved = await saveFullTournament(testTourney);
+      expect(saved.name).toBe('Championship Open');
+      expect(saved.slug).toBe('championship-open');
       expect(saved.organizationId).toBe('org_ctwc');
 
       // Verify direct schema query selecting organization_id, slug, and metadata
@@ -132,24 +132,24 @@ describe('Tournament Creation & Schema Regression Tests', () => {
 
       expect(tRow).toBeDefined();
       expect(tRow.organizationId).toBe('org_ctwc');
-      expect(tRow.slug).toBe('omen-open');
-      expect(tRow.name).toBe('Omen Open');
+      expect(tRow.slug).toBe('championship-open');
+      expect(tRow.name).toBe('Championship Open');
 
       // Verify retrieval through getFullTournament
-      const fetchedBySlug = await getFullTournament('omen-open');
+      const fetchedBySlug = await getFullTournament('championship-open');
       expect(fetchedBySlug).toBeDefined();
       expect(fetchedBySlug?.id).toBe(saved.id);
       expect(fetchedBySlug?.organizationId).toBe('org_ctwc');
 
       const fetchedById = await getFullTournament(saved.id);
       expect(fetchedById).toBeDefined();
-      expect(fetchedById?.slug).toBe('omen-open');
+      expect(fetchedById?.slug).toBe('championship-open');
     });
 
     it('creates tournament via POST /api/tournaments and retrieves via GET /api/tournaments/:id', async () => {
       const res = await makeHttpRequest('/api/tournaments', 'POST', {
-        name: 'Omen Open HTTP',
-        slug: 'omen-open-http',
+        name: 'Championship Open HTTP',
+        slug: 'championship-open-http',
         organizationId: 'org_ctm',
         qualFormat: 'HIGH_SCORE',
         tiers: [
@@ -167,11 +167,11 @@ describe('Tournament Creation & Schema Regression Tests', () => {
       expect(res.status).toBe(201);
       expect(res.body).toBeDefined();
       expect(res.body.organizationId).toBe('org_ctm');
-      expect(res.body.slug).toBe('omen-open-http');
+      expect(res.body.slug).toBe('championship-open-http');
 
       const getRes = await makeHttpRequest(`/api/tournaments/${res.body.id}`, 'GET');
       expect(getRes.status).toBe(200);
-      expect(getRes.body.name).toBe('Omen Open HTTP');
+      expect(getRes.body.name).toBe('Championship Open HTTP');
       expect(getRes.body.organizationId).toBe('org_ctm');
     });
   });
