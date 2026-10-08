@@ -81,3 +81,13 @@
   - `src/server/api.ts` — Vite dev server REST middleware (`/api/health`, `/api/tournaments`, `/api/players`, `/api/simulate/sample`).
   - `src/api/` — Typed DB query operations (`tournaments.ts`, `players.ts`, `qualifiers.ts`, `brackets.ts`, `organizations.ts`).
   - `scripts/seed.ts` — Standalone database CLI seeder (`npm run db:seed`).
+
+## 10. Access Security & Multi-Tier PIN Routing Invariants
+- **Public Friction-Zero Access:** Public routes (`/:slug/brackets`, `/:slug/quals`, `/:slug/standings`, `/:slug/qualify`, OBS overlays) are strictly read-only and open to everyone without login prompts.
+- **Route Gating & Auto-Redirects:** Any unauthenticated attempt to access `/manage/*` or global admin views (`/organizations`, `/players`) auto-redirects to the public tournament view.
+- **Tournament Admin Scope:** Tournament-level PIN unlocks management left-nav for that tournament only (`/:slug/manage/*`). Unauthorized navigation to global admin views redirects back to the tournament management dashboard.
+- **Master Admin & Recovery PIN:** Master PIN grants global access across all tournaments, organizations, and competitors. An immutable `MASTER_ADMIN_RECOVERY_PIN` environment variable acts as a permanent failsafe.
+- **Data Management & Simulation Isolation:** Destructive data management and simulation controls ("Clear All Tournament Data", "Simulate Full Tournament", "Seed Qualifiers Only") and corresponding API endpoints (`/api/simulate/sample`, bulk reset operations) are strictly restricted to Master/System Admins. Tournament Admins cannot view, access, or trigger simulation or data wipe actions.
+- **Encrypted at Rest:** Tournament PINs are encrypted via AES-256-GCM (`pinCrypto.ts`), allowing Master Admins to safely reveal them (`👁️ 7492`) without disrupting active sessions.
+- **API Mutation Protection:** All mutation endpoints (`POST`, `PUT`, `DELETE`) require `Authorization: Bearer <sessionToken>` and enforce role/tournament scope.
+

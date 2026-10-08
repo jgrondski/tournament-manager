@@ -4,7 +4,7 @@ This document is the consolidated, single source of truth for the implementation
 
 ---
 
-## 1. Master Roadmap & Global Status (Phases 1–10)
+## 1. Master Roadmap & Global Status (Phases 1–12)
 
 | Phase | Title | Status | Description |
 | :--- | :--- | :--- | :--- |
@@ -14,10 +14,12 @@ This document is the consolidated, single source of truth for the implementation
 | **Phase 4** | Tournament Organizations | **Complete** | Organization directory (`/organizations`), org branding & default rules inheritance, raw metric indexing. |
 | **Phase 5** | Double Elimination Bracket Engine | **Complete** | Double elim (Winners, Losers, Grand Finals Reset), Accelerated Hybrid multi-pod layout, player journey search. |
 | **Phase 6** | Direct / Manual Seeding & Bulk Import | **Complete** | Qual-less tournament seeding, multiline paste import, drag/drop reordering, tier dividers, direct bracket generation. |
-| **Phase 7** | Relational Database & API Backend | **Complete (Foundation)** | PostgreSQL (Neon/Docker) + Drizzle ORM, REST API middleware, authentic player pool (1,620 competitors). *(RBAC & R2 avatar uploads deferred).* |
-| **Phase 8** | **Live & Online Qualifiers Engine** | **Next Up (Priority Track C)** | Competitor self-service portal (`/:slug/qualify`), Twitch OAuth 2.0, NES Authwords, countdown timer, online judge review queue, Discord webhooks. |
-| **Phase 9** | Match Data Export & Custom Analytics | **Upcoming (Priority Track E)** | Universal match data export (CSV/TSV/Sheets/JSON) with customizable column selection and reordering. |
-| **Phase 10**| Production Deployment & PIN Security | **Upcoming (Priority Track E)** | Shared Passphrase (PIN) gating all `/manage/*` routes, Vercel edge deployment, custom domains. |
+| **Phase 7** | Relational Database & API Backend | **Complete** | PostgreSQL (Neon/Docker) + Drizzle ORM, REST API middleware, authentic player pool (1,620 competitors). |
+| **Phase 8** | Architectural Hardening & Tournament Rules | **Complete** | Decoupled domain hooks, canonical defaults, CLI seeder, 415 automated tests, bye seed alternation (1 vs N), points qual 0-pt tiebreaker, OBS draft overlays. |
+| **Phase 9** | **Production Cloud Deployment & Multi-Tier PIN Security** | **Next Up (Phase 9)** | Vercel Serverless runtime, Neon cloud PostgreSQL migration, 3-tier PIN access security (Public, Tournament Admin, Master Admin with AES-256 revealable PINs & secret recovery PIN), Data Management & Simulation isolated strictly to Master Admin. |
+| **Phase 10**| **Live & Online Qualifiers Engine** | **Upcoming (Phase 10)** | Competitor self-service portal (`/:slug/qualify`), Twitch OAuth 2.0 on production HTTPS, 6–8 char NES Authwords, countdown telemetry, judge review queue, Discord webhooks. |
+| **Phase 11**| **Mobile-Responsive Viewport Overhaul (360×800)** | **Upcoming (Phase 11)** | Handheld 360×800 dense table card views (Leaderboard, Standings, Roster, Global Players), collapsed mobile nav & breadcrumbs. |
+| **Phase 12**| **Universal Match Data Export & Custom Analytics** | **Upcoming (Phase 12)** | Universal match data export (CSV with UTF-8 BOM, Google Sheets TSV clipboard copy, JSON) with custom column selection and reordering. |
 
 ---
 
@@ -99,39 +101,8 @@ This document is the consolidated, single source of truth for the implementation
 * **Drizzle Studio Navigation Architecture:**
   Integrated schema relationships enabling Drizzle Studio's virtual navigation badges between parents and children (`bracket_tier`, `games`, `tournament`).
 
----
-
-## 3. Prioritized Implementation Roadmap (Remaining Work)
-
-```mermaid
-flowchart TD
-    subgraph TrackA["Track A: Architectural Decoupling, Factory Centralization & Developer Ergonomics"]
-        A1["• Decouple Monolithic Store (1,770 lines) into Domain Hooks<br>• Centralized Factory & Defaults (defaults.ts)<br>• Standalone CLI Database Seeder (npm run db:seed)<br>• Contract Alignment & Strict Type Invariants<br>• Targeted Fast-Feedback NPM Test Scripts (test:brackets, test:api)<br>• Agent Architecture Cheatsheet in AGENTS.md"]
-    end
-
-    subgraph TrackB["Track B: Mathematical Rules, Lifecycle Safety & Logic Hardening"]
-        B1["• Flat Bracket Bye Seed Alternation (1 vs N)<br>• Points Qual 0-Point Tiebreaker (High Score)<br>• Clear Quals vs Matches Speedbump Hierarchy<br>• Settings 'Add Tier' Button Position<br>• Homepage Navigation to Admin Bracket View (/:slug/manage/bracket/:tierSlug)<br>• Player Identity: Twitch vs Name vs Nickname<br>• Pre-Lock Bracket Visibility in OBS Overlays (Note 1)"]
-    end
-
-    subgraph TrackC["Track C: Phase 8 — Live & Online Qualifiers Engine"]
-        C1["• Public Self-Service Portal (/:slug/qualify)<br>• Twitch OAuth 2.0 Integration<br>• 6–8 Char NES-Compatible Authword Engine<br>• Countdown Timer & QualTimerLog Telemetry<br>• Online Judge Review Queue & Verification Drawer<br>• Discord Webhook Dispatch"]
-    end
-
-    subgraph TrackD["Track D: Mobile-Responsive Viewport Overhaul (Spec 13.2 / 360×800)"]
-        D1["• Qualifiers Leaderboard Mobile Card View<br>• Final Standings Mobile Card Rows<br>• Tournament Roster & Global Players Handheld Cards<br>• Mobile Navigation Bar & Collapsed Breadcrumbs"]
-    end
-
-    subgraph TrackE["Track E: Phase 9 & Phase 10 — Export, Security & Deployment"]
-        E1["• Universal Match Data Export (CSV, TSV, Sheets, JSON)<br>• Shared Passphrase (PIN) Gating for /manage/*<br>• Production Edge Deployment & Domain Hardening"]
-    end
-
-    TrackA --> TrackB --> TrackC --> TrackD --> TrackE
-```
-
----
-
-### Track A: Architectural Decoupling, Factory Centralization & Developer Ergonomics [COMPLETE]
-* **Goal:** Eliminate monolithic state/form bottlenecks, eliminate defensive mock fallbacks, centralize entity defaults, and introduce fast domain test commands so all subsequent development runs with minimal agent scanning tokens and near-zero credit overhead.
+### Phase 8: Architectural Hardening, Domain Decoupling & Tournament Rules [COMPLETE]
+* **Objective:** Eliminate monolithic state bottlenecks, decouple domain hooks, establish canonical entity factories, introduce fast test suites, and resolve all mathematical and lifecycle edge cases across 415 passing automated regression tests.
 * **Delivered Capabilities:**
   * **Domain Hooks Decoupling:** Created independent domain hooks in `src/features/tournament/hooks/` (`useTournamentSettings`, `useQualifiers`, `useMatches`, `useGlobalPlayers`) with index re-exports and backward-compatible bindings in `store.tsx`.
   * **Single Entity Factory & Defaults (`src/features/tournament/defaults.ts`):** Canonical factories `createEmptyTournament()`, `createDefaultTier(priority)`, and `createEmptyPlayer()` implemented and adopted in `TournamentAdminForm.tsx` and `CreateTournamentModal.tsx`.
@@ -139,57 +110,82 @@ flowchart TD
   * **Contract Alignment & Strict Type Invariants:** Eliminates loose `Record<string, any>` types with strict `TournamentMetadata`, `TierMetadata`, `OrganizationBranding`, and `OrganizationDefaultRules` in `types.ts` and `schema.ts`. Hardens `TierInput` and `TierRecord` to defensively support both `playerCount` and `numPlayers` and align `BracketRouting` with `TRADITIONAL_TREE`.
   * **Targeted Fast-Feedback NPM Test Scripts:** Added `npm run test:brackets` (~2.6s), `npm run test:api` (~5.5s), and `npm run test:ui` (~3.1s) to `package.json`.
   * **Agent Architecture Index:** Added Domain File Map and updated verification commands in `AGENTS.md`.
-  * **Automated Regression Suite:** 12 tests in `src/features/tournament/__tests__/domainHooksAndDefaults.test.ts`.
+  * **Flat Bracket Bye Seed Alternation (1 vs N):** Updated `seed-utils.ts`, `flat.ts`, and `double-elimination.ts` so byes follow standard competitive tournament bracket alternation: highest seeds receive byes and face the lowest surviving seeds ($1 \text{ vs } N, 2 \text{ vs } N-1$), ensuring Seeds 1 and 2 only meet in the Finals.
+  * **Points Qualifier Tiebreaker for 0-Point Players:** Updated `scoring.ts` to compute each player's highest single game score (`peakScore`) and sort descending as the primary tiebreaker for players with 0 points (and tied point totals).
+  * **Simulation & Data Management Safety Hierarchy:** In `DataSimulationSection.tsx` and `TournamentAdminForm.tsx`, disabled and blocked "Clear Quals" whenever active match scores exist. Enforced the strict lifecycle hierarchy: "Clear Matches" must be executed before "Clear Quals" becomes enabled.
+  * **Settings 'Add Tier' Button Placement:** Positioned the "+ Add Tier" button at the bottom of the tiers list when 1 or more tiers exist (retaining it prominently in the empty state when 0 tiers exist).
+  * **Homepage Tournament Card Navigation to Admin Bracket View:** Routed homepage card "Brackets" action button and tier pill links directly to the admin management bracket view (`/:slug/manage/bracket/${tier.slug}`).
+  * **Global Player Card Identity:** Extended `PlayerProfile`, database schema `players` table, API layer, `PlayerEditModal.tsx`, `PlayerDetailDrawer.tsx`, and `PlayerDirectory.tsx` with `displayName`, `nickname`, and `twitchUsername` (sanitizing `@` prefix and providing Twitch stream badges).
+  * **Pre-Lock Bracket Visibility in OBS Overlays:** Created `ObsBracketView.tsx`, `ObsMatchCardView.tsx`, and `ObsOverlayPage.tsx` supporting draft bracket preview mode when `tournament.isLocked === false` with chroma key support (`?chroma=green|#hex`), generating draft/projected match nodes with live qualifier seeds or placeholder seeds and displaying a pulsing "DRAFT PREVIEW" header badge.
+  * **Automated Regression Suite:** 12 tests in `src/features/tournament/__tests__/domainHooksAndDefaults.test.ts` and 7 tests in `src/features/tournament/__tests__/tournamentRulesAndLifecycleRegression.test.ts`.
 
 ---
 
-### Track B: Mathematical Rules, Lifecycle Safety & Logic Hardening [COMPLETE]
-* **Goal:** Eliminate all observed tournament rule discrepancies, navigation misdirections, and simulation safety flaws built on top of the clean decoupled architecture.
-* **Status:** **COMPLETE** (All 7 bug fix items implemented and verified across 415 passing automated regression tests).
+## 3. Prioritized Implementation Roadmap (Remaining Work)
 
-#### 1. Flat Bracket Bye Seed Alternation [COMPLETE]
-* **Problem:** In Flat Single and Double Elimination brackets, byes were previously paired sequentially ($1 \text{ vs } 2, 3 \text{ vs } 4$).
-* **Fix:** Updated `seed-utils.ts`, `flat.ts`, and `double-elimination.ts` so byes follow standard competitive tournament bracket alternation: highest seeds receive byes and face the lowest surviving seeds ($1 \text{ vs } N, 2 \text{ vs } N-1$), ensuring Seeds 1 and 2 only meet in the Finals.
-* **Files:** `src/features/bracket/math/seed-utils.ts`, `src/features/bracket/math/flat.ts`, `src/features/bracket/math/double-elimination.ts`.
+```mermaid
+flowchart TD
+    subgraph Historic["Historic Execution [Phases 1–8 COMPLETE]"]
+        H1["Phases 1–8: Routing Engine, UI Canvas, Standings, Double Elim, Seeding, Relational DB, Architectural Hardening"]
+    end
 
-#### 2. Points Qualifier Tiebreaker for 0-Point Players [COMPLETE]
-* **Problem:** In `POINTS` qualifier format, players with $0$ points previously floated in arbitrary/random order.
-* **Fix:** Updated `scoring.ts` to compute each player's highest single game score (`peakScore`) and sort descending as the primary tiebreaker for players with 0 points (and tied point totals).
-* **Files:** `src/features/qualifiers/scoring.ts`, `src/features/qualifiers/__tests__/scoring.test.ts`.
+    subgraph Phase9["Phase 9: Production Cloud Deployment & Multi-Tier PIN Security [NEXT UP]"]
+        P9["• Vercel Serverless Function Adapter & vercel.json<br>• Neon Cloud PostgreSQL Migration & Schema Push<br>• 3-Tier PIN Access: Public, Tournament Admin, Master Admin<br>• Two-Way AES-256-GCM Revealable PINs & Recovery Env Var<br>• 7-Day Session Tokens & API Mutation Guards<br>• Data Management & Simulation isolated strictly to Master Admin<br>• GitHub Actions CI/CD Pipeline"]
+    end
 
-#### 3. Simulation & Data Management Safety Hierarchy [COMPLETE]
-* **Problem:** Admins could accidentally clear qualifier data while active matches existed, creating orphaned match records.
-* **Fix:** In `DataSimulationSection.tsx` and `TournamentAdminForm.tsx`, disabled and blocked "Clear Quals" whenever active match scores exist. Enforced the strict lifecycle hierarchy: "Clear Matches" must be executed before "Clear Quals" becomes enabled.
-* **Files:** `src/features/tournament/components/TournamentAdminForm.tsx`, `src/features/tournament/components/settings/DataSimulationSection.tsx`.
+    subgraph Phase10["Phase 10: Live & Online Qualifiers Engine"]
+        P10["• Competitor Self-Service Portal (/:slug/qualify)<br>• Twitch OAuth 2.0 Integration on Production HTTPS<br>• 6–8 Char NES-Compatible Authword Engine<br>• Countdown Timer & QualTimerLog Telemetry<br>• Online Judge Review Queue (/:slug/manage/judge)<br>• Discord Webhook Dispatches (Start & Submit)"]
+    end
 
-#### 4. Settings "Add Tier" Button Placement [COMPLETE]
-* **Problem:** The "+ Add Tier" button at the top required organizers to scroll down to find the newly added tier.
-* **Fix:** Positioned the "+ Add Tier" button at the bottom of the tiers list when 1 or more tiers exist (retaining it prominently in the empty state when 0 tiers exist).
-* **Files:** `src/features/tournament/components/settings/TierManagementSection.tsx`.
+    subgraph Phase11["Phase 11: Mobile-Responsive Viewport Overhaul (360×800)"]
+        P11["• Qualifiers Leaderboard Handheld Card View<br>• Final Standings Mobile Card Rows<br>• Tournament Roster & Global Players Handheld Cards<br>• Mobile Navigation Bar & Collapsed Breadcrumbs"]
+    end
 
-#### 5. Homepage Tournament Card Navigation to Admin Bracket View [COMPLETE]
-* **Problem:** Clicking Bracket (or tier pills) on homepage cards routed users into the public/spectator view (`/:slug/:tierSlug`), forcing organizers to constantly click Admin to access the admin management view.
-* **Fix:** Routed homepage card "Brackets" action button and tier pill links directly to the admin management bracket view (`/:slug/manage/bracket/${tier.slug}`).
-* **Files:** `src/features/tournament/components/TournamentCard.tsx`.
+    subgraph Phase12["Phase 12: Universal Match Data Export & Custom Analytics"]
+        P12["• Universal Match Data Export Modal<br>• Formats: CSV (UTF-8 BOM), Sheets TSV (Clipboard), JSON<br>• Column Selection, Reordering & Preset Layouts"]
+    end
 
-#### 6. Global Player Card Identity [COMPLETE]
-* **Problem:** The competitor model lacked distinct separation between Twitch handle, competitive display name, and personal nickname.
-* **Fix:** Extended `PlayerProfile`, database schema `players` table, API layer, `PlayerEditModal.tsx`, `PlayerDetailDrawer.tsx`, and `PlayerDirectory.tsx` with `displayName`, `nickname`, and `twitchUsername` (sanitizing `@` prefix and providing Twitch stream badges). Ran `npm run db:push` against PostgreSQL container.
-* **Files:** `src/features/tournament/types.ts`, `src/db/schema.ts`, `src/api/players.ts`, `src/features/players/components/PlayerEditModal.tsx`, `src/features/qualifiers/components/PlayerDetailDrawer.tsx`, `src/features/players/components/PlayerDirectory.tsx`.
-
-#### 7. Pre-Lock Bracket Visibility in OBS Overlays (Note 1) [COMPLETE]
-* **Problem:** When match play hasn't been finalized but bracket tiers have been specified in settings, brackets were visible to admins and in the public view, but OBS overlays did not display or preview them.
-* **Fix:** Created `ObsBracketView.tsx`, `ObsMatchCardView.tsx`, and `ObsOverlayPage.tsx` supporting draft bracket preview mode when `tournament.isLocked === false` with chroma key support (`?chroma=green|#hex`), generating draft/projected match nodes with live qualifier seeds or placeholder seeds and displaying a pulsing "DRAFT PREVIEW" header badge.
-* **Files:** `src/features/obs/components/ObsBracketView.tsx`, `src/features/obs/components/ObsMatchCardView.tsx`, `src/routes/ObsOverlayPage.tsx`, `src/routes/PublicTierBracketPage.tsx`, `src/features/qualifiers/scoring.ts`, `src/App.tsx`.
+    Historic --> Phase9 --> Phase10 --> Phase11 --> Phase12
+```
 
 ---
 
-### Track C: Master Spec Phase 8 — Live & Online Qualifiers Engine
-* **Goal:** Deliver the full online self-service competitor qualification portal per Master Spec Section 10.
+### Phase 9: Production Cloud Deployment & Multi-Tier PIN Access Security [NEXT UP]
+* **Goal:** Deploy Tournament Manager to the public web (Vercel Serverless + Neon PostgreSQL) with 3-tier PIN access control so real-world users can safely view brackets while management operations are fully secured.
+1. **Unified Vercel Serverless Runtime (`api/index.ts` & `vercel.json`):**
+   * Wrap the existing `createApiMiddleware()` from `src/server/api.ts` into a Vercel Serverless Function adapter (`api/index.ts`).
+   * Configure `vercel.json` rewrites to route `/api/(.*)` to the serverless function and all other routes to the static Vite frontend (`dist/index.html`).
+   * Maintain 100% code reuse between local Vite dev server (`npm run dev`) and production Vercel deployment.
+2. **Neon Cloud PostgreSQL Migration & CLI Pipelines:**
+   * Leverage built-in `@neondatabase/serverless` connection support in `src/db/index.ts`.
+   * Configure production `DATABASE_URL` against Neon serverless Postgres.
+   * Run schema migrations (`npm run db:push`) and populate initial database with organizations and the 1,620 authentic competitors via `npm run db:seed`.
+3. **Multi-Tier PIN Security Engine (Spec Sec 10 / 12):**
+   * **Security Hierarchy:**
+     * **Level 0 (Public / Spectator):** Unauthenticated visitors have access to public views (`/:slug/brackets`, `/:slug/quals`, `/:slug/standings`, `/:slug/qualify`, OBS overlays). Any attempt to access `/manage/*` or global admin routes (`/organizations`, `/players`) auto-redirects to the public tournament view.
+     * **Level 1 (Tournament Admin):** Scoped by per-tournament PIN (`admin_pin_encrypted` in `tournaments` table). Grants access to the full tournament management left-nav (`/:slug/manage/*`). Unauthorized access attempts to global admin views redirect back to the tournament management dashboard.
+     * **Level 2 (Master Admin):** Authenticated via Master PIN (`master_pin_encrypted` in DB). Grants unrestricted global access: organization directory, all tournaments, global player directory, and viewing/editing all tournament PINs.
+     * **Emergency Master Recovery PIN:** Configured via environment variable (`MASTER_ADMIN_RECOVERY_PIN` in `.env`) providing an immutable fallback that can never be locked out even if the database is altered.
+   * **Data Management & Simulation Access Control:**
+     * Destructive controls in `DataSimulationSection.tsx` ("Clear All Tournament Data", "Simulate Full Tournament", "Seed Qualifiers Only") and corresponding API endpoints (`/api/simulate/sample`, bulk reset operations) are **strictly isolated to Master/System Admins**.
+     * Tournament Admins cannot view, access, or trigger simulation or data wipe actions, preventing accidental wiping of real tournament data by event directors or floor judges.
+   * **AES-256-GCM Two-Way Encryption (`pinCrypto.ts`):**
+     * Encrypts tournament PINs at rest using server secret key `PIN_ENCRYPTION_KEY`.
+     * Enables Master Admins to safely reveal and copy tournament PINs in the dashboard (`👁️ 7492`) without resetting them or invalidating active judge sessions.
+   * **Session Management & API Route Mutation Guards:**
+     * Dedicated PIN Login page (`/admin` or `/auth/pin`).
+     * Issues signed 7-day session token stored in `localStorage` (with explicit "Lock / Log Out" button in navbar). PINs themselves remain permanent unless explicitly modified.
+     * Server API middleware enforces `Authorization: Bearer <sessionToken>` on all mutation routes (`POST`, `PUT`, `DELETE`).
+4. **CI/CD Automation:**
+   * GitHub Actions workflow validating typechecks (`npm run typecheck`) and regression tests (`npm test`) on pull requests and pushes to `main`.
 
+---
+
+### Phase 10: Live & Online Qualifiers Engine [UPCOMING]
+* **Goal:** Deliver the full online self-service competitor qualification portal per Master Spec Section 10, running directly against the deployed production HTTPS environment.
 1. **Competitor Self-Service Portal (`/:slug/qualify`):**
    * Public onboarding view for remote competitors.
-   * Twitch OAuth 2.0 integration (retrieves Twitch username, channel ID, and avatar).
+   * Twitch OAuth 2.0 integration (using production HTTPS callback URL) retrieving Twitch handle, avatar, and channel link.
 2. **NES-Compatible Authword Engine (Spec Sec 10.2):**
    * Curated dictionary of ~1,000 family-friendly English words ($\ge 6$ letters).
    * Strict NES character set enforcement (`A–Z`, `0–9`, `.`, `-`, `!`, `♥`; no spaces).
@@ -198,7 +194,7 @@ flowchart TD
    * Non-blocking countdown timer inheriting `qualWindowMinutes`.
    * Captures `QualTimerLog` telemetry (`startedAt`, `submittedAt`, `elapsedSeconds`, `pauses`).
 4. **Online Judge Review Queue & Verification Drawer (Spec Sec 10.4):**
-   * Dedicated judge review drawer for incoming submissions.
+   * Dedicated judge review drawer (`/:slug/manage/judge`) for incoming submissions.
    * Embedded Twitch VOD player, 10k topout authword check, timer telemetry log inspection.
    * Actions: "Verify Qual", "Edit Score", "Mark DNQ", "Disqualify (DQ)".
 5. **Discord Webhooks Integration:**
@@ -208,27 +204,21 @@ flowchart TD
 
 ---
 
-### Track D: Master Spec Section 13.2 — Mobile-Responsive Overhaul (360×800 Viewport)
-* **Goal:** Guarantee all data-dense views are fully readable and operational on smartphone screens without horizontal scroll clipping.
-
+### Phase 11: Mobile-Responsive Viewport Overhaul (360×800 Viewport) [UPCOMING]
+* **Goal:** Guarantee all data-dense views are fully readable and operational on smartphone screens without horizontal scroll clipping per Master Spec Section 11.2 / 13.2.
 1. **Qualifiers Leaderboard:** Compact mobile card/accordion view displaying Rank, Player, Playstyle, Status, and Attempts/Scores.
 2. **Final Standings:** Mobile card rows preserving Final Rank, Competitor, Seed Delta badge, and Stage Reached.
-3. **Tournament Roster & Global Players Directory:** Mobile card rows for player management.
+3. **Tournament Roster & Global Players Directory:** Handheld cards for player management and search.
 4. **Global Navigation & Header:** Hamburger menu / mobile bottom tab bar and collapsed breadcrumbs on viewports $< 768\text{px}$.
 
 ---
 
-### Track E: Master Spec Phases 9 & 10 — Export, Security & Production Deployment
-* **Goal:** Finalize export pipelines, access controls, and hosting configuration.
-
-1. **Universal Match Data Export Modal (Phase 9):**
+### Phase 12: Universal Match Data Export & Custom Analytics [UPCOMING]
+* **Goal:** Finalize export pipelines and reporting tools per Master Spec Section 11.
+1. **Universal Match Data Export Modal:**
    * Configurable column toggles (Tournament, Tier, Stage, Round, Players, Seeds, Game Scores, Winner, Forfeit).
-   * Formats: CSV, TSV (direct paste into Google Sheets), and JSON.
-   * Column reordering and export presets ("CTWC Match Sheet", "Detailed Audit").
-2. **Shared PIN Security (Phase 10):**
-   * Passphrase gating for all `/manage/*` routes.
-3. **Production Deployment (Phase 10):**
-   * Vercel edge deployment configuration, environment variable hardening, custom domain setup.
+   * Formats: CSV (with UTF-8 BOM encoding for Excel), TSV (direct paste into Google Sheets), and JSON.
+   * Column reordering and export presets ("CTWC Match Sheet", "Detailed Audit", "Simple Bracket Results").
 
 ---
 
@@ -242,7 +232,7 @@ Per workspace guidelines in `AGENTS.md`:
 ## 5. Operational Defect Tracking & Verification Status
 
 - **Note 1:** *When match play hasn't been finalized but the brackets have been specified in settings, you can see the brackets as an admin or in public view but not in overlays.*
-  * **Status:** **RESOLVED (Track B, Item 7).** OBS overlay components (`ObsBracketView.tsx`, `ObsMatchCardView.tsx`, and dedicated routes) render projected draft brackets and placeholder match seeds prior to match lock with full chroma key support.
+  * **Status:** **RESOLVED (Phase 8, Item 7).** OBS overlay components (`ObsBracketView.tsx`, `ObsMatchCardView.tsx`, and dedicated routes) render projected draft brackets and placeholder match seeds prior to match lock with full chroma key support.
 
 - **Note 2:** *When the db is down, there doesn't seem to be any indicators in the main global UI that it's down. If the DB goes down and you were admining a tournament, it also doesn't mention that it's down.*
   * **Status:** **RESOLVED.**
