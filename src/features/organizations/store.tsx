@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Organization } from '../tournament/types';
 import { CreateOrganizationInput } from './types';
+import { getAuthHeaders } from '../auth/AuthContext';
 
 export const ORGANIZATIONS_STORAGE_KEY = 'classic_tetris_organizations';
 
@@ -113,7 +114,7 @@ export const OrganizationProvider: React.FC<{
       try {
         const res = await fetch('/api/organizations', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify(newOrg),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -137,7 +138,7 @@ export const OrganizationProvider: React.FC<{
       try {
         const res = await fetch(`/api/organizations/${id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify(updates),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -170,6 +171,7 @@ export const OrganizationProvider: React.FC<{
       try {
         const res = await fetch(`/api/organizations/${id}`, {
           method: 'DELETE',
+          headers: getAuthHeaders(),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         setOrganizations(prev => prev.filter(o => o.id !== id));

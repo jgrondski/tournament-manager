@@ -1,0 +1,377 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { usePinAuth } from '../features/auth/AuthContext';
+import { useTournament } from '../features/tournament/store';
+import { KeyRound, ShieldAlert, ArrowLeft, Eye, EyeOff, Check, LogOut, Info } from 'lucide-react';
+
+export const AdminLoginPage: React.FC = () => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectUrl = searchParams.get('redirect') || '';
+  const initialTourneySlug = searchParams.get('slug') || searchParams.get('tournament') || '';
+  const needSystem = searchParams.get('needSystem') === 'true';
+
+  const { login, logout, isSystemAdmin, session, canManage } = usePinAuth();
+  const { tournaments } = useTournament();
+
+  const [selectedTourneySlug, setSelectedTourneySlug] = useState(initialTourneySlug);
+  const [pin, setPin] = useState('');
+  const [showPin, setShowPin] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Auto redirect if already authorized for the requested destination
+  useEffect(() => {
+    if (isSystemAdmin) {
+      if (redirectUrl) {
+        navigate(redirectUrl, { replace: true });
+      }
+    } else if (selectedTourneySlug && canManage(selectedTourneySlug)) {
+      if (redirectUrl && !needSystem) {
+        navigate(redirectUrl, { replace: true });
+      }
+    }
+  }, [isSystemAdmin, selectedTourneySlug, canManage, navigate, redirectUrl, needSystem]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pin.trim()) {
+      setError('Please enter a PIN');
+      return;
+    }
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      const res = await login(pin, selectedTourneySlug || undefined);
+      if (!res.success) {
+        setError(res.error || 'Invalid PIN');
+        setIsSubmitting(false);
+        return;
+      }
+
+      setSuccessMsg('Authentication successful!');
+      setTimeout(() => {
+        if (redirectUrl) {
+          navigate(redirectUrl, { replace: true });
+        } else if (selectedTourneySlug) {
+          navigate(`/${selectedTourneySlug}/manage/qualifiers`, { replace: true });
+        } else {
+          navigate('/', { replace: true });
+        }
+      }, 400);
+    } catch (err: any) {
+      setError(err.message || 'Login failed');
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleLogout = () => {
+    logout();
+    setSuccessMsg('Logged out successfully');
+    setTimeout(() => setSuccessMsg(null), 2000);
+  };
+
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        backgroundColor: 'var(--color-bg-base, #0d1117)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '1.5rem',
+        fontFamily: 'Inter, system-ui, sans-serif',
+      }}
+    >
+      <div
+        style={{
+          width: '100%',
+          maxWidth: '430px',
+          backgroundColor: 'var(--color-bg-surface, #161b22)',
+          border: '1px solid var(--color-border, #30363d)',
+          borderRadius: '12px',
+          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5)',
+          padding: '2rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1.25rem',
+        }}
+      >
+        {/* Top Header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+          <div
+            style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, var(--color-gold-bright, #ffd700), #f59e0b)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#000',
+              boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)',
+            }}
+          >
+            <KeyRound size={22} />
+          </div>
+          <div>
+            <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#ffffff' }}>
+              Staff & Admin Login
+            </h1>
+            <p style={{ margin: '0.15rem 0 0 0', fontSize: '0.8rem', color: 'var(--color-text-muted, #8b949e)' }}>
+              Tournament Manager Access Control
+            </p>
+          </div>
+        </div>
+
+        {/* Existing Session Alert if active */}
+        {session && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0.65rem 0.85rem',
+              backgroundColor: 'rgba(56, 189, 248, 0.1)',
+              border: '1px solid rgba(56, 189, 248, 0.3)',
+              borderRadius: '8px',
+              color: '#38bdf8',
+              fontSize: '0.8rem',
+            }}
+          >
+            <div>
+              <strong>Active Session:</strong> {session.role === 'SYSTEM_ADMIN' ? '🛡️ System Admin' : '🏆 Tournament Admin'}
+            </div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="btn btn-secondary"
+              style={{ padding: '0.25rem 0.55rem', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+            >
+              <LogOut size={12} /> Log Out
+            </button>
+          </div>
+        )}
+
+        {/* Reason / Context Alert */}
+        {needSystem && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.65rem 0.85rem',
+              backgroundColor: 'rgba(245, 158, 11, 0.12)',
+              border: '1px solid rgba(245, 158, 11, 0.35)',
+              borderRadius: '8px',
+              color: 'var(--color-gold-bright)',
+              fontSize: '0.82rem',
+            }}
+          >
+            <Info size={16} style={{ flexShrink: 0 }} />
+            <span>System Admin Key required to access this administrative section.</span>
+          </div>
+        )}
+
+        {error && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.75rem 1rem',
+              backgroundColor: 'rgba(239, 68, 68, 0.15)',
+              border: '1px solid rgba(239, 68, 68, 0.4)',
+              borderRadius: '8px',
+              color: '#f87171',
+              fontSize: '0.85rem',
+            }}
+          >
+            <ShieldAlert size={18} style={{ flexShrink: 0 }} />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {successMsg && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.75rem 1rem',
+              backgroundColor: 'rgba(16, 185, 129, 0.15)',
+              border: '1px solid rgba(16, 185, 129, 0.4)',
+              borderRadius: '8px',
+              color: '#34d399',
+              fontSize: '0.85rem',
+            }}
+          >
+            <Check size={18} style={{ flexShrink: 0 }} />
+            <span>{successMsg}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {/* Tournament Scope Selector */}
+          <div>
+            <label
+              style={{
+                display: 'block',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                color: 'var(--color-text-secondary, #c9d1d9)',
+                marginBottom: '0.4rem',
+              }}
+            >
+              Tournament Scope (Optional for System Admin)
+            </label>
+            <select
+              value={selectedTourneySlug}
+              onChange={e => setSelectedTourneySlug(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.65rem 0.75rem',
+                backgroundColor: 'var(--color-bg-base, #0d1117)',
+                border: '1px solid var(--color-border, #30363d)',
+                borderRadius: '8px',
+                color: '#ffffff',
+                fontSize: '0.9rem',
+                outline: 'none',
+              }}
+            >
+              <option value="">Global / System Admin (All Tournaments)</option>
+              {tournaments.map(t => (
+                <option key={t.id} value={t.slug}>
+                  {t.name} ({t.slug})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* PIN Input */}
+          <div>
+            <label
+              style={{
+                display: 'block',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                color: 'var(--color-text-secondary, #c9d1d9)',
+                marginBottom: '0.4rem',
+              }}
+            >
+              Security Key / PIN
+            </label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPin ? 'text' : 'password'}
+                value={pin}
+                onChange={e => setPin(e.target.value)}
+                autoFocus
+                placeholder="Enter PIN or Key"
+                style={{
+                  width: '100%',
+                  padding: '0.65rem 2.5rem 0.65rem 0.75rem',
+                  backgroundColor: 'var(--color-bg-base, #0d1117)',
+                  border: '1px solid var(--color-border, #30363d)',
+                  borderRadius: '8px',
+                  color: '#ffffff',
+                  fontSize: '1rem',
+                  letterSpacing: '0.08em',
+                  boxSizing: 'border-box',
+                  outline: 'none',
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPin(!showPin)}
+                style={{
+                  position: 'absolute',
+                  right: '10px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--color-text-muted, #8b949e)',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                }}
+                tabIndex={-1}
+              >
+                {showPin ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            <p
+              style={{
+                margin: '0.45rem 0 0 0',
+                fontSize: '0.74rem',
+                color: 'var(--color-text-muted, #8b949e)',
+                lineHeight: 1.4,
+              }}
+            >
+              Tournament Admins enter the tournament PIN. System Admins enter the System Admin Key.
+            </p>
+          </div>
+
+          {/* Dev Mode Guidance */}
+          {Boolean((import.meta as any).env?.DEV) && (
+            <div
+              style={{
+                padding: '0.6rem 0.8rem',
+                background: 'rgba(56, 189, 248, 0.08)',
+                border: '1px solid rgba(56, 189, 248, 0.25)',
+                borderRadius: '6px',
+                fontSize: '0.74rem',
+                color: '#38bdf8',
+                lineHeight: 1.4,
+              }}
+            >
+              💡 <strong>Dev Mode Hint:</strong> Set <code>SYSTEM_ADMIN_RECOVERY_PIN</code> in your <code>.env</code> file, or use default dev key <code>0000</code> to unlock System Admin.
+            </div>
+          )}
+
+          {/* Submit */}
+          <button
+            type="submit"
+            disabled={isSubmitting || !pin.trim()}
+            style={{
+              padding: '0.75rem',
+              backgroundColor: 'var(--color-gold-bright, #ffd700)',
+              color: '#000000',
+              border: 'none',
+              borderRadius: '8px',
+              fontWeight: 700,
+              fontSize: '0.92rem',
+              cursor: isSubmitting || !pin.trim() ? 'not-allowed' : 'pointer',
+              opacity: isSubmitting || !pin.trim() ? 0.6 : 1,
+              transition: 'opacity 0.15s ease',
+            }}
+          >
+            {isSubmitting ? 'Authenticating...' : 'Unlock Administration'}
+          </button>
+        </form>
+
+        {/* Back Link */}
+        <div style={{ textAlign: 'center', marginTop: '0.5rem' }}>
+          <Link
+            to={selectedTourneySlug ? `/${selectedTourneySlug}/brackets` : '/'}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              fontSize: '0.8rem',
+              color: 'var(--color-text-muted, #8b949e)',
+              textDecoration: 'none',
+            }}
+          >
+            <ArrowLeft size={14} />
+            <span>Return to Public Tournament View</span>
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+};

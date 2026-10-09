@@ -230,5 +230,7 @@ export interface Tournament {
   bannerUrl?: string; // tournament-specific banner override
   discordWebhookUrl?: string; // tournament-specific discord webhook override
   themeColors?: TierThemeColors; // tournament-level 5-color palette override
+  adminPinEncrypted?: string; // AES-256-GCM encrypted tournament PIN
+  adminPin?: string; // transient/decrypted when viewed by authorized System Admin
 }
 

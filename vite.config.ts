@@ -8,6 +8,13 @@ import { createApiMiddleware } from './src/server/api';
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
+  // Ensure all .env variables are available to Node server middleware & runtime
+  for (const [key, val] of Object.entries(env)) {
+    if (process.env[key] === undefined || process.env[key] === '') {
+      process.env[key] = val;
+    }
+  }
+
   const defaultDbUrl = 'postgresql://postgres:postgres@localhost:5432/tournament_manager';
   const databaseUrl = env.DATABASE_URL || process.env.DATABASE_URL || defaultDbUrl;
   if (!process.env.DATABASE_URL && databaseUrl) {

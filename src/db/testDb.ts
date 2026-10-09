@@ -75,6 +75,7 @@ export function setupTestDb() {
       points_config JSONB,
       quals_closed BOOLEAN NOT NULL DEFAULT false,
       is_verified BOOLEAN NOT NULL DEFAULT false,
+      admin_pin_encrypted TEXT,
       metadata JSONB,
       created_at TIMESTAMP NOT NULL DEFAULT now()
     );
@@ -140,6 +141,12 @@ export function setupTestDb() {
       loser_id UUID REFERENCES players(id) ON DELETE SET NULL,
       is_intentional_topout BOOLEAN NOT NULL DEFAULT false,
       created_at TIMESTAMP NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE system_settings (
+      key TEXT PRIMARY KEY,
+      value JSONB NOT NULL,
+      updated_at TIMESTAMP NOT NULL DEFAULT now()
     );
   `);
 

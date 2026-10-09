@@ -12,6 +12,7 @@ import {
 import { runFullSimulation } from '../../features/tournament/simulation';
 import { generateDraftBracketsForTournament } from '../../features/qualifiers/scoring';
 import { createApiMiddleware } from '../../server/api';
+import { createSessionToken } from '../../server/pinCrypto';
 import type { PlayerProfile } from '../../features/tournament/types';
 
 describe('Relational Matches & Games PostgreSQL Integrity (Regression)', () => {
@@ -50,6 +51,9 @@ describe('Relational Matches & Games PostgreSQL Integrity (Regression)', () => {
     const req: any = {
       url,
       method,
+      headers: {
+        authorization: `Bearer ${createSessionToken({ role: 'SYSTEM_ADMIN' })}`,
+      },
       body,
       on: (event: string, callback: any) => {
         if (event === 'data' && body) {

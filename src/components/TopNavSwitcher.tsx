@@ -1,13 +1,16 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Trophy, Building2, Users, Zap, ArrowRight } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Trophy, Building2, Users, Zap, ArrowRight, ShieldCheck, LogOut, KeyRound } from 'lucide-react';
 import { useTournament } from '../features/tournament/store';
 import { useOrganization } from '../features/organizations/store';
+import { usePinAuth } from '../features/auth/AuthContext';
 
 export const TopNavSwitcher: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { tournaments, activeTournament, globalPlayers } = useTournament();
   const { organizations } = useOrganization();
+  const { isSystemAdmin, session, logout } = usePinAuth();
 
   const isTournaments = location.pathname === '/' || location.pathname.startsWith('/tournaments');
   const isOrganizations = location.pathname.startsWith('/organizations') || location.pathname.startsWith('/org/');
@@ -37,6 +40,11 @@ export const TopNavSwitcher: React.FC = () => {
     },
   ];
 
+  const handleLogout = () => {
+    logout();
+    navigate('/', { replace: true });
+  };
+
   return (
     <header
       style={{
@@ -60,87 +68,102 @@ export const TopNavSwitcher: React.FC = () => {
           maxWidth: '1180px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
+          justifyContent: 'space-between',
           position: 'relative',
           boxSizing: 'border-box',
         }}
       >
-        {/* Centered Global Navigation Pills with Strict Equal 3-Column Widths */}
-        <nav
-          aria-label="Global Navigation"
+        {/* Left: Brand / Switcher Home Link */}
+        <Link
+          to="/"
           style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+            display: 'inline-flex',
             alignItems: 'center',
-            padding: '0.3rem',
-            background: 'var(--color-bg-surface-elevated, #161922)',
-            borderRadius: 'var(--radius-full, 9999px)',
-            border: '1px solid var(--color-border, rgba(255,255,255,0.1))',
-            boxShadow: '0 4px 14px rgba(0, 0, 0, 0.35)',
-            gap: '0.25rem',
-            width: '100%',
-            maxWidth: '540px',
-            margin: '0 auto',
-            boxSizing: 'border-box',
+            gap: '0.5rem',
+            textDecoration: 'none',
+            color: 'var(--color-text-primary, #ffffff)',
+            fontWeight: 800,
+            fontSize: '1rem',
+            letterSpacing: '-0.02em',
           }}
         >
-          {navTabs.map(tab => {
-            const Icon = tab.icon;
-            return (
-              <Link
-                key={tab.to}
-                to={tab.to}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
-                  padding: '0.45rem 0.75rem',
-                  borderRadius: 'var(--radius-full, 9999px)',
-                  fontSize: '0.85rem',
-                  fontWeight: tab.isActive ? 700 : 500,
-                  color: tab.isActive ? '#090d16' : 'var(--color-text-secondary, #94a3b8)',
-                  background: tab.isActive
-                    ? 'var(--color-gold-bright, #ffc905)'
-                    : 'transparent',
-                  textDecoration: 'none',
-                  transition: 'all 0.18s ease',
-                  boxShadow: tab.isActive ? '0 2px 8px rgba(255, 201, 5, 0.4)' : 'none',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                <Icon size={16} color={tab.isActive ? '#090d16' : 'currentColor'} style={{ flexShrink: 0 }} />
-                <span>{tab.label}</span>
-                {tab.count !== null && (
-                  <span
-                    style={{
-                      fontSize: '0.7rem',
-                      fontWeight: 700,
-                      padding: '0.1rem 0.45rem',
-                      borderRadius: 'var(--radius-full, 9999px)',
-                      background: tab.isActive ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.08)',
-                      color: tab.isActive ? '#090d16' : 'var(--color-text-muted, #64748b)',
-                    }}
-                  >
-                    {tab.count}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
-        </nav>
+          <Trophy size={18} color="var(--color-gold-bright, #ffc905)" />
+          <span>TOURNAMENT <span style={{ color: 'var(--color-gold-bright, #ffc905)' }}>MANAGER</span></span>
+        </Link>
 
-        {/* Option A: Active Tournament Quick-Return Teleport Chip */}
-        {activeTournament && (
-          <div
-            className="top-nav-teleport-chip"
+        {/* Center: Global Navigation Pills (Strictly restricted to System Admin) */}
+        {isSystemAdmin ? (
+          <nav
+            aria-label="Global System Navigation"
             style={{
-              position: 'absolute',
-              right: 0,
-              display: 'flex',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
               alignItems: 'center',
+              padding: '0.3rem',
+              background: 'var(--color-bg-surface-elevated, #161922)',
+              borderRadius: 'var(--radius-full, 9999px)',
+              border: '1px solid var(--color-border, rgba(255,255,255,0.1))',
+              boxShadow: '0 4px 14px rgba(0, 0, 0, 0.35)',
+              gap: '0.25rem',
+              width: '100%',
+              maxWidth: '520px',
+              margin: '0 auto',
+              boxSizing: 'border-box',
             }}
           >
+            {navTabs.map(tab => {
+              const Icon = tab.icon;
+              return (
+                <Link
+                  key={tab.to}
+                  to={tab.to}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    padding: '0.45rem 0.75rem',
+                    borderRadius: 'var(--radius-full, 9999px)',
+                    fontSize: '0.85rem',
+                    fontWeight: tab.isActive ? 700 : 500,
+                    color: tab.isActive ? '#090d16' : 'var(--color-text-secondary, #94a3b8)',
+                    background: tab.isActive
+                      ? 'var(--color-gold-bright, #ffc905)'
+                      : 'transparent',
+                    textDecoration: 'none',
+                    transition: 'all 0.18s ease',
+                    boxShadow: tab.isActive ? '0 2px 8px rgba(255, 201, 5, 0.4)' : 'none',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <Icon size={16} color={tab.isActive ? '#090d16' : 'currentColor'} style={{ flexShrink: 0 }} />
+                  <span>{tab.label}</span>
+                  {tab.count !== null && (
+                    <span
+                      style={{
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                        padding: '0.1rem 0.45rem',
+                        borderRadius: 'var(--radius-full, 9999px)',
+                        background: tab.isActive ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+                        color: tab.isActive ? '#090d16' : 'var(--color-text-muted, #64748b)',
+                      }}
+                    >
+                      {tab.count}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+          </nav>
+        ) : (
+          <div style={{ flex: 1 }} />
+        )}
+
+        {/* Right: Auth Controls (Login / Log Out & Role Indicator) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          {/* Active Tournament Quick-Return Teleport Chip (if applicable) */}
+          {activeTournament && (
             <Link
               to={activeTournament.isLocked && activeTournament.tiers?.length
                 ? `/${activeTournament.slug}/manage/bracket/${activeTournament.tiers[0].slug}`
@@ -149,23 +172,22 @@ export const TopNavSwitcher: React.FC = () => {
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '0.45rem',
-                padding: '0.4rem 0.85rem',
+                padding: '0.35rem 0.75rem',
                 borderRadius: 'var(--radius-full, 9999px)',
-                background: 'rgba(255, 201, 5, 0.12)',
-                border: '1px solid rgba(255, 201, 5, 0.35)',
+                background: 'rgba(255, 201, 5, 0.1)',
+                border: '1px solid rgba(255, 201, 5, 0.3)',
                 color: 'var(--color-gold-bright, #ffc905)',
-                fontSize: '0.8rem',
+                fontSize: '0.78rem',
                 fontWeight: 700,
                 textDecoration: 'none',
                 transition: 'all 0.18s ease',
-                boxShadow: '0 2px 10px rgba(0, 0, 0, 0.25)',
               }}
               title={`Return to active tournament: ${activeTournament.name}`}
             >
-              <Zap size={13} color="var(--color-gold-bright, #ffc905)" style={{ flexShrink: 0 }} />
+              <Zap size={12} color="var(--color-gold-bright, #ffc905)" style={{ flexShrink: 0 }} />
               <span
                 style={{
-                  maxWidth: '170px',
+                  maxWidth: '140px',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
@@ -173,10 +195,79 @@ export const TopNavSwitcher: React.FC = () => {
               >
                 {activeTournament.name}
               </span>
-              <ArrowRight size={13} color="var(--color-gold-bright, #ffc905)" style={{ flexShrink: 0 }} />
+              <ArrowRight size={12} color="var(--color-gold-bright, #ffc905)" style={{ flexShrink: 0 }} />
             </Link>
-          </div>
-        )}
+          )}
+
+          {/* Role Status & Log Out Button */}
+          {session ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  padding: '0.3rem 0.65rem',
+                  borderRadius: 'var(--radius-full, 9999px)',
+                  background: isSystemAdmin ? 'rgba(56, 189, 248, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                  border: isSystemAdmin ? '1px solid rgba(56, 189, 248, 0.4)' : '1px solid rgba(245, 158, 11, 0.4)',
+                  color: isSystemAdmin ? '#38bdf8' : 'var(--color-gold-bright, #ffc905)',
+                  fontSize: '0.74rem',
+                  fontWeight: 700,
+                }}
+                title={isSystemAdmin ? 'Authenticated with System Admin Key' : 'Authenticated with Tournament Admin PIN'}
+              >
+                <ShieldCheck size={12} />
+                <span>{isSystemAdmin ? 'System Admin' : 'Tournament Admin'}</span>
+              </span>
+
+              <button
+                type="button"
+                onClick={handleLogout}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  padding: '0.3rem 0.65rem',
+                  borderRadius: 'var(--radius-full, 9999px)',
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid var(--color-border, rgba(255,255,255,0.15))',
+                  color: 'var(--color-text-secondary, #94a3b8)',
+                  fontSize: '0.74rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+                title="Log out and reset session to public spectator"
+              >
+                <LogOut size={12} />
+                <span>Log Out</span>
+              </button>
+            </div>
+          ) : (
+            <Link
+              to="/admin"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                padding: '0.35rem 0.8rem',
+                borderRadius: 'var(--radius-full, 9999px)',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid var(--color-border, rgba(255,255,255,0.12))',
+                color: 'var(--color-text-secondary, #94a3b8)',
+                fontSize: '0.78rem',
+                fontWeight: 600,
+                textDecoration: 'none',
+                transition: 'all 0.15s ease',
+              }}
+              title="Staff & Organizer Login"
+            >
+              <KeyRound size={13} color="var(--color-gold-bright, #ffc905)" />
+              <span>Staff Login</span>
+            </Link>
+          )}
+        </div>
       </div>
     </header>
   );

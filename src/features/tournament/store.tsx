@@ -12,6 +12,7 @@ import { generateDraftBracketsForTournament } from '../qualifiers/scoring';
 import {
   generateAdditionalFakePlayers,
 } from './simulation';
+import { getAuthHeaders } from '../auth/AuthContext';
 
 interface TournamentContextType {
   tournaments: Tournament[];
@@ -239,7 +240,15 @@ export const TournamentContext = createContext<TournamentContextType | null>(nul
 
 async function apiCall(endpoint: string, options: RequestInit = {}) {
   if (typeof fetch === 'undefined') return null;
-  const res = await fetch(endpoint, options);
+  const authHeaders = getAuthHeaders();
+  const mergedHeaders: Record<string, string> = {
+    ...authHeaders,
+    ...((options.headers as Record<string, string>) || {}),
+  };
+  const res = await fetch(endpoint, {
+    ...options,
+    headers: mergedHeaders,
+  });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({ error: res.statusText }));
     const msg = errorData.error || `HTTP ${res.status}`;

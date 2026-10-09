@@ -22,7 +22,9 @@ import { TournamentInfoSection } from './settings/TournamentInfoSection';
 import { OrgBrandPaletteSection } from './settings/OrgBrandPaletteSection';
 import { TierManagementSection } from './settings/TierManagementSection';
 import { DataSimulationSection } from './settings/DataSimulationSection';
+import { TournamentSecuritySection } from './settings/TournamentSecuritySection';
 import { AdminFormModals } from './settings/AdminFormModals';
+import { usePinAuth } from '../../auth/AuthContext';
 
 interface TournamentAdminFormProps {
   tournament: Tournament;
@@ -44,6 +46,7 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
     simulateFullTournament,
     unlockBrackets,
   } = useTournament();
+  const { isSystemAdmin } = usePinAuth();
 
   const { organizations, getOrganizationById } = useOrganization();
 
@@ -745,18 +748,26 @@ export const TournamentAdminForm: React.FC<TournamentAdminFormProps> = ({
         onRequestDeleteTier={(idx, tier) => setTierToDelete({ index: idx, tier })}
       />
 
-      {/* Section 4: Data Management & Simulation */}
-      <DataSimulationSection
-        seedingMethod={seedingMethod}
-        manualSeedsCount={tournament.manualSeeds?.length || 0}
-        qualifierCount={qualifierCount}
-        recordedMatchCount={recordedMatchCount}
-        hasTiers={tiers.length > 0}
-        simFeedback={simFeedback}
-        onSeedQualifiers={handleSeedQualifiers}
-        onSimulate={handleSimulate}
-        onRequestDataAction={action => setDataActionToConfirm(action)}
+      {/* Section 4: Access Security & PIN Management */}
+      <TournamentSecuritySection
+        tournamentId={tournament.id}
+        tournamentSlug={tournament.slug}
       />
+
+      {/* Section 5: Data Management & Simulation (Strictly System Admin Only per AGENTS.md Section 10) */}
+      {isSystemAdmin && (
+        <DataSimulationSection
+          seedingMethod={seedingMethod}
+          manualSeedsCount={tournament.manualSeeds?.length || 0}
+          qualifierCount={qualifierCount}
+          recordedMatchCount={recordedMatchCount}
+          hasTiers={tiers.length > 0}
+          simFeedback={simFeedback}
+          onSeedQualifiers={handleSeedQualifiers}
+          onSimulate={handleSimulate}
+          onRequestDataAction={action => setDataActionToConfirm(action)}
+        />
+      )}
 
       {/* Save Button Bar */}
       <div

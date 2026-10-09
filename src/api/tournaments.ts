@@ -379,6 +379,7 @@ export async function getFullTournament(idOrSlug: string): Promise<Tournament | 
     bannerUrl: meta.bannerUrl || undefined,
     discordWebhookUrl: meta.discordWebhookUrl || undefined,
     themeColors: meta.themeColors || undefined,
+    adminPinEncrypted: t.adminPinEncrypted || undefined,
   };
 
   return fullTourney;
@@ -437,18 +438,22 @@ export async function saveFullTournament(tourney: Tournament): Promise<Tournamen
 
   if (existing.length > 0) {
     savedTourneyId = existing[0].id;
+    const updatePayload: Record<string, any> = {
+      name: tourney.name,
+      slug,
+      organizationId: orgId,
+      qualFormat: tourney.qualFormat,
+      qualAverageCount: tourney.qualAverageCount || null,
+      pointsConfig: tourney.pointsConfig || null,
+      qualsClosed: Boolean(tourney.isLocked),
+      metadata,
+    };
+    if (tourney.adminPinEncrypted !== undefined) {
+      updatePayload.adminPinEncrypted = tourney.adminPinEncrypted;
+    }
     await db
       .update(tournaments)
-      .set({
-        name: tourney.name,
-        slug,
-        organizationId: orgId,
-        qualFormat: tourney.qualFormat,
-        qualAverageCount: tourney.qualAverageCount || null,
-        pointsConfig: tourney.pointsConfig || null,
-        qualsClosed: Boolean(tourney.isLocked),
-        metadata,
-      })
+      .set(updatePayload)
       .where(eq(tournaments.id, savedTourneyId));
   } else {
     const [inserted] = await db
@@ -463,6 +468,7 @@ export async function saveFullTournament(tourney: Tournament): Promise<Tournamen
         pointsConfig: tourney.pointsConfig || null,
         qualsClosed: Boolean(tourney.isLocked),
         isVerified: false,
+        adminPinEncrypted: tourney.adminPinEncrypted || null,
         metadata,
       })
       .returning();

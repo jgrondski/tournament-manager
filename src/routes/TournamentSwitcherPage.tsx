@@ -5,8 +5,10 @@ import { Layers, Plus, Trophy, AlertTriangle, Sparkles } from 'lucide-react';
 import { Tournament } from '../features/tournament/types';
 import { TournamentCard } from '../features/tournament/components/TournamentCard';
 import { CreateTournamentModal } from '../features/tournament/components/CreateTournamentModal';
+import { usePinAuth } from '../features/auth/AuthContext';
 
 export const TournamentSwitcherPage: React.FC = () => {
+  const { isSystemAdmin } = usePinAuth();
   const {
     tournaments,
     deleteTournament,
@@ -59,35 +61,37 @@ export const TournamentSwitcherPage: React.FC = () => {
             Organizer command center, public broadcast brackets, and mobile floor judge portal for competitive gaming tournaments.
           </p>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <button
-              onClick={() => setIsCreateModalOpen(true)}
-              className="btn btn-primary"
-              style={{ padding: '0.65rem 1.5rem', fontSize: '0.95rem', boxShadow: 'var(--shadow-gold)' }}
-            >
-              <Plus size={18} />
-              Create New Tournament
-            </button>
-            <button
-              onClick={handleSimulateSample}
-              disabled={isSimulating}
-              className="btn"
-              style={{
-                padding: '0.65rem 1.5rem',
-                fontSize: '0.95rem',
-                background: 'rgba(59, 130, 246, 0.15)',
-                color: '#60a5fa',
-                border: '1px solid rgba(59, 130, 246, 0.35)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                cursor: isSimulating ? 'not-allowed' : 'pointer',
-              }}
-            >
-              <Sparkles size={18} />
-              {isSimulating ? 'Simulating...' : 'Simulate Sample Tournament'}
-            </button>
-          </div>
+          {isSystemAdmin && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                className="btn btn-primary"
+                style={{ padding: '0.65rem 1.5rem', fontSize: '0.95rem', boxShadow: 'var(--shadow-gold)' }}
+              >
+                <Plus size={18} />
+                Create New Tournament
+              </button>
+              <button
+                onClick={handleSimulateSample}
+                disabled={isSimulating}
+                className="btn"
+                style={{
+                  padding: '0.65rem 1.5rem',
+                  fontSize: '0.95rem',
+                  background: 'rgba(59, 130, 246, 0.15)',
+                  color: '#60a5fa',
+                  border: '1px solid rgba(59, 130, 246, 0.35)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  cursor: isSimulating ? 'not-allowed' : 'pointer',
+                }}
+              >
+                <Sparkles size={18} />
+                {isSimulating ? 'Simulating...' : 'Simulate Sample Tournament'}
+              </button>
+            </div>
+          )}
         </header>
 
         {/* Tournament Grid / Empty State */}

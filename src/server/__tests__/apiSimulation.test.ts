@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { setupTestDb } from '../../db/testDb';
 import { setDb } from '../../db';
 import { simulateSampleTournament, createApiMiddleware } from '../api';
+import { createSessionToken } from '../pinCrypto';
 import { getFullTournament, deleteTournament } from '../../api/tournaments';
 import { tournaments, bracketTiers, qualifierSubmissions, tournamentPlayers } from '../../db/schema';
 import { runFullSimulation, generateRealisticPlayers } from '../../features/tournament/simulation';
@@ -203,6 +204,9 @@ describe('API Server & Full Simulation Engine against PostgreSQL Schema', () => 
       const req: any = {
         url: '/api/simulate/sample',
         method: 'POST',
+        headers: {
+          authorization: `Bearer ${createSessionToken({ role: 'MASTER_ADMIN' })}`,
+        },
       };
       const res: any = {
         setHeader: () => {},

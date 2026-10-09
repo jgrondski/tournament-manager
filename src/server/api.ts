@@ -1,6 +1,15 @@
-import { getDb } from '../db';
-import { sql } from 'drizzle-orm';
+import { getDb, tournaments, systemSettings } from '../db';
+import { sql, eq, or } from 'drizzle-orm';
 import type { IncomingMessage, ServerResponse } from 'http';
+import {
+  encryptPin,
+  decryptPin,
+  createSessionToken,
+  verifySessionToken,
+  isSystemRecoveryPin,
+  safeCompareStrings,
+  type SessionPayload,
+} from './pinCrypto';
 import {
   createPlayer,
   createPlayersBatch,
@@ -14,6 +23,7 @@ import {
   getFullTournament,
   saveFullTournament,
   deleteTournament,
+  isUuid,
 } from '../api/tournaments';
 import {
   submitQualifierScore,
@@ -76,6 +86,43 @@ function sendError(res: ServerResponse, status: number, message: string) {
   sendJson(res, status, { error: message });
 }
 
+function checkAuth(
+  req: IncomingMessage,
+  res: ServerResponse,
+  requiredRole: 'SYSTEM_ADMIN' | 'TOURNAMENT_ADMIN' | 'MASTER_ADMIN',
+  targetTournamentId?: string
+): SessionPayload | null {
+  const authHeader = (req.headers && req.headers['authorization']) || '';
+  if (!authHeader.startsWith('Bearer ')) {
+    sendError(res, 401, 'Unauthorized: Admin session token required');
+    return null;
+  }
+  const token = authHeader.slice(7).trim();
+  const session = verifySessionToken(token);
+  if (!session) {
+    sendError(res, 401, 'Unauthorized: Invalid or expired session token');
+    return null;
+  }
+  if (session.role === 'SYSTEM_ADMIN' || session.role === 'MASTER_ADMIN') {
+    return session;
+  }
+  if (requiredRole === 'TOURNAMENT_ADMIN') {
+    if (session.role === 'TOURNAMENT_ADMIN') {
+      if (
+        !targetTournamentId ||
+        session.tournamentId === targetTournamentId ||
+        session.tournamentSlug === targetTournamentId
+      ) {
+        return session;
+      }
+      sendError(res, 403, 'Forbidden: Tournament Admin scope does not match this tournament');
+      return null;
+    }
+  }
+  sendError(res, 403, 'Forbidden: Requires System Admin permissions');
+  return null;
+}
+
 export function createApiMiddleware() {
   return async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
     const rawUrl = req.url || '';
@@ -123,6 +170,171 @@ export function createApiMiddleware() {
         return sendJson(res, 200, { ok: true });
       }
 
+      // --- AUTHENTICATION & PIN ENDPOINTS ---
+      // POST /api/auth/pin
+      if (pathname === '/api/auth/pin' && method === 'POST') {
+        const candidatePin = typeof body?.pin === 'string' ? body.pin.trim() : '';
+        const tournamentSlugOrId = typeof body?.tournamentSlugOrId === 'string' ? body.tournamentSlugOrId.trim() : undefined;
+
+        if (!candidatePin) {
+          return sendError(res, 400, 'PIN is required');
+        }
+
+        // 1. Check System Recovery PIN from environment variable
+        if (isSystemRecoveryPin(candidatePin)) {
+          const token = createSessionToken({ role: 'SYSTEM_ADMIN' });
+          return sendJson(res, 200, {
+            success: true,
+            role: 'SYSTEM_ADMIN',
+            token,
+          });
+        }
+
+        // 2. Check System PIN from system_settings table
+        try {
+          const db = getDb();
+          const masterSetting = await db
+            .select()
+            .from(systemSettings)
+            .where(eq(systemSettings.key, 'master_credentials'));
+          if (masterSetting.length > 0) {
+            const val = masterSetting[0].value as any;
+            if (val?.masterPinEncrypted) {
+              const storedPin = decryptPin(val.masterPinEncrypted);
+              if (safeCompareStrings(candidatePin, storedPin)) {
+                const token = createSessionToken({ role: 'SYSTEM_ADMIN' });
+                return sendJson(res, 200, {
+                  success: true,
+                  role: 'SYSTEM_ADMIN',
+                  token,
+                });
+              }
+            }
+          }
+        } catch {
+          // Ignore DB / decryption error and continue
+        }
+
+        // Dev fallback for System Admin if no Recovery PIN is configured and not in production
+        const rawRecoveryPin = (process.env.SYSTEM_ADMIN_RECOVERY_PIN || process.env.MASTER_ADMIN_RECOVERY_PIN || '').trim();
+        const cleanRecoveryPin = rawRecoveryPin.replace(/^["']|["']$/g, '').trim();
+        const hasConfiguredRecoveryPin = Boolean(cleanRecoveryPin);
+        if (process.env.NODE_ENV !== 'production' && !hasConfiguredRecoveryPin) {
+          if (safeCompareStrings(candidatePin, 'admin') || safeCompareStrings(candidatePin, '0000')) {
+            const token = createSessionToken({ role: 'SYSTEM_ADMIN' });
+            return sendJson(res, 200, {
+              success: true,
+              role: 'SYSTEM_ADMIN',
+              token,
+            });
+          }
+        }
+
+        // 3. Check Tournament PIN
+        try {
+          const db = getDb();
+          if (tournamentSlugOrId) {
+            const cond = isUuid(tournamentSlugOrId)
+              ? or(eq(tournaments.id, tournamentSlugOrId), eq(tournaments.slug, tournamentSlugOrId))
+              : eq(tournaments.slug, tournamentSlugOrId);
+            const tourneyRows = await db
+              .select()
+              .from(tournaments)
+              .where(cond);
+            if (tourneyRows.length > 0 && tourneyRows[0].adminPinEncrypted) {
+              const storedPin = decryptPin(tourneyRows[0].adminPinEncrypted);
+              if (safeCompareStrings(candidatePin, storedPin)) {
+                const token = createSessionToken({
+                  role: 'TOURNAMENT_ADMIN',
+                  tournamentId: tourneyRows[0].id,
+                  tournamentSlug: tourneyRows[0].slug,
+                });
+                return sendJson(res, 200, {
+                  success: true,
+                  role: 'TOURNAMENT_ADMIN',
+                  tournamentId: tourneyRows[0].id,
+                  tournamentSlug: tourneyRows[0].slug,
+                  token,
+                });
+              }
+            }
+          } else {
+            // Check all tournaments
+            const allTourneys = await db.select().from(tournaments);
+            for (const t of allTourneys) {
+              if (t.adminPinEncrypted) {
+                try {
+                  const storedPin = decryptPin(t.adminPinEncrypted);
+                  if (safeCompareStrings(candidatePin, storedPin)) {
+                    const token = createSessionToken({
+                      role: 'TOURNAMENT_ADMIN',
+                      tournamentId: t.id,
+                      tournamentSlug: t.slug,
+                    });
+                    return sendJson(res, 200, {
+                      success: true,
+                      role: 'TOURNAMENT_ADMIN',
+                      tournamentId: t.id,
+                      tournamentSlug: t.slug,
+                      token,
+                    });
+                  }
+                } catch {
+                  // Ignore
+                }
+              }
+            }
+          }
+        } catch {
+          // Ignore DB error
+        }
+
+        return sendError(res, 401, 'Invalid PIN');
+      }
+
+      // GET /api/auth/session
+      if (pathname === '/api/auth/session' && method === 'GET') {
+        const authHeader = (req.headers && req.headers['authorization']) || '';
+        if (!authHeader.startsWith('Bearer ')) {
+          return sendJson(res, 200, { valid: false });
+        }
+        const session = verifySessionToken(authHeader.slice(7).trim());
+        if (!session) {
+          return sendJson(res, 200, { valid: false });
+        }
+        return sendJson(res, 200, {
+          valid: true,
+          role: session.role,
+          tournamentId: session.tournamentId,
+          expiresAt: session.expiresAt,
+        });
+      }
+
+      // PUT /api/auth/system-pin (and legacy /api/auth/master-pin)
+      if ((pathname === '/api/auth/system-pin' || pathname === '/api/auth/master-pin') && method === 'PUT') {
+        if (!checkAuth(req, res, 'SYSTEM_ADMIN')) return;
+        const newPin = typeof body?.pin === 'string' ? body.pin.trim() : '';
+        if (!newPin) return sendError(res, 400, 'New PIN is required');
+        const db = getDb();
+        const encrypted = encryptPin(newPin);
+        const existing = await db
+          .select()
+          .from(systemSettings)
+          .where(eq(systemSettings.key, 'master_credentials'));
+        if (existing.length > 0) {
+          await db
+            .update(systemSettings)
+            .set({ value: { masterPinEncrypted: encrypted }, updatedAt: new Date() })
+            .where(eq(systemSettings.key, 'master_credentials'));
+        } else {
+          await db.insert(systemSettings).values({
+            key: 'master_credentials',
+            value: { masterPinEncrypted: encrypted },
+          });
+        }
+        return sendJson(res, 200, { success: true });
+      }
+
       // --- PLAYERS ENDPOINTS ---
       // GET /api/players
       if (pathname === '/api/players' && method === 'GET') {
@@ -147,6 +359,7 @@ export function createApiMiddleware() {
 
       // POST /api/players/batch
       if (pathname === '/api/players/batch' && method === 'POST') {
+        if (!checkAuth(req, res, 'SYSTEM_ADMIN')) return;
         const list = Array.isArray(body) ? body : body.players || [];
         const created = await createPlayersBatch(list);
         return sendJson(res, 201, created);
@@ -154,6 +367,7 @@ export function createApiMiddleware() {
 
       // POST /api/players
       if (pathname === '/api/players' && method === 'POST') {
+        if (!checkAuth(req, res, 'SYSTEM_ADMIN')) return;
         const created = await createPlayer(body);
         return sendJson(res, 201, created);
       }
@@ -168,11 +382,13 @@ export function createApiMiddleware() {
           return sendJson(res, 200, p);
         }
         if (method === 'PUT') {
+          if (!checkAuth(req, res, 'SYSTEM_ADMIN')) return;
           const updated = await updatePlayer(playerId, body);
           if (!updated) return sendError(res, 404, 'Player not found');
           return sendJson(res, 200, updated);
         }
         if (method === 'DELETE') {
+          if (!checkAuth(req, res, 'SYSTEM_ADMIN')) return;
           const deleted = await deletePlayer(playerId);
           return sendJson(res, 200, { success: deleted });
         }
@@ -187,6 +403,7 @@ export function createApiMiddleware() {
 
       // POST /api/organizations
       if (pathname === '/api/organizations' && method === 'POST') {
+        if (!checkAuth(req, res, 'SYSTEM_ADMIN')) return;
         const created = await createOrganization(body as any);
         return sendJson(res, 201, created);
       }
@@ -201,11 +418,13 @@ export function createApiMiddleware() {
           return sendJson(res, 200, org);
         }
         if (method === 'PUT') {
+          if (!checkAuth(req, res, 'SYSTEM_ADMIN')) return;
           const updated = await updateOrganization(orgId, body as any);
           if (!updated) return sendError(res, 404, 'Organization not found');
           return sendJson(res, 200, updated);
         }
         if (method === 'DELETE') {
+          if (!checkAuth(req, res, 'SYSTEM_ADMIN')) return;
           const result = await deleteOrganization(orgId);
           if (!result.success) {
             return sendError(res, 400, result.error || 'Failed to delete organization');
@@ -223,12 +442,14 @@ export function createApiMiddleware() {
 
       // POST /api/tournaments
       if (pathname === '/api/tournaments' && method === 'POST') {
+        if (!checkAuth(req, res, 'SYSTEM_ADMIN')) return;
         const saved = await saveFullTournament(body);
         return sendJson(res, 201, saved);
       }
 
       // POST /api/simulate/sample (1-click sample tournament)
       if (pathname === '/api/simulate/sample' && method === 'POST') {
+        if (!checkAuth(req, res, 'SYSTEM_ADMIN')) return;
         const sampleTourney = await simulateSampleTournament();
         return sendJson(res, 201, sampleTourney);
       }
@@ -247,18 +468,62 @@ export function createApiMiddleware() {
             return sendJson(res, 200, t);
           }
           if (method === 'PUT') {
+            if (!checkAuth(req, res, 'TOURNAMENT_ADMIN', tourneyId)) return;
             const updated = await saveFullTournament({ ...body, id: tourneyId });
             return sendJson(res, 200, updated);
           }
           if (method === 'DELETE') {
+            if (!checkAuth(req, res, 'SYSTEM_ADMIN')) return;
             const deleted = await deleteTournament(tourneyId);
             return sendJson(res, 200, { success: deleted });
           }
         }
 
         // Subactions
+        // PUT /api/tournaments/:id/pin (Update tournament PIN)
+        if (subAction === 'pin' && method === 'PUT') {
+          if (!checkAuth(req, res, 'TOURNAMENT_ADMIN', tourneyId)) return;
+          const pin = typeof body?.pin === 'string' ? body.pin.trim() : '';
+          if (!pin) return sendError(res, 400, 'PIN is required');
+          const encrypted = encryptPin(pin);
+          const db = getDb();
+          const pinCond = isUuid(tourneyId)
+            ? or(eq(tournaments.id, tourneyId), eq(tournaments.slug, tourneyId))
+            : eq(tournaments.slug, tourneyId);
+          await db
+            .update(tournaments)
+            .set({ adminPinEncrypted: encrypted })
+            .where(pinCond);
+          return sendJson(res, 200, { success: true });
+        }
+
+        // GET /api/tournaments/:id/reveal-pin (Master Admin reveals plaintext PIN)
+        if (subAction === 'reveal-pin' && method === 'GET') {
+          if (!checkAuth(req, res, 'SYSTEM_ADMIN')) return;
+          const db = getDb();
+          const revealCond = isUuid(tourneyId)
+            ? or(eq(tournaments.id, tourneyId), eq(tournaments.slug, tourneyId))
+            : eq(tournaments.slug, tourneyId);
+          const rows = await db
+            .select()
+            .from(tournaments)
+            .where(revealCond);
+          if (rows.length === 0) return sendError(res, 404, 'Tournament not found');
+          const encrypted = rows[0].adminPinEncrypted;
+          let plaintextPin: string | null = null;
+          if (encrypted) {
+            try {
+              plaintextPin = decryptPin(encrypted);
+            } catch {
+              plaintextPin = null;
+            }
+          }
+          return sendJson(res, 200, { pin: plaintextPin });
+        }
+
         // POST /api/tournaments/:id/qualifiers
         if (subAction === 'qualifiers' && method === 'POST') {
+          if (!checkAuth(req, res, 'TOURNAMENT_ADMIN', tourneyId)) return;
           await submitQualifierScore(tourneyId, body.playerId, body.score);
           const t = await getFullTournament(tourneyId);
           if (t && !t.isLocked) {
@@ -271,6 +536,7 @@ export function createApiMiddleware() {
 
         // POST /api/tournaments/:id/qualifiers/batch
         if (subAction === 'qualifiers/batch' && method === 'POST') {
+          if (!checkAuth(req, res, 'TOURNAMENT_ADMIN', tourneyId)) return;
           await submitQualifiersBatch(tourneyId, body.submissions || body);
           const t = await getFullTournament(tourneyId);
           if (t && !t.isLocked) {
@@ -281,8 +547,9 @@ export function createApiMiddleware() {
           return sendJson(res, 201, t);
         }
 
-        // DELETE /api/tournaments/:id/qualifiers
+        // DELETE /api/tournaments/:id/qualifiers (Destructive clear - Master Admin only!)
         if (subAction === 'qualifiers' && method === 'DELETE') {
+          if (!checkAuth(req, res, 'SYSTEM_ADMIN')) return;
           const t = await getFullTournament(tourneyId);
           if (!t) return sendError(res, 404, 'Tournament not found');
 
@@ -297,8 +564,9 @@ export function createApiMiddleware() {
           return sendJson(res, 200, saved);
         }
 
-        // DELETE /api/tournaments/:id/matches
+        // DELETE /api/tournaments/:id/matches (Destructive clear - Master Admin only!)
         if (subAction === 'matches' && method === 'DELETE') {
+          if (!checkAuth(req, res, 'SYSTEM_ADMIN')) return;
           const t = await getFullTournament(tourneyId);
           if (!t) return sendError(res, 404, 'Tournament not found');
 
@@ -311,8 +579,9 @@ export function createApiMiddleware() {
           return sendJson(res, 200, saved);
         }
 
-        // POST /api/tournaments/:id/clear-all
+        // POST /api/tournaments/:id/clear-all (Destructive wipe - Master Admin only!)
         if (subAction === 'clear-all' && method === 'POST') {
+          if (!checkAuth(req, res, 'SYSTEM_ADMIN')) return;
           const t = await getFullTournament(tourneyId);
           if (!t) return sendError(res, 404, 'Tournament not found');
 
@@ -334,8 +603,9 @@ export function createApiMiddleware() {
           return sendJson(res, 200, saved);
         }
 
-        // POST /api/tournaments/:id/simulate/seed-quals
+        // POST /api/tournaments/:id/simulate/seed-quals (Simulation - Master Admin only!)
         if (subAction === 'simulate/seed-quals' && method === 'POST') {
+          if (!checkAuth(req, res, 'SYSTEM_ADMIN')) return;
           const t = await getFullTournament(tourneyId);
           if (!t) return sendError(res, 404, 'Tournament not found');
 
@@ -363,8 +633,9 @@ export function createApiMiddleware() {
           return sendJson(res, 200, saved);
         }
 
-        // POST /api/tournaments/:id/simulate/full
+        // POST /api/tournaments/:id/simulate/full (Simulation - Master Admin only!)
         if (subAction === 'simulate/full' && method === 'POST') {
+          if (!checkAuth(req, res, 'SYSTEM_ADMIN')) return;
           const t = await getFullTournament(tourneyId);
           if (!t) return sendError(res, 404, 'Tournament not found');
 
@@ -388,6 +659,7 @@ export function createApiMiddleware() {
         // DELETE /api/tournaments/:id/qualifiers/:subId
         const qualDelMatch = subAction.match(/^qualifiers\/([^/]+)$/);
         if (qualDelMatch && method === 'DELETE') {
+          if (!checkAuth(req, res, 'TOURNAMENT_ADMIN', tourneyId)) return;
           const subId = qualDelMatch[1];
           const t = await getFullTournament(tourneyId);
           if (!t) return sendError(res, 404, 'Tournament not found');
@@ -402,6 +674,7 @@ export function createApiMiddleware() {
 
         // POST /api/tournaments/:id/lock
         if (subAction === 'lock' && method === 'POST') {
+          if (!checkAuth(req, res, 'TOURNAMENT_ADMIN', tourneyId)) return;
           const t = await getFullTournament(tourneyId);
           if (!t) return sendError(res, 404, 'Tournament not found');
 
@@ -413,6 +686,7 @@ export function createApiMiddleware() {
 
         // POST /api/tournaments/:id/unlock
         if (subAction === 'unlock' && method === 'POST') {
+          if (!checkAuth(req, res, 'TOURNAMENT_ADMIN', tourneyId)) return;
           const t = await getFullTournament(tourneyId);
           if (!t) return sendError(res, 404, 'Tournament not found');
 
@@ -444,6 +718,7 @@ export function createApiMiddleware() {
 
         // POST /api/tournaments/:id/matches/swap-slots
         if (subAction === 'matches/swap-slots' && method === 'POST') {
+          if (!checkAuth(req, res, 'TOURNAMENT_ADMIN', tourneyId)) return;
           const t = await getFullTournament(tourneyId);
           if (!t) return sendError(res, 404, 'Tournament not found');
 
@@ -482,6 +757,7 @@ export function createApiMiddleware() {
         // PUT /api/tournaments/:id/matches/:matchId/score
         const matchScoreSub = subAction.match(/^matches\/([^/]+)\/score$/);
         if (matchScoreSub && method === 'PUT') {
+          if (!checkAuth(req, res, 'TOURNAMENT_ADMIN', tourneyId)) return;
           const matchId = matchScoreSub[1];
           const t = await getFullTournament(tourneyId);
           if (!t) return sendError(res, 404, 'Tournament not found');
@@ -586,6 +862,7 @@ export function createApiMiddleware() {
         // POST /api/tournaments/:id/matches/:matchId/forfeit
         const matchForfeitSub = subAction.match(/^matches\/([^/]+)\/forfeit$/);
         if (matchForfeitSub && method === 'POST') {
+          if (!checkAuth(req, res, 'TOURNAMENT_ADMIN', tourneyId)) return;
           const matchId = matchForfeitSub[1];
           const t = await getFullTournament(tourneyId);
           if (!t) return sendError(res, 404, 'Tournament not found');
@@ -639,6 +916,7 @@ export function createApiMiddleware() {
         // PUT /api/tournaments/:id/matches/:matchId/best-of
         const matchBestOfSub = subAction.match(/^matches\/([^/]+)\/best-of$/);
         if (matchBestOfSub && method === 'PUT') {
+          if (!checkAuth(req, res, 'TOURNAMENT_ADMIN', tourneyId)) return;
           const matchId = matchBestOfSub[1];
           const t = await getFullTournament(tourneyId);
           if (!t) return sendError(res, 404, 'Tournament not found');

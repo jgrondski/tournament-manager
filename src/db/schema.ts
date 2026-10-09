@@ -66,6 +66,7 @@ export const tournaments = pgTable('tournaments', {
   pointsConfig: jsonb('points_config').$type<Array<{ minScore: number; points: number }>>(),
   qualsClosed: boolean('quals_closed').notNull().default(false),
   isVerified: boolean('is_verified').notNull().default(false),
+  adminPinEncrypted: text('admin_pin_encrypted'),
   metadata: jsonb('metadata').$type<TournamentMetadata>(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
@@ -139,4 +140,11 @@ export const games = pgTable('games', {
   isIntentionalTopout: boolean('is_intentional_topout').notNull().default(false),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
+
+export const systemSettings = pgTable('system_settings', {
+  key: text('key').primaryKey(),
+  value: jsonb('value').$type<Record<string, unknown>>().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 

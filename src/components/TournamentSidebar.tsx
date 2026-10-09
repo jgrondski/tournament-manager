@@ -25,7 +25,11 @@ import {
   Building2,
   Search,
   ExternalLink,
+  KeyRound,
+  LogOut,
 } from 'lucide-react';
+import { usePinAuth } from '../features/auth/AuthContext';
+import { AdminLoginModal } from '../features/auth/AdminLoginModal';
 
 export type SidebarNavView =
   | 'leaderboard'
@@ -159,6 +163,10 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
       : activeTourney?.tiers[0]?.slug);
   const currentOrg = activeTourney?.organizationId ? getOrganizationById(activeTourney.organizationId) : undefined;
 
+  const { isSystemAdmin, canManage, logout } = usePinAuth();
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+  const isAuthorized = slug ? canManage(slug) : isSystemAdmin;
+
   useEffect(() => {
     if (activeTourney?.id) {
       setActiveTournamentId(activeTourney.id);
@@ -166,6 +174,16 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
   }, [activeTourney?.id, setActiveTournamentId]);
 
   const handleLinkClick = (e: React.MouseEvent, url: string) => {
+    if (url.includes('/manage') && !canManage(slug)) {
+      e.preventDefault();
+      setIsAdminModalOpen(true);
+      return;
+    }
+    if ((url === '/organizations' || url === '/players') && !isSystemAdmin) {
+      e.preventDefault();
+      setIsAdminModalOpen(true);
+      return;
+    }
     if (onNavigate) {
       const allowed = onNavigate(url);
       if (allowed === false) {
@@ -225,14 +243,14 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
       key: 'leaderboard' as const,
       label: activeTourney?.seedingMethod === 'MANUAL' ? 'Seeding' : 'Qualifiers',
       icon: BarChart3,
-      to: slug ? `/${slug}/manage/qualifiers` : '/',
+      to: slug ? (isAuthorized ? `/${slug}/manage/qualifiers` : `/${slug}/leaderboard`) : '/',
       badge: null,
     },
     {
       key: 'standings' as const,
       label: 'Standings',
       icon: Trophy,
-      to: slug ? `/${slug}/manage/standings` : '/',
+      to: slug ? (isAuthorized ? `/${slug}/manage/standings` : `/${slug}/standings`) : '/',
       badge: null,
     },
     {
@@ -240,13 +258,17 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
       label: 'Master Sheet',
       icon: Sheet,
       to: slug ? (currentTierSlug ? `/${slug}/manage/sheet?tier=${currentTierSlug}` : `/${slug}/manage/sheet`) : '/',
-      badge: null,
+      badge: !isAuthorized ? '🔒' : null,
     },
     {
       key: 'bracket' as const,
       label: 'Brackets',
       icon: GitBranch,
-      to: slug ? (currentTierSlug ? `/${slug}/manage/bracket/${currentTierSlug}` : `/${slug}/manage/bracket`) : '/',
+      to: slug
+        ? isAuthorized
+          ? (currentTierSlug ? `/${slug}/manage/bracket/${currentTierSlug}` : `/${slug}/manage/bracket`)
+          : (currentTierSlug ? `/${slug}/${currentTierSlug}` : `/${slug}/brackets`)
+        : '/',
       badge: activeTourney?.tiers.length ? `${activeTourney.tiers.length} Tiers` : null,
     },
     {
@@ -254,7 +276,7 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
       label: 'Floor Judge',
       icon: Scale,
       to: slug ? (currentTierSlug ? `/${slug}/manage/judge?tier=${currentTierSlug}` : `/${slug}/manage/judge`) : '/',
-      badge: null,
+      badge: !isAuthorized ? '🔒' : null,
     },
     {
       key: 'obs' as const,
@@ -268,14 +290,14 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
       label: 'Players',
       icon: Users,
       to: slug ? `/${slug}/manage/players` : '/',
-      badge: activeTourney?.playersPool?.length ? String(activeTourney.playersPool.length) : null,
+      badge: !isAuthorized ? '🔒' : (activeTourney?.playersPool?.length ? String(activeTourney.playersPool.length) : null),
     },
     {
       key: 'settings' as const,
       label: 'Settings',
       icon: Settings,
       to: slug ? `/${slug}/manage/settings` : '/',
-      badge: null,
+      badge: !isAuthorized ? '🔒' : null,
     },
   ];
 
@@ -988,63 +1010,135 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
             )}
           </Link>
 
-          {/* Organizations Directory */}
-          <Link
-            to="/organizations"
-            onClick={e => handleLinkClick(e, '/organizations')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.65rem',
-              padding: isCollapsed ? '0.55rem 0' : '0.45rem 0.75rem',
-              justifyContent: isCollapsed ? 'center' : 'flex-start',
-              borderRadius: 'var(--radius-sm)',
-              fontSize: '0.8rem',
-              fontWeight: activeView === 'organizations' ? 700 : 500,
-              color: activeView === 'organizations' ? 'var(--color-gold-bright)' : 'var(--color-text-secondary)',
-              background: activeView === 'organizations' ? 'var(--color-gold-bg)' : 'transparent',
-              borderLeft: activeView === 'organizations' ? '3px solid var(--color-gold-bright)' : '3px solid transparent',
-              textDecoration: 'none',
-              transition: 'background 0.12s ease, color 0.12s ease',
-            }}
-            title="Organizations Directory"
-          >
-            <Building2 size={16} style={{ flexShrink: 0 }} />
-            {!isCollapsed && (
-              <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                Organizations
-              </span>
-            )}
-          </Link>
+          {/* Organizations Directory (System Admin Only) */}
+          {isSystemAdmin && (
+            <Link
+              to="/organizations"
+              onClick={e => handleLinkClick(e, '/organizations')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.65rem',
+                padding: isCollapsed ? '0.55rem 0' : '0.45rem 0.75rem',
+                justifyContent: isCollapsed ? 'center' : 'flex-start',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '0.8rem',
+                fontWeight: activeView === 'organizations' ? 700 : 500,
+                color: activeView === 'organizations' ? 'var(--color-gold-bright)' : 'var(--color-text-secondary)',
+                background: activeView === 'organizations' ? 'var(--color-gold-bg)' : 'transparent',
+                borderLeft: activeView === 'organizations' ? '3px solid var(--color-gold-bright)' : '3px solid transparent',
+                textDecoration: 'none',
+                transition: 'background 0.12s ease, color 0.12s ease',
+              }}
+              title="Organizations Directory"
+            >
+              <Building2 size={16} style={{ flexShrink: 0 }} />
+              {!isCollapsed && (
+                <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  Organizations
+                </span>
+              )}
+            </Link>
+          )}
 
-          {/* Global Player Pool */}
-          <Link
-            to="/players"
-            onClick={e => handleLinkClick(e, '/players')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.65rem',
-              padding: isCollapsed ? '0.55rem 0' : '0.45rem 0.75rem',
-              justifyContent: isCollapsed ? 'center' : 'flex-start',
-              borderRadius: 'var(--radius-sm)',
-              fontSize: '0.8rem',
-              fontWeight: activeView === 'globalPlayers' ? 700 : 500,
-              color: activeView === 'globalPlayers' ? 'var(--color-gold-bright)' : 'var(--color-text-secondary)',
-              background: activeView === 'globalPlayers' ? 'var(--color-gold-bg)' : 'transparent',
-              borderLeft: activeView === 'globalPlayers' ? '3px solid var(--color-gold-bright)' : '3px solid transparent',
-              textDecoration: 'none',
-              transition: 'background 0.12s ease, color 0.12s ease',
-            }}
-            title="Global Master Player Pool"
-          >
-            <Globe2 size={16} style={{ flexShrink: 0 }} />
-            {!isCollapsed && (
-              <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                Global Players
-              </span>
+          {/* Global Player Pool (System Admin Only) */}
+          {isSystemAdmin && (
+            <Link
+              to="/players"
+              onClick={e => handleLinkClick(e, '/players')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.65rem',
+                padding: isCollapsed ? '0.55rem 0' : '0.45rem 0.75rem',
+                justifyContent: isCollapsed ? 'center' : 'flex-start',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '0.8rem',
+                fontWeight: activeView === 'globalPlayers' ? 700 : 500,
+                color: activeView === 'globalPlayers' ? 'var(--color-gold-bright)' : 'var(--color-text-secondary)',
+                background: activeView === 'globalPlayers' ? 'var(--color-gold-bg)' : 'transparent',
+                borderLeft: activeView === 'globalPlayers' ? '3px solid var(--color-gold-bright)' : '3px solid transparent',
+                textDecoration: 'none',
+                transition: 'background 0.12s ease, color 0.12s ease',
+              }}
+              title="Global Player Pool"
+            >
+              <Globe2 size={16} style={{ flexShrink: 0 }} />
+              {!isCollapsed && (
+                <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  Global Players
+                </span>
+              )}
+            </Link>
+          )}
+
+          {/* Admin Role Status / Log Out / Admin Login Shortcut */}
+          <div style={{ marginTop: '0.4rem', borderTop: '1px solid var(--color-border-subtle)', paddingTop: '0.4rem' }}>
+            {isAuthorized ? (
+              <button
+                type="button"
+                onClick={() => {
+                  logout();
+                  if (window.location.pathname.includes('/manage')) {
+                    navigate(slug ? `/${slug}/brackets` : '/');
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.65rem',
+                  padding: isCollapsed ? '0.55rem 0' : '0.45rem 0.75rem',
+                  justifyContent: isCollapsed ? 'center' : 'flex-start',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  color: isSystemAdmin ? '#38bdf8' : 'var(--color-gold-bright)',
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+                title={`Logged in as ${isSystemAdmin ? 'System Admin' : 'Tournament Admin'}. Click to Log Out.`}
+              >
+                <LogOut size={16} style={{ flexShrink: 0 }} />
+                {!isCollapsed && (
+                  <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    Log Out ({isSystemAdmin ? 'System' : 'Admin'})
+                  </span>
+                )}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsAdminModalOpen(true)}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.65rem',
+                  padding: isCollapsed ? '0.55rem 0' : '0.45rem 0.75rem',
+                  justifyContent: isCollapsed ? 'center' : 'flex-start',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  color: 'var(--color-text-secondary)',
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+                title="Unlock administration with PIN"
+              >
+                <KeyRound size={16} color="var(--color-gold-bright)" style={{ flexShrink: 0 }} />
+                {!isCollapsed && (
+                  <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    Admin Access
+                  </span>
+                )}
+              </button>
             )}
-          </Link>
+          </div>
 
           {/* Collapse / Expand Toggle Button */}
           <button
@@ -1074,6 +1168,17 @@ export const TournamentSidebar: React.FC<TournamentSidebarProps> = ({
           </button>
         </div>
       </aside>
+
+      {/* Admin Login Modal */}
+      <AdminLoginModal
+        isOpen={isAdminModalOpen}
+        onClose={() => setIsAdminModalOpen(false)}
+        tournamentSlugOrId={slug}
+        tournamentName={activeTourney?.name}
+        onSuccess={() => {
+          if (slug) navigate(`/${slug}/manage/qualifiers`);
+        }}
+      />
 
       {/* Verification / Lock Modal */}
       {activeTourney && (

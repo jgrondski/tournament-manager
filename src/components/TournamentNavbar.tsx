@@ -21,7 +21,11 @@ import {
   Sheet,
   Scale,
   GitBranch,
+  KeyRound,
+  LogOut,
 } from 'lucide-react';
+import { usePinAuth } from '../features/auth/AuthContext';
+import { AdminLoginModal } from '../features/auth/AdminLoginModal';
 
 interface TournamentNavbarProps {
   tournament: Tournament;
@@ -47,6 +51,10 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [obsSearchTerm, setObsSearchTerm] = useState('');
   const [selectedChroma, setSelectedChroma] = useState<'none' | 'green' | 'magenta' | 'blue'>('none');
+
+  const { isSystemAdmin, canManage, logout } = usePinAuth();
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+  const isAuthorized = canManage(tournament.slug);
 
   const storedTierSlug = tournament?.slug ? getStoredTierSlug(tournament.slug) : null;
   const currentTierSlug =
@@ -76,6 +84,11 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
   };
 
   const handleLinkClick = (e: React.MouseEvent, url: string) => {
+    if (url.includes('/manage') && !canManage(tournament.slug)) {
+      e.preventDefault();
+      setIsAdminModalOpen(true);
+      return;
+    }
     if (onNavigate) {
       const allowed = onNavigate(url);
       if (allowed === false) {
@@ -241,17 +254,19 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
             </Link>
           )}
 
-          {/* Global Players Button (Directly next to Tournament Switcher dropdown) */}
-          <Link
-            to="/players"
-            onClick={e => handleLinkClick(e, '/players')}
-            className="btn btn-secondary"
-            title="Open Global Player Pool Directory"
-            style={{ fontSize: '0.74rem', padding: '0.28rem 0.55rem', gap: '0.35rem' }}
-          >
-            <Users size={13} color="var(--color-gold-bright)" />
-            <span>Players</span>
-          </Link>
+          {/* Global Players Button (Strictly restricted to System Admin) */}
+          {isSystemAdmin && (
+            <Link
+              to="/players"
+              onClick={e => handleLinkClick(e, '/players')}
+              className="btn btn-secondary"
+              title="Open Global Player Pool Directory"
+              style={{ fontSize: '0.74rem', padding: '0.28rem 0.55rem', gap: '0.35rem' }}
+            >
+              <Users size={13} color="var(--color-gold-bright)" />
+              <span>Players</span>
+            </Link>
+          )}
         </div>
 
         {/* Right Side: Mode Pill Chip, Bracket Views Group, and All OBS Overlays */}
@@ -572,6 +587,56 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
               </div>
             )}
           </div>
+
+          {/* Admin Role Badge / Lock Button / Admin Access Button */}
+          {isAuthorized ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span
+                style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  padding: '0.22rem 0.55rem',
+                  borderRadius: 'var(--radius-full)',
+                  background: isSystemAdmin ? 'rgba(56, 189, 248, 0.18)' : 'rgba(245, 158, 11, 0.18)',
+                  border: isSystemAdmin ? '1px solid rgba(56, 189, 248, 0.4)' : '1px solid rgba(245, 158, 11, 0.4)',
+                  color: isSystemAdmin ? '#38bdf8' : 'var(--color-gold-bright)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.3rem',
+                }}
+                title={isSystemAdmin ? 'System Administrator' : 'Tournament Administrator'}
+              >
+                <KeyRound size={11} />
+                <span>{isSystemAdmin ? 'System Admin' : 'Admin'}</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  logout();
+                  if (window.location.pathname.includes('/manage')) {
+                    navigate(`/${tournament.slug}/brackets`);
+                  }
+                }}
+                className="btn btn-secondary"
+                title="Log out of Admin and reset to public spectator"
+                style={{ fontSize: '0.74rem', padding: '0.28rem 0.55rem', gap: '0.3rem' }}
+              >
+                <LogOut size={12} />
+                <span>Log Out</span>
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsAdminModalOpen(true)}
+              className="btn btn-secondary"
+              title="Unlock tournament administration using PIN"
+              style={{ fontSize: '0.74rem', padding: '0.28rem 0.55rem', gap: '0.3rem' }}
+            >
+              <KeyRound size={12} color="var(--color-gold-bright)" />
+              <span>Admin Access</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -714,6 +779,17 @@ export const TournamentNavbar: React.FC<TournamentNavbarProps> = ({
         isOpen={isVerifyModalOpen}
         onClose={() => setIsVerifyModalOpen(false)}
         tournament={tournament}
+      />
+
+      {/* Admin Login PIN Modal */}
+      <AdminLoginModal
+        isOpen={isAdminModalOpen}
+        onClose={() => setIsAdminModalOpen(false)}
+        tournamentSlugOrId={tournament.slug}
+        tournamentName={tournament.name}
+        onSuccess={() => {
+          navigate(`/${tournament.slug}/manage/qualifiers`);
+        }}
       />
     </header>
   );

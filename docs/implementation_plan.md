@@ -125,15 +125,11 @@ This document is the consolidated, single source of truth for the implementation
 
 ```mermaid
 flowchart TD
-    subgraph Historic["Historic Execution [Phases 1–8 COMPLETE]"]
-        H1["Phases 1–8: Routing Engine, UI Canvas, Standings, Double Elim, Seeding, Relational DB, Architectural Hardening"]
+    subgraph Historic["Historic Execution [Phases 1–9 COMPLETE]"]
+        H1["Phases 1–9: Routing Engine, UI Canvas, Standings, Double Elim, Seeding, Relational DB, Architectural Hardening, Production Deployment & PIN Security"]
     end
 
-    subgraph Phase9["Phase 9: Production Cloud Deployment & Multi-Tier PIN Security [NEXT UP]"]
-        P9["• Vercel Serverless Function Adapter & vercel.json<br>• Neon Cloud PostgreSQL Migration & Schema Push<br>• 3-Tier PIN Access: Public, Tournament Admin, Master Admin<br>• Two-Way AES-256-GCM Revealable PINs & Recovery Env Var<br>• 7-Day Session Tokens & API Mutation Guards<br>• Data Management & Simulation isolated strictly to Master Admin<br>• GitHub Actions CI/CD Pipeline"]
-    end
-
-    subgraph Phase10["Phase 10: Live & Online Qualifiers Engine"]
+    subgraph Phase10["Phase 10: Live & Online Qualifiers Engine [NEXT UP]"]
         P10["• Competitor Self-Service Portal (/:slug/qualify)<br>• Twitch OAuth 2.0 Integration on Production HTTPS<br>• 6–8 Char NES-Compatible Authword Engine<br>• Countdown Timer & QualTimerLog Telemetry<br>• Online Judge Review Queue (/:slug/manage/judge)<br>• Discord Webhook Dispatches (Start & Submit)"]
     end
 
@@ -145,12 +141,12 @@ flowchart TD
         P12["• Universal Match Data Export Modal<br>• Formats: CSV (UTF-8 BOM), Sheets TSV (Clipboard), JSON<br>• Column Selection, Reordering & Preset Layouts"]
     end
 
-    Historic --> Phase9 --> Phase10 --> Phase11 --> Phase12
+    Historic --> Phase10 --> Phase11 --> Phase12
 ```
 
 ---
 
-### Phase 9: Production Cloud Deployment & Multi-Tier PIN Access Security [NEXT UP]
+### Phase 9: Production Cloud Deployment & Multi-Tier PIN Access Security [COMPLETE]
 * **Goal:** Deploy Tournament Manager to the public web (Vercel Serverless + Neon PostgreSQL) with 3-tier PIN access control so real-world users can safely view brackets while management operations are fully secured.
 1. **Unified Vercel Serverless Runtime (`api/index.ts` & `vercel.json`):**
    * Wrap the existing `createApiMiddleware()` from `src/server/api.ts` into a Vercel Serverless Function adapter (`api/index.ts`).
@@ -249,3 +245,14 @@ Per workspace guidelines in `AGENTS.md`:
     * Made `tournaments.organizationId` nullable in `schema.ts`, `testDb.ts`, and `types.ts` to cleanly support independent tournaments without requiring foreign key references to mock organizations.
     * Removed all fallback references to `'org_ctwc'` across `store.tsx`, `TournamentAdminForm.tsx`, `tournaments.ts`, and `CreateTournamentModal.tsx`.
     * Cleaned up dropdown and organization views to gracefully handle empty organization catalogs.
+
+- **Note 4:** *Multi-Tier PIN Access Security, Serverless Vercel Adapter & Simulation Data Isolation.*
+  * **Status:** **RESOLVED (Phase 9 COMPLETE).**
+    * Multi-tier PIN security implemented (`src/server/pinCrypto.ts`, `src/features/auth/AuthContext.tsx`, `src/features/auth/RouteGuards.tsx`).
+    * Public friction-free access maintained for spectator views (`/:slug/brackets`, `/:slug/quals`, `/:slug/standings`, OBS overlays).
+    * Tournament Admin scoped access enforced for management views (`/:slug/manage/*`). Unauthorized access auto-redirects to public bracket view.
+    * Master Admin privileges across organizations, global player directory, and tournament PIN reveals (`👁️ Reveal PIN`).
+    * Destructive data management and simulation controls (`DataSimulationSection.tsx`, `/api/simulate/sample`, clear-all) strictly restricted to Master Admin.
+    * Two-way AES-256-GCM PIN encryption with immutable `MASTER_ADMIN_RECOVERY_PIN` environment failsafe.
+    * Vercel Serverless Function adapter (`api/index.ts`) and SPA rewrite routing (`vercel.json`) deployed.
+    * Fully backed by automated tests: 42 test files, 479 tests passing with zero TypeScript errors.

@@ -16,6 +16,7 @@ import {
   saveFullTournament,
 } from '../tournaments';
 import { createApiMiddleware } from '../../server/api';
+import { createSessionToken } from '../../server/pinCrypto';
 import { runFullSimulation } from '../../features/tournament/simulation';
 import type { PlayerProfile, Tournament } from '../../features/tournament/types';
 
@@ -55,6 +56,9 @@ describe('Tournament Creation & Schema Regression Tests', () => {
     const req: any = {
       url,
       method,
+      headers: {
+        authorization: `Bearer ${createSessionToken({ role: 'SYSTEM_ADMIN' })}`,
+      },
       body,
       on: (event: string, callback: any) => {
         if (event === 'data' && body) {
